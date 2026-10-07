@@ -1,6 +1,30 @@
 package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.theme.AccentChoices
+import im.flume.hearth.ui.theme.AccentDeep
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +71,46 @@ private val BITRATES = listOf(0 to "Original quality", 320 to "320 kbps", 256 to
 private val CACHE_SIZES = listOf(512 to "512 MB", 1024 to "1 GB", 2048 to "2 GB", 4096 to "4 GB", 8192 to "8 GB")
 
 @Composable
+private fun SettingsPage(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Row(Modifier.statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
+            BackButton()
+            Text(title, style = MaterialTheme.typography.titleLarge)
+        }
+        content()
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** Settings home: three groups, each its own page. */
+@Composable
 fun SettingsScreen() {
+    val actions = LocalActions.current
+    SettingsPage("Settings") {
+        listOf(
+            Triple("General", "Account, library, streaming, updates", Icons.Outlined.Settings) to "settings/general",
+            Triple("Storage", "Downloads, cache, offline mode", Icons.Outlined.Storage) to "settings/storage",
+            Triple("Appearance", "Accent colour, lyrics", Icons.Outlined.Palette) to "settings/appearance",
+        ).forEach { (row, route) ->
+            val (title, subtitle, icon) = row
+            Row(
+                Modifier.fillMaxWidth().clickable { actions.open(route) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, null, tint = Accent)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title)
+                    Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+fun GeneralSettings() {
     val c = LocalContext.current.container
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -55,16 +118,9 @@ fun SettingsScreen() {
     val creds by c.session.credentials.collectAsStateWithLifecycle()
     val songCount by remember { c.db.library().songCount() }.collectAsStateWithLifecycle(0)
     val sync by c.sync.state.collectAsStateWithLifecycle()
-    val downloadedBytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
     var confirmLogout by remember { mutableStateOf(false) }
-    var cacheBytes by remember { mutableStateOf(-1L) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Row(Modifier.statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
-            BackButton()
-            Text("Settings", style = MaterialTheme.typography.titleLarge)
-        }
-
+    SettingsPage("General") {
         Section("App")
         UpdateSettingsRow()
 
@@ -86,38 +142,11 @@ fun SettingsScreen() {
             "Lower qualities are converted on the server, so seeking within a song that isn't cached yet can be slower.",
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
-        Choice("Streaming cache size", settings.cacheSizeMb, CACHE_SIZES) { v -> c.session.updateSettings { it.copy(cacheSizeMb = v) } }
-        Clickable(
-            title = "Clear streaming cache",
-            subtitle = if (cacheBytes >= 0) "Cleared" else "Takes effect immediately; downloads are kept",
-        ) {
-            scope.launch {
-                withContext(Dispatchers.IO) {
-                    c.mediaCache.keys.toList().forEach { c.mediaCache.removeResource(it) }
-                }
-                cacheBytes = 0
-            }
-        }
-
-        Section("Downloads")
-        Info("Space used", formatBytes(downloadedBytes))
-        Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } }
-        Toggle("Download on Wi-Fi only", settings.wifiOnlyDownloads) { v ->
-            c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
-            c.downloads.schedule()
-        }
-        Toggle("Offline mode", settings.offlineMode, "Only play downloaded songs, even with a connection") { v ->
-            c.session.updateSettings { it.copy(offlineMode = v) }
-        }
 
         Section("")
         Clickable("Sign out", "Removes downloads and the library index from this phone", color = MaterialTheme.colorScheme.error) {
             confirmLogout = true
         }
-        Text(
-            "Cache size changes apply after the app restarts",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(16.dp),
-        )
     }
 
     if (confirmLogout) {
@@ -140,6 +169,114 @@ fun SettingsScreen() {
             },
             dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+fun StorageSettings() {
+    val c = LocalContext.current.container
+    val scope = rememberCoroutineScope()
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val downloadedBytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    var cacheCleared by remember { mutableStateOf(false) }
+    var confirmRemoveAll by remember { mutableStateOf(false) }
+
+    SettingsPage("Storage") {
+        Section("Downloads")
+        Info("Space used", formatBytes(downloadedBytes))
+        Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } }
+        Toggle("Download on Wi-Fi only", settings.wifiOnlyDownloads) { v ->
+            c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
+            c.downloads.schedule()
+        }
+        Toggle("Offline mode", settings.offlineMode, "Only play downloaded songs, even with a connection") { v ->
+            c.session.updateSettings { it.copy(offlineMode = v) }
+        }
+        if (downloadedBytes > 0) {
+            Clickable("Remove all downloads", color = MaterialTheme.colorScheme.error) { confirmRemoveAll = true }
+        }
+
+        Section("Streaming cache")
+        Choice("Cache size", settings.cacheSizeMb, CACHE_SIZES) { v -> c.session.updateSettings { it.copy(cacheSizeMb = v) } }
+        Clickable(
+            title = "Clear streaming cache",
+            subtitle = if (cacheCleared) "Cleared" else "Recently played songs kept for instant replay. Downloads aren't affected.",
+        ) {
+            scope.launch {
+                withContext(Dispatchers.IO) { c.mediaCache.keys.toList().forEach { c.mediaCache.removeResource(it) } }
+                cacheCleared = true
+            }
+        }
+        Text(
+            "Cache size changes apply after the app restarts.",
+            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+
+    if (confirmRemoveAll) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoveAll = false },
+            title = { Text("Remove all downloads?") },
+            text = { Text("Everything downloaded to this phone will be deleted. You can download it again later.") },
+            confirmButton = {
+                TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AppearanceSettings() {
+    val c = LocalContext.current.container
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+
+    SettingsPage("Appearance") {
+        Section("Accent colour")
+        FlowRow(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            AccentChoices.forEach { (name, argb) ->
+                val selected = settings.accent == argb.toInt()
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color(argb))
+                            .border(if (selected) 3.dp else 0.dp, Color.White, CircleShape)
+                            .clickable { c.session.updateSettings { it.copy(accent = argb.toInt()) } },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (selected) Icon(Icons.Default.Check, name, tint = Color.Black)
+                    }
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) Color.White else TextSecondary)
+                }
+            }
+        }
+
+        Section("Lyrics")
+        Choice("Text size", settings.lyricsSize, listOf(0 to "Small", 1 to "Medium", 2 to "Large", 3 to "Extra large")) { v ->
+            c.session.updateSettings { it.copy(lyricsSize = v) }
+        }
+        Choice("Line spacing", settings.lyricsSpacing, listOf(0 to "Compact", 1 to "Normal", 2 to "Relaxed")) { v ->
+            c.session.updateSettings { it.copy(lyricsSpacing = v) }
+        }
+        // Live preview of the lyric style.
+        val size = LYRIC_SIZES.getOrElse(settings.lyricsSize) { 22 }.sp
+        val gap = LYRIC_GAPS.getOrElse(settings.lyricsSpacing) { 8 }.dp
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(8.dp)).background(AccentDeep).padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            listOf("Here's how your lyrics" to 0.45f, "will look while a song" to 1f, "is playing" to 0.35f).forEach { (line, alpha) ->
+                Text(line, fontSize = size, lineHeight = size * 1.25f, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = alpha), modifier = Modifier.padding(vertical = gap))
+            }
+        }
     }
 }
 

@@ -15,6 +15,12 @@ data class Settings(
     val wifiOnlyDownloads: Boolean = true,
     val cacheSizeMb: Int = 2048,
     val offlineMode: Boolean = false,
+    /** ARGB of the app's accent colour. */
+    val accent: Int = 0xFFFF8A3D.toInt(),
+    /** 0 = small, 1 = medium, 2 = large, 3 = extra large */
+    val lyricsSize: Int = 1,
+    /** 0 = compact, 1 = normal, 2 = relaxed */
+    val lyricsSpacing: Int = 1,
 )
 
 /** Login and preferences. Lives in private app storage; only the Subsonic token is kept, never the password. */
@@ -66,6 +72,9 @@ class SessionStore(context: Context) {
         wifiOnlyDownloads = prefs.getBoolean("wifiOnlyDownloads", true),
         cacheSizeMb = prefs.getInt("cacheSizeMb", 2048),
         offlineMode = prefs.getBoolean("offlineMode", false),
+        accent = prefs.getInt("accent", 0xFFFF8A3D.toInt()),
+        lyricsSize = prefs.getInt("lyricsSize", 1),
+        lyricsSpacing = prefs.getInt("lyricsSpacing", 1),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -77,6 +86,9 @@ class SessionStore(context: Context) {
             putBoolean("wifiOnlyDownloads", s.wifiOnlyDownloads)
             putInt("cacheSizeMb", s.cacheSizeMb)
             putBoolean("offlineMode", s.offlineMode)
+            putInt("accent", s.accent)
+            putInt("lyricsSize", s.lyricsSize)
+            putInt("lyricsSpacing", s.lyricsSpacing)
         }
         _settings.value = s
     }

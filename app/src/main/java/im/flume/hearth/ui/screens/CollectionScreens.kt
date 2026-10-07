@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +95,22 @@ fun CollectionScreen(
     val anyDownloading = songs.any { downloads[it.id] == DownloadState.QUEUED || downloads[it.id] == DownloadState.DOWNLOADING }
     val doneCount = songs.count { downloads[it.id] == DownloadState.DONE }
     val headerColor = rememberCoverColor(cover)
+    var confirmCancel by remember { mutableStateOf(false) }
+    if (confirmCancel) {
+        AlertDialog(
+            onDismissRequest = { confirmCancel = false },
+            title = { Text("Stop downloading?") },
+            text = { Text("This removes \"$title\" from your downloads, including songs that already finished.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCancel = false
+                    if (pin != null) c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
+                    else actions.removeDownload(songs.map { it.id })
+                }) { Text("Stop") }
+            },
+            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("Keep downloading") } },
+        )
+    }
     val totalSec = songs.sumOf { it.durationSec.toLong() }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -124,6 +143,7 @@ fun CollectionScreen(
                         progress = if (anyDownloading) doneCount.toFloat() / songs.size.coerceAtLeast(1) else null,
                     ) {
                         when {
+                            anyDownloading -> confirmCancel = true
                             pin != null && (isPinned || allDownloaded) -> c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
                             pin != null -> c.downloads.pinAndDownload(pin.kind, pin.id, songs)
                             allDownloaded -> actions.removeDownload(songs.map { it.id })
@@ -161,6 +181,7 @@ fun AlbumScreen(id: String) {
         pin = PinTarget(DownloadRepository.KIND_ALBUM, id),
         showTrackNumbers = true,
         extraContent = {
+            item { AlbumDetails(a, id, songs.size, songs.sumOf { it.durationSec.toLong() }) }
             a?.artistId?.let { artistId ->
                 item {
                     TextButton(onClick = { actions.openArtist(artistId) }, modifier = Modifier.padding(horizontal = 8.dp)) {
@@ -231,6 +252,7 @@ fun ArtistScreen(id: String) {
                 SongRow(s, onClick = { actions.play(source, startSongId = s.id) })
             }
         }
+        item { ArtistAbout(id) }
     }
 }
 

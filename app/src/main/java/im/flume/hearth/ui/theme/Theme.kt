@@ -4,21 +4,39 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-val Accent = Color(0xFFFF8A3D)
+/** The user's chosen accent colour. Reading it inside composition recomposes when it changes. */
+val accentState = mutableStateOf(Color(0xFFFF8A3D))
+val Accent: Color get() = accentState.value
+
+/** Deep tint of the accent, used for the mini player and default page backgrounds. */
+val AccentDeep: Color get() = lerp(Accent, Color.Black, 0.72f)
+
+val AccentChoices = listOf(
+    "Ember" to 0xFFFF8A3D,
+    "Green" to 0xFF1ED760,
+    "Blue" to 0xFF4A9DFF,
+    "Purple" to 0xFFB283FF,
+    "Pink" to 0xFFFF6FA5,
+    "Red" to 0xFFFF5A5A,
+    "Teal" to 0xFF2EC4B6,
+    "Gold" to 0xFFFFC53D,
+)
 val Background = Color(0xFF121212)
 val Surface = Color(0xFF1C1C1C)
 val SurfaceHigh = Color(0xFF282828)
 val TextSecondary = Color(0xFFB3B3B3)
 
-private val Colors = darkColorScheme(
-    primary = Accent,
+private fun colors(accent: Color) = darkColorScheme(
+    primary = accent,
     onPrimary = Color.Black,
-    secondary = Accent,
+    secondary = accent,
     background = Background,
     onBackground = Color.White,
     surface = Background,
@@ -44,5 +62,5 @@ private val Type = Typography(
 
 @Composable
 fun HearthTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Colors, typography = Type, content = content)
+    MaterialTheme(colorScheme = colors(Accent), typography = Type, content = content)
 }

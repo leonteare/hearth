@@ -149,6 +149,11 @@ class SubsonicClient(
             addQueryParameter("title", title)
         }.lyrics?.value?.takeIf { it.isNotBlank() }
 
+    suspend fun artistInfo(id: String): ArtistInfo? =
+        call("getArtistInfo2") { addQueryParameter("id", id); addQueryParameter("count", "12") }.artistInfo2
+
+    suspend fun albumInfo(id: String): AlbumInfo? = call("getAlbumInfo2") { addQueryParameter("id", id) }.albumInfo
+
     suspend fun star(songId: String) { call("star") { addQueryParameter("id", songId) } }
 
     suspend fun unstar(songId: String) { call("unstar") { addQueryParameter("id", songId) } }

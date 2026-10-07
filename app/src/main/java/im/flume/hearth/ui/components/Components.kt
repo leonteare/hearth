@@ -34,7 +34,11 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -153,7 +157,7 @@ fun SongRow(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (dl) {
-                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(14.dp), tint = Accent)
+                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = Accent)
                     DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, null, Modifier.size(14.dp), tint = TextSecondary)
                     else -> {}
                 }
@@ -179,6 +183,7 @@ fun SongRow(
 fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit) {
     val actions = LocalActions.current
     val dl = LocalRowContext.current.downloads[song.id]
+    var info by remember { mutableStateOf(false) }
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         MenuItem("Play next", Icons.AutoMirrored.Filled.QueueMusic) { actions.playNext(listOf(song.id)); onDismiss() }
         MenuItem("Add to queue", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToQueue(listOf(song.id)); onDismiss() }
@@ -186,14 +191,48 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit) {
             if (song.starred) "Remove from Liked Songs" else "Add to Liked Songs",
             if (song.starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
         ) { actions.setStarred(song.id, !song.starred); onDismiss() }
-        if (dl == null) {
-            MenuItem("Download", Icons.Outlined.ArrowCircleDown) { actions.download(listOf(song)); onDismiss() }
-        } else {
-            MenuItem("Remove download", Icons.Default.CheckCircle) { actions.removeDownload(listOf(song.id)); onDismiss() }
+        when (dl) {
+            null -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) { actions.download(listOf(song)); onDismiss() }
+            DownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) { actions.removeDownload(listOf(song.id)); onDismiss() }
+            else -> MenuItem("Cancel download", Icons.Default.Close) { actions.removeDownload(listOf(song.id)); onDismiss() }
         }
         song.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { actions.openAlbum(id); onDismiss() } }
         song.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { actions.openArtist(id); onDismiss() } }
+        MenuItem("Song info", Icons.Outlined.Info) { info = true; onDismiss() }
     }
+    if (info) SongInfoDialog(song, onDismiss = { info = false })
+}
+
+/** Details for the curious: format, quality, size, play count. */
+@Composable
+fun SongInfoDialog(song: SongEntity, onDismiss: () -> Unit) {
+    val kbps = if (song.durationSec > 0 && song.sizeBytes > 0) song.sizeBytes * 8 / 1000 / song.durationSec else null
+    val rows = listOfNotNull(
+        "Album" to song.album,
+        "Artist" to song.artist,
+        song.track.takeIf { it > 0 }?.let { "Track" to (if (song.disc > 1) "Disc ${song.disc}, track $it" else "$it") },
+        song.year?.let { "Year" to it.toString() },
+        song.genre?.let { "Genre" to it },
+        "Length" to formatDuration(song.durationSec.toLong()),
+        song.suffix?.let { "Format" to it.uppercase() + (kbps?.let { k -> " · ~$k kbps" } ?: "") },
+        song.sizeBytes.takeIf { it > 0 }?.let { "File size" to formatBytes(it) },
+        "Plays" to song.playCount.toString(),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text(song.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                rows.forEach { (label, value) ->
+                    Row {
+                        Text(label, color = TextSecondary, modifier = Modifier.width(88.dp))
+                        Text(value)
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable

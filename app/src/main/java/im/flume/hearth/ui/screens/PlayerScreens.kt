@@ -50,7 +50,9 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -104,6 +106,8 @@ import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatDuration
 import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.theme.AccentDeep
+import androidx.compose.ui.graphics.lerp
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.Surface
 import im.flume.hearth.ui.theme.SurfaceHigh
@@ -140,7 +144,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF3A2A20))
+            .background(AccentDeep)
             .clickable(onClick = onOpen)
     ) {
         Row(Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -174,7 +178,7 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     val songId = current.mediaId
     val song by remember(songId) { c.db.library().songFlow(songId) }.collectAsStateWithLifecycle(null)
     var showLyrics by rememberSaveable { mutableStateOf(false) }
-    val topColor = rememberCoverColor(state.coverArt)
+    val topColor = rememberCoverColor(state.coverArt, lerp(Accent, Color.Black, 0.6f))
 
     BoxWithConstraints(
         Modifier
@@ -294,7 +298,7 @@ private fun PlayerControls(
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         IconButton(onClick = onToggleLyrics) {
-            Icon(Icons.Default.Lyrics, "Lyrics", tint = if (showLyrics) Accent else Color.White)
+            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, "Lyrics", tint = if (showLyrics) Accent else Color.White)
         }
         IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
     }
@@ -364,7 +368,11 @@ private fun NowPlayingMenu(song: SongEntity?, onClose: () -> Unit) {
 
 @Composable
 private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: Modifier) {
-    val player = LocalContext.current.container.player
+    val c = LocalContext.current.container
+    val player = c.player
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val fontSize = LYRIC_SIZES.getOrElse(settings.lyricsSize) { 22 }.sp
+    val gap = LYRIC_GAPS.getOrElse(settings.lyricsSpacing) { 8 }.dp
     val pos = rememberPosition(state)
     val rows = remember(lyrics) { lyrics.rows() }
     val current = rows.currentIndex(pos)
@@ -382,13 +390,14 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
                     i < current -> 1f
                     else -> 0f
                 }
-                BreakDots(active, progress, Modifier.padding(vertical = 28.dp))
+                BreakDots(active, progress, Modifier.padding(vertical = gap + 20.dp))
             } else {
                 val active = !lyrics.synced || i == current
                 val past = lyrics.synced && i < current
                 Text(
                     row.text,
-                    style = if (lyrics.synced) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
+                    fontSize = if (lyrics.synced) fontSize else fontSize * 0.8f,
+                    lineHeight = (if (lyrics.synced) fontSize else fontSize * 0.8f) * 1.25f,
                     fontWeight = if (lyrics.synced) FontWeight.Bold else FontWeight.Normal,
                     color = when {
                         active -> Color.White
@@ -397,13 +406,21 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = lyrics.synced && row.start != null) { player.seekTo(row.start ?: 0) }
-                        .padding(vertical = if (lyrics.synced) 8.dp else 2.dp),
+                        .clickable(
+                            enabled = lyrics.synced && row.start != null,
+                            interactionSource = null,
+                            indication = null,
+                        ) { player.seekTo(row.start ?: 0) }
+                        .padding(vertical = if (lyrics.synced) gap else gap / 3),
                 )
             }
         }
     }
 }
+
+/** Lyric text sizes (sp) and line gaps (dp) for the Appearance settings. */
+val LYRIC_SIZES = listOf(18, 22, 27, 32)
+val LYRIC_GAPS = listOf(4, 8, 14)
 
 /** Instrumental break: three small dots that slowly fill with white, one after another, until the next line. */
 @Composable

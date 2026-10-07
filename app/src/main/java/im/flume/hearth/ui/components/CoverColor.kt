@@ -38,10 +38,10 @@ import kotlinx.coroutines.withContext
 
 /** A rich but dark-enough colour taken from the cover art, for header gradients. Fades in once known. */
 @Composable
-fun rememberCoverColor(coverArt: String?, fallback: Color = Color(0xFF5A3A26)): Color {
+fun rememberCoverColor(coverArt: String?, fallback: Color = lerp(Accent, Color.Black, 0.6f)): Color {
     val context = LocalContext.current
     val actions = LocalActions.current
-    var target by remember(coverArt) { mutableStateOf(fallback) }
+    var found by remember(coverArt) { mutableStateOf<Color?>(null) }
     LaunchedEffect(coverArt) {
         val url = actions.coverUrl(coverArt, 120) ?: return@LaunchedEffect
         val request = ImageRequest.Builder(context).data(url).size(120).allowHardware(false).build()
@@ -50,9 +50,9 @@ fun rememberCoverColor(coverArt: String?, fallback: Color = Color(0xFF5A3A26)): 
         val palette = withContext(Dispatchers.Default) { Palette.from(bitmap).generate() }
         val swatch = palette.vibrantSwatch ?: palette.darkVibrantSwatch ?: palette.dominantSwatch ?: return@LaunchedEffect
         // Pull towards black so white text on top stays readable.
-        target = lerp(Color(swatch.rgb), Color.Black, 0.35f)
+        found = lerp(Color(swatch.rgb), Color.Black, 0.35f)
     }
-    val color by animateColorAsState(target, tween(500), label = "cover")
+    val color by animateColorAsState(found ?: fallback, tween(500), label = "cover")
     return color
 }
 

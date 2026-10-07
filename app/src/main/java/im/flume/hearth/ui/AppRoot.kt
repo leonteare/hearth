@@ -80,7 +80,10 @@ import im.flume.hearth.ui.screens.NowPlayingScreen
 import im.flume.hearth.ui.screens.PlaylistScreen
 import im.flume.hearth.ui.screens.QueueScreen
 import im.flume.hearth.ui.screens.SearchScreen
+import im.flume.hearth.ui.screens.AppearanceSettings
+import im.flume.hearth.ui.screens.GeneralSettings
 import im.flume.hearth.ui.screens.SettingsScreen
+import im.flume.hearth.ui.screens.StorageSettings
 import im.flume.hearth.ui.theme.Accent
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.TextSecondary
@@ -221,6 +224,9 @@ fun AppRoot() {
                         screen("liked") { LikedScreen() }
                         screen("downloads") { DownloadsScreen() }
                         screen("settings") { SettingsScreen() }
+                        screen("settings/general") { GeneralSettings() }
+                        screen("settings/storage") { StorageSettings() }
+                        screen("settings/appearance") { AppearanceSettings() }
                         screen("album/{id}") { AlbumScreen(it.arguments!!.getString("id")!!) }
                         screen("artist/{id}") { ArtistScreen(it.arguments!!.getString("id")!!) }
                         screen("playlist/{id}") { PlaylistScreen(it.arguments!!.getString("id")!!) }

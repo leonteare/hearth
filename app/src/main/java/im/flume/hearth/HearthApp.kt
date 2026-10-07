@@ -18,6 +18,8 @@ import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.playback.PlayerConnection
 import im.flume.hearth.sync.LibrarySync
 import im.flume.hearth.update.Updater
+import im.flume.hearth.ui.theme.accentState
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -69,6 +71,12 @@ class AppContainer(context: Context) {
     val sync = LibrarySync(api, db, session, onPlaylistsSynced = { downloads.refreshPinned() })
     val player = PlayerConnection(context)
     val updater = Updater(context, http, appScope)
+
+    init {
+        appScope.launch(Dispatchers.Main) {
+            session.settings.collect { accentState.value = androidx.compose.ui.graphics.Color(it.accent) }
+        }
+    }
 
     /** Recently streamed audio, so replays are instant and work with no signal. One instance per process. */
     @androidx.annotation.OptIn(UnstableApi::class)

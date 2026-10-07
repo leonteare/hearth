@@ -24,6 +24,8 @@ data class SubsonicResponse(
     val scanStatus: ScanStatus? = null,
     val lyricsList: LyricsList? = null,
     val lyrics: PlainLyrics? = null,
+    val artistInfo2: ArtistInfo? = null,
+    val albumInfo: AlbumInfo? = null,
 )
 
 @Serializable
@@ -67,7 +69,27 @@ data class AlbumDto(
     val starred: String? = null,
     val playCount: Long? = null,
     val song: List<SongDto> = emptyList(),
+    val releaseDate: ItemDate? = null,
+    val originalReleaseDate: ItemDate? = null,
+    val recordLabels: List<NamedItem> = emptyList(),
+    val releaseTypes: List<String> = emptyList(),
 )
+
+@Serializable
+data class ItemDate(val year: Int? = null, val month: Int? = null, val day: Int? = null)
+
+@Serializable
+data class NamedItem(val name: String = "")
+
+@Serializable
+data class ArtistInfo(
+    val biography: String? = null,
+    val lastFmUrl: String? = null,
+    val similarArtist: List<ArtistDto> = emptyList(),
+)
+
+@Serializable
+data class AlbumInfo(val notes: String? = null, val lastFmUrl: String? = null)
 
 @Serializable
 data class ArtistDto(

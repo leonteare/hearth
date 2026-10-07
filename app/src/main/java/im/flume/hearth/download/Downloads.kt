@@ -14,9 +14,9 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import im.flume.hearth.AppContainer
 import im.flume.hearth.HearthApp
 import im.flume.hearth.R
-import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.DownloadEntity
 import im.flume.hearth.data.DownloadState
@@ -29,10 +29,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import okhttp3.Call
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Songs kept on the phone for offline play. Files live in app-private storage; the playback data
@@ -46,6 +51,8 @@ class DownloadRepository(
 ) {
     private val dao = db.downloads()
     private val done = ConcurrentHashMap<String, String>()
+    /** In-flight HTTP calls by song id, so removing a download stops it immediately. */
+    internal val active = ConcurrentHashMap<String, Call>()
     val dir: File = File(context.filesDir, "music").apply { mkdirs() }
 
     val states: Flow<Map<String, DownloadState>> = dao.all().map { list -> list.associate { it.songId to it.state } }
@@ -73,7 +80,7 @@ class DownloadRepository(
     }
 
     fun remove(songIds: List<String>) = scope.launch {
-        songIds.forEach { id -> done.remove(id); File(dir, id).delete() }
+        songIds.forEach { id -> active.remove(id)?.cancel(); done.remove(id); File(dir, id).delete() }
         songIds.chunked(500).forEach { dao.delete(it) }
     }
 
@@ -126,44 +133,64 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         val c = (applicationContext as HearthApp).container
         val dao = c.db.downloads()
-        var completed = 0
-        var failuresInRow = 0
+        val claim = Mutex()
+        val completed = AtomicInteger(0)
+        val failuresInRow = AtomicInteger(0)
+        val backOff = AtomicBoolean(false)
         runCatching { setForeground(foregroundInfo(0)) }
-        while (true) {
-            val next = dao.nextQueued() ?: break
-            dao.upsert(next.copy(state = DownloadState.DOWNLOADING))
-            val ok = runCatching { fetch(c.http, c.api, next.songId, c.downloads.dir, c.session.settings.value.downloadBitrate) }
-            val file = ok.getOrNull()
-            if (file != null && dao.get(next.songId) != null) {
-                dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
-                c.downloads.markDone(next.songId, file.absolutePath)
-                c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) }
-                completed++
-                failuresInRow = 0
-                runCatching { setForeground(foregroundInfo(completed)) }
-            } else {
-                file?.delete()
-                failuresInRow++
-                // Several failures in a row usually means the server is unreachable: back off and retry later.
-                val giveUp = isStopped || failuresInRow >= 3
-                if (dao.get(next.songId) != null) {
-                    dao.upsert(next.copy(state = if (giveUp) DownloadState.QUEUED else DownloadState.FAILED))
+
+        coroutineScope {
+            repeat(PARALLEL) {
+                launch {
+                    while (!backOff.get() && !isStopped) {
+                        val next = claim.withLock {
+                            dao.nextQueued()?.also { dao.upsert(it.copy(state = DownloadState.DOWNLOADING)) }
+                        } ?: break
+                        val file = runCatching {
+                            fetch(c, next.songId, c.downloads.dir, c.session.settings.value.downloadBitrate)
+                        }.getOrNull()
+                        val stillWanted = dao.get(next.songId) != null
+                        when {
+                            !stillWanted -> file?.delete() // cancelled while downloading
+                            file != null -> {
+                                dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
+                                c.downloads.markDone(next.songId, file.absolutePath)
+                                c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) }
+                                failuresInRow.set(0)
+                                runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
+                            }
+                            else -> {
+                                // Several failures in a row usually means the server is unreachable: back off and retry later.
+                                val giveUp = isStopped || failuresInRow.incrementAndGet() >= 3
+                                dao.upsert(next.copy(state = if (giveUp) DownloadState.QUEUED else DownloadState.FAILED))
+                                if (giveUp) backOff.set(true)
+                            }
+                        }
+                    }
                 }
-                if (giveUp) return Result.retry()
             }
         }
-        return Result.success()
+        return if (backOff.get()) Result.retry() else Result.success()
     }
 
-    private suspend fun fetch(http: OkHttpClient, api: SubsonicClient, songId: String, dir: File, bitrate: Int): File =
+    private suspend fun fetch(c: AppContainer, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {
-            val url = api.streamUrl(songId, bitrate) ?: error("Not logged in")
+            val url = c.api.streamUrl(songId, bitrate) ?: error("Not logged in")
             val tmp = File(dir, "$songId.part")
-            http.newCall(Request.Builder().url(url).build()).execute().use { resp ->
-                check(resp.isSuccessful) { "HTTP ${resp.code}" }
-                val type = resp.header("Content-Type").orEmpty()
-                check(!type.contains("json") && !type.contains("xml")) { "Server returned an error instead of audio" }
-                resp.body!!.byteStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+            val call = c.http.newCall(Request.Builder().url(url).build())
+            c.downloads.active[songId] = call
+            try {
+                call.execute().use { resp ->
+                    check(resp.isSuccessful) { "HTTP ${resp.code}" }
+                    val type = resp.header("Content-Type").orEmpty()
+                    check(!type.contains("json") && !type.contains("xml")) { "Server returned an error instead of audio" }
+                    resp.body!!.byteStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                }
+            } catch (e: Exception) {
+                tmp.delete()
+                throw e
+            } finally {
+                c.downloads.active.remove(songId)
             }
             File(dir, songId).also { dest -> dest.delete(); check(tmp.renameTo(dest)) { "Rename failed" } }
         }
@@ -190,5 +217,6 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     companion object {
         private const val CHANNEL = "downloads"
         private const val NOTIFICATION_ID = 42
+        private const val PARALLEL = 3
     }
 }
