@@ -3,8 +3,6 @@ package im.flume.hearth.ui
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
@@ -142,10 +140,17 @@ private val TABS = listOf(
     Triple("search", "Search", Icons.Default.Search),
     Triple("library", "Your Library", Icons.Default.LibraryMusic),
 )
-private val TAB_ROUTES = TABS.map { it.first }.toSet()
+private val TAB_ROUTES = TABS.map { it.first }
 
-/** Set while switching tabs so the switch is instant rather than a page slide. */
-private class TransitionFlags { var tabSwitch = false }
+/**
+ * Remembers the last tab switch so its page slides in from the side the tab is on
+ * (left-hand tab from the left, right-hand tab from the right).
+ */
+private class TransitionFlags {
+    var tabSwitchAt = 0L
+    var direction = 1
+    val isTabSwitch: Boolean get() = System.currentTimeMillis() - tabSwitchAt < 600
+}
 
 private const val SLIDE_MS = 280
 
@@ -167,14 +172,14 @@ fun AppRoot() {
     // The tab you're "in" is the last tab page on the back stack, even when deep inside an album.
     val backStack by nav.currentBackStack.collectAsStateWithLifecycle()
     val currentTab = backStack.lastOrNull { it.destination.route in TAB_ROUTES }?.destination?.route ?: "home"
-    LaunchedEffect(backStack.lastOrNull()) { flags.tabSwitch = false }
 
     val onTabClick: (String) -> Unit = { dest ->
         if (dest == currentTab) {
             // Tapping the tab you're already in goes back to its main page.
             nav.popBackStack(dest, inclusive = false)
         } else {
-            flags.tabSwitch = true
+            flags.direction = if (TAB_ROUTES.indexOf(dest) > TAB_ROUTES.indexOf(currentTab)) 1 else -1
+            flags.tabSwitchAt = System.currentTimeMillis()
             nav.navigate(dest) {
                 popUpTo("home") { saveState = true }
                 launchSingleTop = true
@@ -208,12 +213,12 @@ fun AppRoot() {
                         startDestination = "home",
                         modifier = Modifier.padding(padding),
                         enterTransition = {
-                            if (flags.tabSwitch) EnterTransition.None
-                            else slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it }
+                            val dir = if (flags.isTabSwitch) flags.direction else 1
+                            slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it * dir }
                         },
                         exitTransition = {
-                            if (flags.tabSwitch) ExitTransition.None
-                            else slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { -it / 4 }
+                            val dir = if (flags.isTabSwitch) flags.direction else 1
+                            slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { -it * dir / 4 }
                         },
                         popEnterTransition = { slideInHorizontally(tween(SLIDE_MS, easing = ease)) { -it / 4 } },
                         popExitTransition = { slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { it } },
