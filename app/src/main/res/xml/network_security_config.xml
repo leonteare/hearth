@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Navidrome is reached over Tailscale, usually as plain http://100.x.y.z:4533 -->
+<!--
+  Plain http is allowed for Tailscale addresses like http://100.x.y.z:4533.
+  User-installed CAs are trusted so a home reverse proxy with its own certificate authority
+  (e.g. Caddy's "tls internal") works once its root certificate is installed on the phone.
+-->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

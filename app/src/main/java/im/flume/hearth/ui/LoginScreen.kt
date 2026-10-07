@@ -89,8 +89,14 @@ fun LoginScreen() {
                         c.network.reportServerSuccess()
                         c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
                     }.onFailure { e ->
-                        error = "Couldn't sign in: ${e.message ?: e.javaClass.simpleName}.\n" +
-                            "Check the address and that Tailscale is connected."
+                        error = if (generateSequence(e) { it.cause }.any { it is javax.net.ssl.SSLException || it is java.security.cert.CertificateException }) {
+                            "Couldn't sign in: the server's HTTPS certificate isn't trusted by this phone. " +
+                                "If it's your own certificate (e.g. Caddy's local one), install its root certificate on the phone, " +
+                                "or use a plain http:// address over Tailscale."
+                        } else {
+                            "Couldn't sign in: ${e.message ?: e.javaClass.simpleName}.\n" +
+                                "Check the address and that Tailscale is connected."
+                        }
                     }
                 }
             },
