@@ -1,0 +1,83 @@
+package im.flume.hearth.data
+
+import android.content.Context
+import androidx.core.content.edit
+import im.flume.hearth.api.Credentials
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+data class Settings(
+    /** kbps, 0 = original quality */
+    val wifiBitrate: Int = 0,
+    val mobileBitrate: Int = 0,
+    val downloadBitrate: Int = 0,
+    val wifiOnlyDownloads: Boolean = true,
+    val cacheSizeMb: Int = 2048,
+    val offlineMode: Boolean = false,
+)
+
+/** Login and preferences. Lives in private app storage; only the Subsonic token is kept, never the password. */
+class SessionStore(context: Context) {
+    private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
+
+    private val _credentials = MutableStateFlow(readCredentials())
+    val credentials: StateFlow<Credentials?> = _credentials.asStateFlow()
+
+    private val _settings = MutableStateFlow(readSettings())
+    val settings: StateFlow<Settings> = _settings.asStateFlow()
+
+    var lastSyncAt: Long
+        get() = prefs.getLong("lastSyncAt", 0)
+        set(v) = prefs.edit { putLong("lastSyncAt", v) }
+
+    var lastScan: String?
+        get() = prefs.getString("lastScan", null)
+        set(v) = prefs.edit { putString("lastScan", v) }
+
+    private fun readCredentials(): Credentials? {
+        val url = prefs.getString("serverUrl", null) ?: return null
+        val user = prefs.getString("username", null) ?: return null
+        val salt = prefs.getString("salt", null) ?: return null
+        val token = prefs.getString("token", null) ?: return null
+        return Credentials(url, user, salt, token)
+    }
+
+    fun saveCredentials(c: Credentials) {
+        prefs.edit {
+            putString("serverUrl", c.serverUrl)
+            putString("username", c.username)
+            putString("salt", c.salt)
+            putString("token", c.token)
+        }
+        _credentials.value = c
+    }
+
+    fun logout() {
+        prefs.edit { clear() }
+        _credentials.value = null
+        _settings.value = Settings()
+    }
+
+    private fun readSettings() = Settings(
+        wifiBitrate = prefs.getInt("wifiBitrate", 0),
+        mobileBitrate = prefs.getInt("mobileBitrate", 0),
+        downloadBitrate = prefs.getInt("downloadBitrate", 0),
+        wifiOnlyDownloads = prefs.getBoolean("wifiOnlyDownloads", true),
+        cacheSizeMb = prefs.getInt("cacheSizeMb", 2048),
+        offlineMode = prefs.getBoolean("offlineMode", false),
+    )
+
+    fun updateSettings(transform: (Settings) -> Settings) {
+        val s = transform(_settings.value)
+        prefs.edit {
+            putInt("wifiBitrate", s.wifiBitrate)
+            putInt("mobileBitrate", s.mobileBitrate)
+            putInt("downloadBitrate", s.downloadBitrate)
+            putBoolean("wifiOnlyDownloads", s.wifiOnlyDownloads)
+            putInt("cacheSizeMb", s.cacheSizeMb)
+            putBoolean("offlineMode", s.offlineMode)
+        }
+        _settings.value = s
+    }
+}

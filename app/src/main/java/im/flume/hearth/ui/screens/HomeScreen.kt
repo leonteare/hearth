@@ -1,0 +1,211 @@
+package im.flume.hearth.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import im.flume.hearth.container
+import im.flume.hearth.data.AlbumEntity
+import im.flume.hearth.data.PlaySource
+import im.flume.hearth.sync.SyncState
+import im.flume.hearth.ui.components.AlbumRow
+import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.SectionHeader
+import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.theme.SurfaceHigh
+import im.flume.hearth.ui.theme.TextSecondary
+import java.util.Calendar
+
+@Composable
+fun HomeScreen() {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val dao = c.db.library()
+
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
+    val sync by c.sync.state.collectAsStateWithLifecycle()
+    val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
+    val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
+    val added by remember { dao.recentlyAdded(15) }.collectAsStateWithLifecycle(emptyList())
+    val mostPlayed by remember { dao.mostPlayed(15) }.collectAsStateWithLifecycle(emptyList())
+    val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
+    val genres by remember { dao.genres() }.collectAsStateWithLifecycle(emptyList())
+
+    var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
+    var rediscover by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
+    LaunchedEffect(online, songCount > 0) {
+        if (online) serverRecent = runCatching { c.library.serverRecentAlbums(12) }.getOrDefault(emptyList())
+        rediscover = dao.randomAlbums(15)
+    }
+    val recent = serverRecent.ifEmpty { localRecent }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(greeting(), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                if (!online) Icon(Icons.Default.CloudOff, "Offline", tint = TextSecondary)
+                IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
+            }
+        }
+
+        val running = sync as? SyncState.Running
+        if (running != null && songCount <= 0) {
+            item {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Loading your library… ${running.songsSoFar} songs", color = TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+        }
+        (sync as? SyncState.Failed)?.let { f ->
+            item { Text("Library sync failed: ${f.message}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+        }
+
+        item {
+            QuickGrid(
+                tiles = buildList {
+                    add(QuickTile("Shuffle all", Icons.Default.Shuffle, Accent) { actions.play(PlaySource.All, shuffle = true) })
+                    add(QuickTile("Liked Songs", Icons.Default.Favorite, Color(0xFF5038A0)) { actions.open("liked") })
+                    add(QuickTile("Downloads", Icons.Default.DownloadDone, Color(0xFF1E6B52)) { actions.open("downloads") })
+                    recent.take(3).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
+                }
+            )
+        }
+
+        item { AlbumRow("Jump back in", recent) }
+        item { AlbumRow("Recently added", added) }
+        item { AlbumRow("Your most played", mostPlayed) }
+
+        if (playlists.isNotEmpty()) {
+            item {
+                SectionHeader("Your playlists")
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(playlists, key = { it.id }) { p ->
+                        Column(Modifier.width(140.dp).clickable { actions.openPlaylist(p.id) }) {
+                            CoverArt(p.coverArt, 140.dp)
+                            Spacer(Modifier.height(8.dp))
+                            Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                            Text("${p.songCount} songs", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (genres.isNotEmpty()) {
+            item {
+                SectionHeader("Shuffle a genre")
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(genres.take(20), key = { it.genre }) { g ->
+                        AssistChip(
+                            onClick = { actions.play(PlaySource(PlaySource.Kind.GENRE, g.genre, g.genre), shuffle = true) },
+                            label = { Text(g.genre) },
+                            leadingIcon = { Icon(Icons.Default.Shuffle, null, Modifier.size(16.dp)) },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceHigh),
+                        )
+                    }
+                }
+            }
+        }
+
+        item { AlbumRow("Rediscover", rediscover) }
+    }
+}
+
+private data class QuickTile(
+    val title: String,
+    val icon: ImageVector? = null,
+    val color: Color = SurfaceHigh,
+    val cover: String? = null,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun QuickGrid(tiles: List<QuickTile>) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        tiles.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { t -> QuickTileView(t, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickTileView(t: QuickTile, modifier: Modifier) {
+    Row(
+        modifier.height(56.dp).clip(RoundedCornerShape(6.dp)).background(SurfaceHigh).clickable(onClick = t.onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (t.icon != null) {
+            Box(Modifier.size(56.dp).background(t.color), contentAlignment = Alignment.Center) {
+                Icon(t.icon, null, tint = if (t.color == Accent) Color.Black else Color.White)
+            }
+        } else {
+            CoverArt(t.cover, 56.dp, corner = 0.dp, requestSize = 150)
+        }
+        Text(
+            t.title,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
+    }
+}
+
+private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "Good morning"
+    in 12..17 -> "Good afternoon"
+    else -> "Good evening"
+}
