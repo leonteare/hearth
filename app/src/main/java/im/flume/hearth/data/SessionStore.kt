@@ -21,6 +21,10 @@ data class Settings(
     val lyricsSize: Int = 1,
     /** 0 = compact, 1 = normal, 2 = relaxed */
     val lyricsSpacing: Int = 1,
+    /** 0 = off, 1 = per track, 2 = per album */
+    val volumeLevelling: Int = 1,
+    /** Spread out songs by the same artist when shuffling. */
+    val smartShuffle: Boolean = true,
 )
 
 /** Login and preferences. Lives in private app storage; only the Subsonic token is kept, never the password. */
@@ -36,6 +40,11 @@ class SessionStore(context: Context) {
     var lastSyncAt: Long
         get() = prefs.getLong("lastSyncAt", 0)
         set(v) = prefs.edit { putLong("lastSyncAt", v) }
+
+    /** Bumped when a release needs fields that only a full sync fills in. */
+    var syncedSchema: Int
+        get() = prefs.getInt("syncedSchema", 0)
+        set(v) = prefs.edit { putInt("syncedSchema", v) }
 
     var lastScan: String?
         get() = prefs.getString("lastScan", null)
@@ -75,6 +84,8 @@ class SessionStore(context: Context) {
         accent = prefs.getInt("accent", 0xFFFF8A3D.toInt()),
         lyricsSize = prefs.getInt("lyricsSize", 1),
         lyricsSpacing = prefs.getInt("lyricsSpacing", 1),
+        volumeLevelling = prefs.getInt("volumeLevelling", 1),
+        smartShuffle = prefs.getBoolean("smartShuffle", true),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -89,6 +100,8 @@ class SessionStore(context: Context) {
             putInt("accent", s.accent)
             putInt("lyricsSize", s.lyricsSize)
             putInt("lyricsSpacing", s.lyricsSpacing)
+            putInt("volumeLevelling", s.volumeLevelling)
+            putBoolean("smartShuffle", s.smartShuffle)
         }
         _settings.value = s
     }

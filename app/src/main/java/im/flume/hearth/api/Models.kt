@@ -26,6 +26,19 @@ data class SubsonicResponse(
     val lyrics: PlainLyrics? = null,
     val artistInfo2: ArtistInfo? = null,
     val albumInfo: AlbumInfo? = null,
+    val similarSongs: SongList? = null,
+    val similarSongs2: SongList? = null,
+)
+
+@Serializable
+data class SongList(val song: List<SongDto> = emptyList())
+
+@Serializable
+data class ReplayGain(
+    val trackGain: Double? = null,
+    val albumGain: Double? = null,
+    val trackPeak: Double? = null,
+    val albumPeak: Double? = null,
 )
 
 @Serializable
@@ -52,6 +65,7 @@ data class SongDto(
     val playCount: Long? = null,
     val created: String? = null,
     val isDir: Boolean = false,
+    val replayGain: ReplayGain? = null,
 )
 
 @Serializable

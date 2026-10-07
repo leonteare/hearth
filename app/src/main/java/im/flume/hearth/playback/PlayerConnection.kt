@@ -30,6 +30,8 @@ data class PlayerUiState(
     val sourceLabel: String = "",
     val queue: List<QueueEntry> = emptyList(),
     val pendingCount: Int = 0,
+    /** Epoch ms when the sleep timer pauses playback, -1 for end of song, 0 for none. */
+    val sleepAt: Long = 0,
     val error: String? = null,
 )
 
@@ -84,6 +86,7 @@ class PlayerConnection(private val context: Context) {
             sourceLabel = extras.getString(PlaybackService.EXTRA_SOURCE_LABEL).orEmpty(),
             queue = List(count) { QueueEntry(it, c.getMediaItemAt(it)) },
             pendingCount = extras.getInt(PlaybackService.EXTRA_PENDING_COUNT),
+            sleepAt = extras.getLong(PlaybackService.EXTRA_SLEEP_AT),
             error = c.playerError?.let { "Couldn't play this song (${it.errorCodeName})" },
         )
     }
@@ -115,6 +118,8 @@ class PlayerConnection(private val context: Context) {
     })
 
     fun moveToNext(index: Int) = send(PlaybackService.CMD_MOVE_NEXT, Bundle().apply { putInt(PlaybackService.ARG_INDEX, index) })
+
+    fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })
 
     fun toggleShuffle() = send(PlaybackService.CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)
 

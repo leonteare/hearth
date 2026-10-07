@@ -24,6 +24,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.foundation.layout.width
+import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -87,6 +90,7 @@ fun CollectionScreen(
     headerIcon: (@Composable () -> Unit)? = null,
     extraContent: LazyListScope.() -> Unit = {},
     topContent: LazyListScope.() -> Unit = {},
+    onRemoveSong: ((index: Int) -> Unit)? = null,
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -156,10 +160,11 @@ fun CollectionScreen(
             )
         }
         topContent()
-        itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { _, song ->
+        itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { index, song ->
             SongRow(
                 song,
                 onClick = { actions.play(source, startSongId = song.id) },
+                onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
                 showCover = !showTrackNumbers,
                 leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
             )
@@ -200,12 +205,16 @@ fun AlbumScreen(id: String) {
 fun PlaylistScreen(id: String) {
     val dao = LocalContext.current.container.db.library()
     val playlist by remember(id) { dao.playlist(id) }.collectAsStateWithLifecycle(null)
-    val me = LocalContext.current.container.session.credentials.collectAsStateWithLifecycle().value?.username
+    val c = LocalContext.current.container
+    val me = c.session.credentials.collectAsStateWithLifecycle().value?.username
     val songs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
     CollectionScreen(
         title = playlist?.name.orEmpty(),
         // Only name the owner when it's someone else's playlist.
         subtitle = playlist?.owner?.takeIf { !it.equals(me, ignoreCase = true) }.orEmpty(),
+        onRemoveSong = if (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true)) { index ->
+            c.appScope.launch { runCatching { c.library.removeFromPlaylist(id, index) } }
+        } else null,
         cover = playlist?.coverArt,
         songs = songs,
         source = PlaySource(PlaySource.Kind.PLAYLIST, id, playlist?.name.orEmpty()),
@@ -236,7 +245,19 @@ fun ArtistScreen(id: String) {
                 }
             }
         }
-        item { PlayShuffleButtons(onPlay = { actions.play(source) }, onShuffle = { actions.play(source, shuffle = true) }) }
+        item {
+            PlayShuffleButtons(
+                onPlay = { actions.play(source) },
+                onShuffle = { actions.play(source, shuffle = true) },
+                extra = {
+                    TextButton(onClick = { actions.startArtistRadio(id, name) }) {
+                        Icon(Icons.Default.Radio, null, tint = Accent, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Radio", color = Accent)
+                    }
+                },
+            )
+        }
         if (songs.isNotEmpty()) {
             item { SectionHeader("Popular") }
             items(songs.take(5), key = { "top:${it.id}" }) { s ->
@@ -284,6 +305,7 @@ fun LikedScreen() {
         cover = null,
         songs = songs,
         source = PlaySource.Liked,
+        pin = PinTarget(DownloadRepository.KIND_LIKED, "liked"),
         headerIcon = { BigIcon(Icons.Default.Favorite, Color(0xFF5038A0)) },
     )
 }

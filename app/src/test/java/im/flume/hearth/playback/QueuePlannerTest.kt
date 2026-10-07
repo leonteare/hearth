@@ -73,3 +73,14 @@ class QueuePlannerTest {
         assertEquals(3, QueuePlanner.addToQueueIndex(currentIndex = 2, isManual = { false }, windowSize = 10))
     }
 }
+
+class SmartShuffleTest {
+    @Test
+    fun `same artist is not played twice in a row when avoidable`() {
+        val artist = mapOf("a1" to "A", "a2" to "A", "a3" to "A", "b1" to "B", "b2" to "B", "c1" to "C")
+        val out = QueuePlanner.spreadArtists(listOf("a1", "a2", "a3", "b1", "b2", "c1"), artist::get)
+        org.junit.Assert.assertEquals(artist.keys, out.toSet())
+        org.junit.Assert.assertEquals("a1", out.first())
+        for (i in 1 until out.size) org.junit.Assert.assertNotEquals(out.toString(), artist[out[i - 1]], artist[out[i]])
+    }
+}

@@ -39,7 +39,7 @@ class LibrarySync(
         val scan = api.scanStatus()
         val stale = System.currentTimeMillis() - session.lastSyncAt > SIX_HOURS
         val rescanned = scan?.lastScan != null && scan.lastScan != session.lastScan
-        if (force || session.lastSyncAt == 0L || stale || rescanned) {
+        if (force || session.lastSyncAt == 0L || stale || rescanned || session.syncedSchema < SCHEMA) {
             fullSync(scan?.lastScan)
         }
     }
@@ -62,6 +62,7 @@ class LibrarySync(
                 playlistSongs = playlistSongs,
             )
             session.lastSyncAt = System.currentTimeMillis()
+            session.syncedSchema = SCHEMA
             if (lastScan != null) session.lastScan = lastScan
             onPlaylistsSynced()
             _state.value = SyncState.Idle
@@ -104,6 +105,7 @@ class LibrarySync(
 
     companion object {
         const val PAGE = 500
+        private const val SCHEMA = 3
         private const val SIX_HOURS = 6 * 60 * 60 * 1000L
     }
 }

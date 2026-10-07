@@ -43,6 +43,21 @@ object QueuePlanner {
             if (idx >= 0) context.subList(idx + 1, context.size) else context
         }
 
+    /**
+     * Nudges a shuffled order so the same artist rarely plays twice in a row: whenever two
+     * neighbours share an artist, swap in the nearest later song by someone else.
+     */
+    fun spreadArtists(order: List<String>, artistOf: (String) -> String?): List<String> {
+        val out = order.toMutableList()
+        for (i in 1 until out.size) {
+            val prev = artistOf(out[i - 1]) ?: continue
+            if (artistOf(out[i]) != prev) continue
+            val j = (i + 1 until out.size).firstOrNull { artistOf(out[it]) != prev } ?: break
+            out[i] = out[j].also { out[j] = out[i] }
+        }
+        return out
+    }
+
     fun needsRefill(windowSize: Int, currentIndex: Int): Boolean = windowSize - currentIndex - 1 < REFILL_WHEN_LEFT
 
     /** How many already-played items to drop from the front of the window, or 0. */

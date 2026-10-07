@@ -155,6 +155,17 @@ interface LibraryDao {
     @Query("DELETE FROM artists") suspend fun clearArtists()
     @Query("DELETE FROM playlists") suspend fun clearPlaylists()
     @Query("DELETE FROM playlist_songs") suspend fun clearPlaylistSongs()
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId") suspend fun clearPlaylistSongs(playlistId: String)
+
+    @Transaction
+    suspend fun replacePlaylist(playlist: PlaylistEntity, songs: List<PlaylistSongEntity>) {
+        insertPlaylists(listOf(playlist))
+        clearPlaylistSongs(playlist.id)
+        insertPlaylistSongs(songs)
+    }
+
+    @Query("SELECT * FROM songs WHERE (artistId = :artistId OR genre = :genre) AND id != :exclude ORDER BY RANDOM() LIMIT :limit")
+    suspend fun radioFallback(artistId: String?, genre: String?, exclude: String, limit: Int): List<SongEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertSongs(items: List<SongEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAlbums(items: List<AlbumEntity>)
@@ -217,7 +228,7 @@ class Converters {
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -233,9 +244,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE songs ADD COLUMN trackGain REAL")
+                db.execSQL("ALTER TABLE songs ADD COLUMN albumGain REAL")
+                db.execSQL("ALTER TABLE songs ADD COLUMN trackPeak REAL")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }

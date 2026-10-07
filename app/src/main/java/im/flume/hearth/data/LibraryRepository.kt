@@ -62,6 +62,46 @@ class LibraryRepository(
         dao.setStarred(songId, starred)
         runCatching { if (starred) api.star(songId) else api.unstar(songId) }
             .onFailure { dao.setStarred(songId, !starred); throw it }
+        if (starred) downloads.refreshPinned()
+    }
+
+    /**
+     * Songs for a radio station: the seed first, then similar songs from Navidrome (via Last.fm),
+     * falling back to the same artist and genre from the local library when there are none.
+     */
+    suspend fun radio(seed: SongEntity?, artistId: String?, online: Boolean): List<String> {
+        val remote = if (online) runCatching {
+            if (seed != null) api.similarSongs(seed.id) else api.similarSongsForArtist(artistId!!)
+        }.getOrDefault(emptyList()) else emptyList()
+        val known = songsByIds(remote.map { it.id }).map { it.id }
+        val ids = if (known.size >= 10) known else {
+            val local = dao.radioFallback(seed?.artistId ?: artistId, seed?.genre, seed?.id ?: "", 60)
+            (known + local.map { it.id }).distinct()
+        }
+        return (listOfNotNull(seed?.id) + ids.filter { it != seed?.id }).let {
+            if (online) it else it.filter(downloads::isDownloaded)
+        }
+    }
+
+    suspend fun refreshPlaylist(id: String) {
+        val pl = api.playlist(id) ?: return
+        dao.replacePlaylist(pl.toEntity(), pl.entry.mapIndexed { i, s -> PlaylistSongEntity(id, i, s.id) })
+        downloads.refreshPinned()
+    }
+
+    suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
+        api.addToPlaylist(playlistId, songIds)
+        refreshPlaylist(playlistId)
+    }
+
+    suspend fun createPlaylist(name: String, songIds: List<String>) {
+        val id = api.createPlaylist(name, songIds) ?: api.playlists().firstOrNull { it.name == name }?.id ?: return
+        refreshPlaylist(id)
+    }
+
+    suspend fun removeFromPlaylist(playlistId: String, index: Int) {
+        api.removeFromPlaylist(playlistId, index)
+        refreshPlaylist(playlistId)
     }
 
     /** Server's "recently played" albums, mapped onto local rows so covers and counts are consistent. */

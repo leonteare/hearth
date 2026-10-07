@@ -10,7 +10,14 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.outlined.Bedtime
+import im.flume.hearth.playback.PlaybackService
 import androidx.compose.material3.DropdownMenuItem
 import im.flume.hearth.data.currentIndex
 import im.flume.hearth.data.rows
@@ -203,8 +210,9 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("PLAYING FROM", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                     Text(state.sourceLabel.ifBlank { "Your queue" }, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    SleepStatus(state.sleepAt)
                 }
-                NowPlayingMenu(song, onClose)
+                NowPlayingMenu(song, state.sleepAt, onClose)
             }
             if (landscape) {
                 Row(Modifier.weight(1f).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -331,13 +339,35 @@ private fun LyricsMessage(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun NowPlayingMenu(song: SongEntity?, onClose: () -> Unit) {
+private fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit) {
     val actions = LocalActions.current
+    val player = LocalContext.current.container.player
     val downloaded = song != null && LocalRowContext.current.downloads[song.id] != null
     var open by remember { mutableStateOf(false) }
+    var sleepPicker by remember { mutableStateOf(false) }
+    if (sleepPicker) {
+        SleepTimerDialog(active = sleepAt != 0L, onPick = { player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
+    }
     Box {
         IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
         DropdownMenu(open, onDismissRequest = { open = false }) {
+            if (song != null) {
+                DropdownMenuItem(
+                    text = { Text("Start radio") },
+                    leadingIcon = { Icon(Icons.Default.Radio, null) },
+                    onClick = { open = false; actions.startRadio(song) },
+                )
+                DropdownMenuItem(
+                    text = { Text("Add to playlist") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },
+                    onClick = { open = false; actions.addToPlaylist(listOf(song.id)) },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer") },
+                leadingIcon = { Icon(Icons.Outlined.Bedtime, null, tint = if (sleepAt != 0L) Accent else LocalContentColor.current) },
+                onClick = { open = false; sleepPicker = true },
+            )
             song?.albumId?.let { id ->
                 DropdownMenuItem(
                     text = { Text("Go to album") },
@@ -418,6 +448,41 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
     }
 }
 
+/** "Stops in 23 min" / "Stops after this song" under the source label. */
+@Composable
+private fun SleepStatus(sleepAt: Long) {
+    if (sleepAt == 0L) return
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(sleepAt) { while (true) { now = System.currentTimeMillis(); delay(15_000) } }
+    val text = if (sleepAt == PlaybackService.SLEEP_END_OF_SONG) "Stops after this song"
+    else "Stops in ${((sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min"
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.Bedtime, null, tint = Accent, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = Accent)
+    }
+}
+
+@Composable
+private fun SleepTimerDialog(active: Boolean, onPick: (Long) -> Unit, onDismiss: () -> Unit) {
+    val options = listOf(15, 30, 45, 60).map { "$it minutes" to it * 60_000L } + ("End of this song" to PlaybackService.SLEEP_END_OF_SONG)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sleep timer") },
+        text = {
+            Column {
+                options.forEach { (label, ms) ->
+                    Text(label, modifier = Modifier.fillMaxWidth().clickable { onPick(ms) }.padding(vertical = 12.dp))
+                }
+                if (active) {
+                    Text("Turn off timer", color = Accent, modifier = Modifier.fillMaxWidth().clickable { onPick(0) }.padding(vertical = 12.dp))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 /** Lyric text sizes (sp) and line gaps (dp) for the Appearance settings. */
 val LYRIC_SIZES = listOf(18, 22, 27, 32)
 val LYRIC_GAPS = listOf(4, 8, 14)
@@ -466,6 +531,15 @@ fun QueueScreen() {
         draggingKey = null
     }
 
+    // Songs already played (kept briefly in the player) and everything still to come beyond it.
+    val history = state.queue.take(state.currentIndex)
+    val info by c.queueInfo.collectAsStateWithLifecycle()
+    var later by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
+    LaunchedEffect(info.pending) { later = c.library.songsByIds(info.pending) }
+    val total = info.trimmed + state.queue.size + info.pending.size
+    val position = info.trimmed + state.currentIndex + 1
+    LaunchedEffect(Unit) { if (history.isNotEmpty()) listState.scrollToItem(history.size + 1) }
+
     val firstAuto = local.indexOfFirst { !it.item.isManual }.let { if (it < 0) local.size else it }
     val manual = local.take(firstAuto)
     val auto = local.drop(firstAuto)
@@ -498,8 +572,24 @@ fun QueueScreen() {
             Text("Queue", style = MaterialTheme.typography.titleLarge)
         }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            if (history.isNotEmpty()) {
+                item(key = "h-prev") { QueueHeader("Previously played", 0.6f) }
+                items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e.index) }) }
+            }
             state.current?.let { cur ->
-                item(key = "h-now") { QueueHeader("Now playing") }
+                item(key = "h-now") {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        QueueHeader("Now playing")
+                        if (total > 1) {
+                            Text(
+                                "$position of $total",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(start = 8.dp, bottom = 10.dp),
+                            )
+                        }
+                    }
+                }
                 item(key = "now") { QueueRow(QueueEntry(state.currentIndex, cur), isCurrent = true) }
             }
             if (repeatOne) {
@@ -515,10 +605,8 @@ fun QueueScreen() {
                 item(key = "h-auto") { QueueHeader("Next from: ${state.sourceLabel.ifBlank { "your queue" }}", upcomingAlpha) }
                 items(auto, key = { it.key }) { e -> Upcoming(e) }
             }
-            if (state.pendingCount > 0) {
-                item(key = "more") {
-                    Text("+ ${state.pendingCount} more songs", color = TextSecondary.copy(alpha = upcomingAlpha), modifier = Modifier.padding(16.dp))
-                }
+            if (later.isNotEmpty()) {
+                itemsIndexed(later, key = { i, s -> "l:$i:${s.id}" }) { _, song -> LaterRow(song, upcomingAlpha) }
             }
             if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 item(key = "repeat-all") {
@@ -623,6 +711,19 @@ private fun SwipeableQueueRow(
                     }
                 }
         ) { content() }
+    }
+}
+
+/** A song further down the queue than the player has loaded yet; it moves into the list above as you listen. */
+@Composable
+private fun LaterRow(song: SongEntity, alpha: Float) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        CoverArt(song.coverArt, 44.dp, requestSize = 150)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = alpha * 0.85f))
+            Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary.copy(alpha = alpha), style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

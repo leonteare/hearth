@@ -16,6 +16,12 @@ const val EXTRA_MANUAL = "manual"
 const val EXTRA_ALBUM_ID = "albumId"
 const val EXTRA_ARTIST_ID = "artistId"
 const val EXTRA_COVER_ART = "coverArt"
+const val EXTRA_TRACK_GAIN = "trackGain"
+const val EXTRA_ALBUM_GAIN = "albumGain"
+const val EXTRA_TRACK_PEAK = "trackPeak"
+
+/** Live queue details the UI shows ("12 of 300", the full upcoming list). Service and UI share a process. */
+data class QueueInfo(val pending: List<String> = emptyList(), val trimmed: Int = 0)
 
 fun SongEntity.toMediaItem(api: SubsonicClient, manual: Boolean = false): MediaItem =
     MediaItem.Builder()
@@ -39,6 +45,9 @@ fun SongEntity.toMediaItem(api: SubsonicClient, manual: Boolean = false): MediaI
                     putString(EXTRA_ALBUM_ID, albumId)
                     putString(EXTRA_ARTIST_ID, artistId)
                     putString(EXTRA_COVER_ART, coverArt)
+                    trackGain?.let { putDouble(EXTRA_TRACK_GAIN, it) }
+                    albumGain?.let { putDouble(EXTRA_ALBUM_GAIN, it) }
+                    trackPeak?.let { putDouble(EXTRA_TRACK_PEAK, it) }
                 })
                 .build()
         )

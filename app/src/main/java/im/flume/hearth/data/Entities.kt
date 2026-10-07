@@ -30,6 +30,9 @@ data class SongEntity(
     val starred: Boolean,
     val playCount: Long,
     val created: String?,
+    val trackGain: Double? = null,
+    val albumGain: Double? = null,
+    val trackPeak: Double? = null,
 )
 
 @Entity(tableName = "albums", indices = [Index("artistId")])
@@ -125,6 +128,9 @@ fun SongDto.toEntity() = SongEntity(
     starred = starred != null,
     playCount = playCount ?: 0,
     created = created,
+    trackGain = replayGain?.trackGain,
+    albumGain = replayGain?.albumGain,
+    trackPeak = replayGain?.trackPeak,
 )
 
 fun AlbumDto.toEntity() = AlbumEntity(

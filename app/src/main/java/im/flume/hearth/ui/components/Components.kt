@@ -38,6 +38,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -85,6 +87,10 @@ interface Actions {
     fun openGenre(name: String)
     fun open(route: String)
     fun coverUrl(coverArt: String?, size: Int = 300): String?
+    fun startRadio(song: SongEntity)
+    fun startArtistRadio(artistId: String, name: String)
+    /** Opens the "Add to playlist" picker for these songs. */
+    fun addToPlaylist(songIds: List<String>)
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }
@@ -122,6 +128,7 @@ fun SongRow(
     onClick: () -> Unit,
     showCover: Boolean = true,
     leading: String? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null,
 ) {
     val actions = LocalActions.current
     val ctx = LocalRowContext.current
@@ -174,18 +181,23 @@ fun SongRow(
         if (song.starred) Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = Accent)
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
-            SongMenu(song, menu, onDismiss = { menu = false })
+            SongMenu(song, menu, onDismiss = { menu = false }, onRemoveFromPlaylist = onRemoveFromPlaylist)
         }
     }
 }
 
 @Composable
-fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit) {
+fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemoveFromPlaylist: (() -> Unit)? = null) {
     val actions = LocalActions.current
     val dl = LocalRowContext.current.downloads[song.id]
     var info by remember { mutableStateOf(false) }
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         MenuItem("Play next", Icons.AutoMirrored.Filled.QueueMusic) { actions.playNext(listOf(song.id)); onDismiss() }
+        MenuItem("Start radio", Icons.Default.Radio) { actions.startRadio(song); onDismiss() }
+        MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
+        onRemoveFromPlaylist?.let { remove ->
+            MenuItem("Remove from this playlist", Icons.Default.RemoveCircleOutline) { remove(); onDismiss() }
+        }
         MenuItem("Add to queue", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToQueue(listOf(song.id)); onDismiss() }
         MenuItem(
             if (song.starred) "Remove from Liked Songs" else "Add to Liked Songs",

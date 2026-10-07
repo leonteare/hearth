@@ -134,6 +134,18 @@ fun GeneralSettings() {
             subtitle = (sync as? SyncState.Failed)?.message ?: "Fetches any changes from Navidrome",
         ) { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } }
 
+        Section("Playback")
+        Choice("Volume levelling", settings.volumeLevelling, listOf(0 to "Off", 1 to "Per song", 2 to "Per album")) { v ->
+            c.session.updateSettings { it.copy(volumeLevelling = v) }
+        }
+        Text(
+            "Uses the loudness info in your music files so songs play at a similar volume. Per album keeps the intended differences between songs on an album.",
+            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Toggle("Smart shuffle", settings.smartShuffle, "Avoid playing the same artist twice in a row") { v ->
+            c.session.updateSettings { it.copy(smartShuffle = v) }
+        }
+
         Section("Streaming")
         Choice("Quality on Wi-Fi", settings.wifiBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(wifiBitrate = v) } }
         Choice("Quality on mobile data", settings.mobileBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(mobileBitrate = v) } }

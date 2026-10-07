@@ -53,6 +53,10 @@ class PlaybackService : MediaSessionService() {
     private var shuffled = false
     private var sourceLabel = ""
     private var restoring: Job? = null
+    private var trimmed = 0
+    private var sleepJob: Job? = null
+    /** Epoch ms when playback will pause, [SLEEP_END_OF_SONG], or 0 for no timer. */
+    private var sleepAt = 0L
     private var consecutiveErrors = 0
     private var ticker: Job? = null
 
@@ -102,6 +106,7 @@ class PlaybackService : MediaSessionService() {
         )
 
         restoring = scope.launch { restoreQueue(playWhenReady = false) }
+        scope.launch { c.session.settings.collect { applyVolumeLevelling() } }
         scope.launch { scrobbler.flushPending() }
         publishExtras()
     }
@@ -131,8 +136,13 @@ class PlaybackService : MediaSessionService() {
         val songs = c.library.resolve(source, offlineOnly = offline)
         if (songs.isEmpty()) return
         val ids = songs.map { it.id }
-        val plan = QueuePlanner.initial(ids, startId, shuffle)
         val byId = songs.associateBy { it.id }
+        val raw = QueuePlanner.initial(ids, startId, shuffle)
+        val plan = if (shuffle && c.session.settings.value.smartShuffle) {
+            val all = QueuePlanner.spreadArtists(raw.window + raw.pending, { byId[it]?.artistId ?: byId[it]?.artist })
+            QueuePlanner.Plan(all.take(raw.window.size), raw.startIndex, all.drop(raw.window.size))
+        } else raw
+        trimmed = 0
 
         context = ids
         shuffled = shuffle
@@ -175,6 +185,41 @@ class PlaybackService : MediaSessionService() {
         saveQueue()
     }
 
+    /** [ms] > 0: pause after that long; [SLEEP_END_OF_SONG]: pause when this song ends; 0: cancel. */
+    private fun setSleepTimer(ms: Long) {
+        sleepJob?.cancel()
+        player.pauseAtEndOfMediaItems = false
+        sleepAt = when {
+            ms == SLEEP_END_OF_SONG -> SLEEP_END_OF_SONG.also { player.pauseAtEndOfMediaItems = true }
+            ms > 0 -> (System.currentTimeMillis() + ms).also {
+                sleepJob = scope.launch {
+                    delay(ms)
+                    player.pause()
+                    sleepAt = 0
+                    publishExtras()
+                }
+            }
+            else -> 0
+        }
+        publishExtras()
+    }
+
+    /**
+     * ReplayGain: turn loud tracks down so everything plays at a similar level. Tracks can only be
+     * made quieter, never louder, so quiet tracks stay at full volume.
+     */
+    private fun applyVolumeLevelling() {
+        val extras = player.currentMediaItem?.mediaMetadata?.extras
+        val mode = c.session.settings.value.volumeLevelling
+        val gain = when (mode) {
+            1 -> extras?.takeIf { it.containsKey(EXTRA_TRACK_GAIN) }?.getDouble(EXTRA_TRACK_GAIN)
+            2 -> extras?.takeIf { it.containsKey(EXTRA_ALBUM_GAIN) }?.getDouble(EXTRA_ALBUM_GAIN)
+                ?: extras?.takeIf { it.containsKey(EXTRA_TRACK_GAIN) }?.getDouble(EXTRA_TRACK_GAIN)
+            else -> null
+        }
+        player.volume = gain?.let { Math.pow(10.0, it / 20.0).toFloat().coerceIn(0.05f, 1f) } ?: 1f
+    }
+
     private fun toggleShuffle() {
         shuffled = !shuffled
         val current = player.currentMediaItem?.mediaId
@@ -183,8 +228,13 @@ class PlaybackService : MediaSessionService() {
         val manualAhead = (cur + 1 until player.mediaItemCount).count { player.getMediaItemAt(it).isManual }
         val firstAuto = cur + 1 + manualAhead
         if (firstAuto < player.mediaItemCount) player.removeMediaItems(firstAuto, player.mediaItemCount)
-        pending = ArrayDeque(QueuePlanner.upcomingAfterToggle(context, current, shuffled))
+        val upcoming = QueuePlanner.upcomingAfterToggle(context, current, shuffled)
+        pending = ArrayDeque(upcoming)
         scope.launch {
+            if (shuffled && c.session.settings.value.smartShuffle) {
+                val artists = c.library.songsByIds(upcoming).associate { it.id to (it.artistId ?: it.artist) }
+                pending = ArrayDeque(QueuePlanner.spreadArtists(upcoming, artists::get))
+            }
             refill(force = true)
             publishExtras()
             saveQueue()
@@ -204,7 +254,10 @@ class PlaybackService : MediaSessionService() {
         player.addMediaItems(songs.map { it.toMediaItem(c.api) })
 
         val trim = QueuePlanner.trimCount(player.currentMediaItemIndex)
-        if (trim > 0) player.removeMediaItems(0, trim)
+        if (trim > 0) {
+            player.removeMediaItems(0, trim)
+            trimmed += trim
+        }
         publishExtras()
     }
 
@@ -213,7 +266,9 @@ class PlaybackService : MediaSessionService() {
             putBoolean(EXTRA_SHUFFLE, shuffled)
             putString(EXTRA_SOURCE_LABEL, sourceLabel)
             putInt(EXTRA_PENDING_COUNT, pending.size)
+            putLong(EXTRA_SLEEP_AT, sleepAt)
         })
+        c.queueInfo.value = QueueInfo(pending.toList(), trimmed)
     }
 
     // ---------------------------------------------------------------- persistence
@@ -283,6 +338,7 @@ class PlaybackService : MediaSessionService() {
                 .add(SessionCommand(CMD_ADD_TO_QUEUE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_MOVE_NEXT, Bundle.EMPTY))
+                .add(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -307,6 +363,7 @@ class PlaybackService : MediaSessionService() {
                 CMD_ADD_TO_QUEUE -> scope.launch { insertSongs(args.getStringArrayList(ARG_SONG_IDS).orEmpty(), next = false) }
                 CMD_TOGGLE_SHUFFLE -> toggleShuffle()
                 CMD_MOVE_NEXT -> moveToNext(args.getInt(ARG_INDEX, -1))
+                CMD_SLEEP -> setSleepTimer(args.getLong(ARG_SLEEP_MS))
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -352,6 +409,7 @@ class PlaybackService : MediaSessionService() {
     private inner class PlayerListener : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem ?: return
+            applyVolumeLevelling()
             scrobbler.onTrackStarted(
                 mediaItem.mediaId,
                 mediaItem.mediaMetadata.extras?.getString(EXTRA_ALBUM_ID),
@@ -383,6 +441,14 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && sleepAt == SLEEP_END_OF_SONG) {
+                player.pauseAtEndOfMediaItems = false
+                sleepAt = 0
+                publishExtras()
+            }
+        }
+
         override fun onRepeatModeChanged(repeatMode: Int) {
             scope.launch { refill() }
         }
@@ -405,6 +471,10 @@ class PlaybackService : MediaSessionService() {
         const val CMD_ADD_TO_QUEUE = "hearth.ADD_TO_QUEUE"
         const val CMD_TOGGLE_SHUFFLE = "hearth.TOGGLE_SHUFFLE"
         const val CMD_MOVE_NEXT = "hearth.MOVE_NEXT"
+        const val CMD_SLEEP = "hearth.SLEEP"
+        const val ARG_SLEEP_MS = "sleepMs"
+        const val EXTRA_SLEEP_AT = "sleepAt"
+        const val SLEEP_END_OF_SONG = -1L
         const val ARG_INDEX = "index"
         const val ARG_SOURCE = "source"
         const val ARG_START_ID = "startId"

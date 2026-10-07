@@ -65,6 +65,7 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.ui.components.Actions
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.LocalRowContext
+import im.flume.hearth.ui.components.PlaylistPickerDialog
 import im.flume.hearth.ui.components.RowContext
 import im.flume.hearth.ui.screens.AlbumScreen
 import im.flume.hearth.ui.screens.ArtistScreen
@@ -133,6 +134,39 @@ private class AppActions(
     override fun openGenre(name: String) = nav.navigate("genre/${Uri.encode(name)}")
     override fun open(route: String) = nav.navigate(route)
     override fun coverUrl(coverArt: String?, size: Int) = c.api.coverArtUrl(coverArt, size)
+
+    /** Songs waiting for the "Add to playlist" picker, or null when it's closed. */
+    val playlistPicker = mutableStateOf<List<String>?>(null)
+
+    override fun addToPlaylist(songIds: List<String>) { playlistPicker.value = songIds }
+
+    override fun startRadio(song: SongEntity) = radio("Radio · ${song.title}") { c.library.radio(song, null, it) }
+
+    override fun startArtistRadio(artistId: String, name: String) = radio("Radio · $name") { c.library.radio(null, artistId, it) }
+
+    private fun radio(label: String, ids: suspend (online: Boolean) -> List<String>) {
+        scope.launch {
+            val list = ids(c.network.isOnline.value)
+            if (list.isEmpty()) {
+                snackbar.showSnackbar("Couldn't find anything for this radio")
+            } else {
+                c.player.play(PlaySource(PlaySource.Kind.SONGS, label = label, songIds = list))
+            }
+        }
+    }
+
+    fun confirmAddToPlaylist(playlistId: String?, name: String, songIds: List<String>) {
+        playlistPicker.value = null
+        c.appScope.launch {
+            val result = runCatching {
+                if (playlistId == null) c.library.createPlaylist(name, songIds) else c.library.addToPlaylist(playlistId, songIds)
+            }
+            snackbar.showSnackbar(
+                if (result.isSuccess) (if (playlistId == null) "Created \"$name\"" else "Added to \"$name\"")
+                else "Couldn't update the playlist (offline?)"
+            )
+        }
+    }
 }
 
 private val TABS = listOf(
@@ -239,6 +273,15 @@ fun AppRoot() {
                         screen("queue") { QueueScreen() }
                     }
                 }
+            }
+
+            actions.playlistPicker.value?.let { ids ->
+                PlaylistPickerDialog(
+                    songIds = ids,
+                    onDismiss = { actions.playlistPicker.value = null },
+                    onAdd = { id, name -> actions.confirmAddToPlaylist(id, name, ids) },
+                    onCreate = { name -> actions.confirmAddToPlaylist(null, name, ids) },
+                )
             }
 
             AnimatedVisibility(

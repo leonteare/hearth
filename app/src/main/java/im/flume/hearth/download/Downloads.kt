@@ -124,6 +124,7 @@ class DownloadRepository(
             val songs = when (p.kind) {
                 KIND_PLAYLIST -> lib.playlistSongsOnce(p.id)
                 KIND_ALBUM -> lib.albumSongsOnce(p.id)
+                KIND_LIKED -> lib.starredSongsOnce()
                 else -> emptyList()
             }
             if (songs.isNotEmpty()) download(songs)
@@ -161,6 +162,7 @@ class DownloadRepository(
         const val WORK_NAME = "downloads"
         const val KIND_ALBUM = "album"
         const val KIND_PLAYLIST = "playlist"
+        const val KIND_LIKED = "liked"
     }
 }
 

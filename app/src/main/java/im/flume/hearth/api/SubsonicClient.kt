@@ -154,6 +154,33 @@ class SubsonicClient(
 
     suspend fun albumInfo(id: String): AlbumInfo? = call("getAlbumInfo2") { addQueryParameter("id", id) }.albumInfo
 
+    suspend fun similarSongs(songId: String, count: Int = 50): List<SongDto> =
+        call("getSimilarSongs") { addQueryParameter("id", songId); addQueryParameter("count", count.toString()) }.similarSongs?.song.orEmpty()
+
+    suspend fun similarSongsForArtist(artistId: String, count: Int = 50): List<SongDto> =
+        call("getSimilarSongs2") { addQueryParameter("id", artistId); addQueryParameter("count", count.toString()) }.similarSongs2?.song.orEmpty()
+
+    /** Creates a playlist and returns its id. */
+    suspend fun createPlaylist(name: String, songIds: List<String>): String? =
+        call("createPlaylist") {
+            addQueryParameter("name", name)
+            songIds.forEach { addQueryParameter("songId", it) }
+        }.playlist?.id
+
+    suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
+        call("updatePlaylist") {
+            addQueryParameter("playlistId", playlistId)
+            songIds.forEach { addQueryParameter("songIdToAdd", it) }
+        }
+    }
+
+    suspend fun removeFromPlaylist(playlistId: String, index: Int) {
+        call("updatePlaylist") {
+            addQueryParameter("playlistId", playlistId)
+            addQueryParameter("songIndexToRemove", index.toString())
+        }
+    }
+
     suspend fun star(songId: String) { call("star") { addQueryParameter("id", songId) } }
 
     suspend fun unstar(songId: String) { call("unstar") { addQueryParameter("id", songId) } }
