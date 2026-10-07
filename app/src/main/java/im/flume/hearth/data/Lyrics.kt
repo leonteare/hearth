@@ -13,18 +13,44 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class Lyrics(val synced: Boolean, val lines: List<LyricLine>) {
     val isEmpty: Boolean get() = lines.none { it.value.isNotBlank() }
-
-    /** Index of the line being sung at [positionMs], or -1 before the first line. */
-    fun currentLine(positionMs: Long): Int {
-        if (!synced) return -1
-        var idx = -1
-        for (i in lines.indices) {
-            val start = lines[i].start ?: continue
-            if (start <= positionMs) idx = i else break
-        }
-        return idx
-    }
 }
+
+/** A row on the lyrics screen: a sung line, or an instrumental break shown as animated dots. */
+data class LyricRow(val start: Long?, val end: Long?, val text: String, val isBreak: Boolean)
+
+/**
+ * Turns lyrics into display rows. For synced lyrics, an intro of [MIN_INTRO_MS] or more before the
+ * first line and every blank line become breaks that run until the next line starts.
+ */
+fun Lyrics.rows(): List<LyricRow> {
+    if (!synced) return lines.map { LyricRow(null, null, it.value, isBreak = false) }
+    val out = ArrayList<LyricRow>()
+    val firstStart = lines.firstOrNull { it.value.isNotBlank() }?.start
+    if (firstStart != null && firstStart >= MIN_INTRO_MS) out += LyricRow(0, firstStart, "", isBreak = true)
+    lines.forEachIndexed { i, line ->
+        val nextStart = lines.drop(i + 1).firstOrNull { it.start != null }?.start
+        if (line.value.isBlank()) {
+            if (out.lastOrNull()?.isBreak != true && line.start != null) {
+                out += LyricRow(line.start, nextStart ?: (line.start + 5_000), "", isBreak = true)
+            }
+        } else {
+            out += LyricRow(line.start, nextStart, line.value, isBreak = false)
+        }
+    }
+    return out
+}
+
+/** Index of the row playing at [positionMs] (the last row that has started), or -1. */
+fun List<LyricRow>.currentIndex(positionMs: Long): Int {
+    var idx = -1
+    for (i in indices) {
+        val s = this[i].start ?: return -1
+        if (s <= positionMs) idx = i else break
+    }
+    return idx
+}
+
+const val MIN_INTRO_MS = 3_000L
 
 @Entity(tableName = "lyrics")
 data class LyricsEntity(@PrimaryKey val songId: String, val json: String, val fetchedAt: Long)
@@ -52,7 +78,8 @@ class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsD
         }
         if (cached != null) {
             val (lyrics, at) = cached
-            val stale = lyrics.isEmpty && System.currentTimeMillis() - at > WEEK
+            val age = System.currentTimeMillis() - at
+            val stale = age > (if (lyrics.isEmpty) WEEK else MONTH)
             if (!stale || !online) return lyrics
         }
         if (!online) return null
@@ -82,5 +109,6 @@ class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsD
 
     companion object {
         private const val WEEK = 7 * 24 * 60 * 60 * 1000L
+        private const val MONTH = 30 * 24 * 60 * 60 * 1000L
     }
 }

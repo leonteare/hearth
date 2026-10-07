@@ -1,6 +1,19 @@
 package im.flume.hearth.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import im.flume.hearth.data.currentIndex
+import im.flume.hearth.data.rows
+import im.flume.hearth.ui.components.LocalRowContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -184,30 +197,34 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
                     Text("PLAYING FROM", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                     Text(state.sourceLabel.ifBlank { "Your queue" }, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                IconButton(onClick = { showLyrics = !showLyrics }) {
-                    Icon(Icons.Default.Lyrics, "Lyrics", tint = if (showLyrics) Accent else Color.White)
-                }
-                IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
+                NowPlayingMenu(song, onClose)
             }
             if (landscape) {
                 Row(Modifier.weight(1f).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     artOrLyrics(Modifier.weight(1f).fillMaxHeight())
                     Spacer(Modifier.width(32.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        PlayerControls(state, song, onClose)
+                        PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue)
                     }
                 }
             } else {
                 artOrLyrics(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
-                PlayerControls(state, song, onClose)
-                Spacer(Modifier.height(16.dp))
+                PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue)
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
 }
 
 @Composable
-private fun PlayerControls(state: PlayerUiState, song: SongEntity?, onClose: () -> Unit) {
+private fun PlayerControls(
+    state: PlayerUiState,
+    song: SongEntity?,
+    onClose: () -> Unit,
+    showLyrics: Boolean,
+    onToggleLyrics: () -> Unit,
+    onOpenQueue: () -> Unit,
+) {
     val actions = LocalActions.current
     val player = LocalContext.current.container.player
     val meta = state.current?.mediaMetadata ?: return
@@ -272,6 +289,12 @@ private fun PlayerControls(state: PlayerUiState, song: SongEntity?, onClose: () 
             )
         }
     }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        IconButton(onClick = onToggleLyrics) {
+            Icon(Icons.Default.Lyrics, "Lyrics", tint = if (showLyrics) Accent else Color.White)
+        }
+        IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
+    }
 }
 
 @Composable
@@ -301,32 +324,97 @@ private fun LyricsMessage(text: String, modifier: Modifier) {
 }
 
 @Composable
+private fun NowPlayingMenu(song: SongEntity?, onClose: () -> Unit) {
+    val actions = LocalActions.current
+    val downloaded = song != null && LocalRowContext.current.downloads[song.id] != null
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            song?.albumId?.let { id ->
+                DropdownMenuItem(
+                    text = { Text("Go to album") },
+                    leadingIcon = { Icon(Icons.Default.Album, null) },
+                    onClick = { open = false; onClose(); actions.openAlbum(id) },
+                )
+            }
+            song?.artistId?.let { id ->
+                DropdownMenuItem(
+                    text = { Text("Go to artist") },
+                    leadingIcon = { Icon(Icons.Default.Person, null) },
+                    onClick = { open = false; onClose(); actions.openArtist(id) },
+                )
+            }
+            if (song != null) {
+                DropdownMenuItem(
+                    text = { Text(if (downloaded) "Remove download" else "Download") },
+                    leadingIcon = { Icon(if (downloaded) Icons.Default.DownloadDone else Icons.Default.Download, null) },
+                    onClick = {
+                        open = false
+                        if (downloaded) actions.removeDownload(listOf(song.id)) else actions.download(listOf(song))
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: Modifier) {
     val player = LocalContext.current.container.player
     val pos = rememberPosition(state)
-    val currentLine = lyrics.currentLine(pos)
+    val rows = remember(lyrics) { lyrics.rows() }
+    val current = rows.currentIndex(pos)
     val listState = rememberLazyListState()
-    LaunchedEffect(currentLine) {
-        if (currentLine >= 0) listState.animateScrollToItem((currentLine - 2).coerceAtLeast(0))
+    LaunchedEffect(current) {
+        if (current >= 0) listState.animateScrollToItem((current - 2).coerceAtLeast(0))
     }
     LazyColumn(modifier, state = listState, contentPadding = PaddingValues(vertical = 24.dp)) {
-        itemsIndexed(lyrics.lines) { i, line ->
-            val active = !lyrics.synced || i == currentLine
-            val past = lyrics.synced && i < currentLine
-            Text(
-                line.value.ifBlank { "♪" },
-                style = if (lyrics.synced) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
-                fontWeight = if (lyrics.synced) FontWeight.Bold else FontWeight.Normal,
-                color = when {
-                    active -> Color.White
-                    past -> Color.White.copy(alpha = 0.55f)
-                    else -> Color.White.copy(alpha = 0.35f)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = lyrics.synced && line.start != null) { player.seekTo(line.start ?: 0) }
-                    .padding(vertical = if (lyrics.synced) 8.dp else 2.dp),
-            )
+        itemsIndexed(rows) { i, row ->
+            if (row.isBreak) {
+                val active = i == current
+                val progress = when {
+                    active && row.start != null && row.end != null && row.end > row.start ->
+                        ((pos - row.start).toFloat() / (row.end - row.start)).coerceIn(0f, 1f)
+                    i < current -> 1f
+                    else -> 0f
+                }
+                BreakDots(active, progress, Modifier.padding(vertical = 28.dp))
+            } else {
+                val active = !lyrics.synced || i == current
+                val past = lyrics.synced && i < current
+                Text(
+                    row.text,
+                    style = if (lyrics.synced) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (lyrics.synced) FontWeight.Bold else FontWeight.Normal,
+                    color = when {
+                        active -> Color.White
+                        past -> Color.White.copy(alpha = 0.55f)
+                        else -> Color.White.copy(alpha = 0.35f)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = lyrics.synced && row.start != null) { player.seekTo(row.start ?: 0) }
+                        .padding(vertical = if (lyrics.synced) 8.dp else 2.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Instrumental break: three small dots that slowly fill with white, one after another, until the next line. */
+@Composable
+private fun BreakDots(active: Boolean, progress: Float, modifier: Modifier = Modifier) {
+    val smooth by animateFloatAsState(progress, tween(300, easing = LinearEasing), label = "dots")
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            val lit = (smooth * 3 - i).coerceIn(0f, 1f)
+            val alpha = when {
+                active -> 0.3f + 0.7f * lit
+                progress >= 1f -> 0.55f
+                else -> 0.3f
+            }
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Color.White.copy(alpha = alpha)))
         }
     }
 }
