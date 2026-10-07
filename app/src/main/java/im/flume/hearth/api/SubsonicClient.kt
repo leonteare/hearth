@@ -138,6 +138,17 @@ class SubsonicClient(
 
     suspend fun scanStatus(): ScanStatus? = runCatching { call("getScanStatus").scanStatus }.getOrNull()
 
+    /** Structured (possibly synced) lyrics; empty when the song has none. */
+    suspend fun lyricsBySongId(songId: String): List<StructuredLyrics> =
+        call("getLyricsBySongId") { addQueryParameter("id", songId) }.lyricsList?.structuredLyrics.orEmpty()
+
+    /** Older plain-text lyrics endpoint, matched by artist and title. */
+    suspend fun lyricsByName(artist: String, title: String): String? =
+        call("getLyrics") {
+            addQueryParameter("artist", artist)
+            addQueryParameter("title", title)
+        }.lyrics?.value?.takeIf { it.isNotBlank() }
+
     suspend fun star(songId: String) { call("star") { addQueryParameter("id", songId) } }
 
     suspend fun unstar(songId: String) { call("unstar") { addQueryParameter("id", songId) } }

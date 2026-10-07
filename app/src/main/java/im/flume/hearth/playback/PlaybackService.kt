@@ -163,6 +163,18 @@ class PlaybackService : MediaSessionService() {
         saveQueue()
     }
 
+    /** Swipe-right in the queue: this song plays straight after the current one, as a hand-queued song. */
+    private fun moveToNext(index: Int) {
+        val cur = player.currentMediaItemIndex
+        if (index <= cur || index >= player.mediaItemCount) return
+        val item = player.getMediaItemAt(index)
+        val extras = Bundle(item.mediaMetadata.extras ?: Bundle.EMPTY).apply { putBoolean(EXTRA_MANUAL, true) }
+        val manual = item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
+        player.removeMediaItem(index)
+        player.addMediaItem(cur + 1, manual)
+        saveQueue()
+    }
+
     private fun toggleShuffle() {
         shuffled = !shuffled
         val current = player.currentMediaItem?.mediaId
@@ -270,6 +282,7 @@ class PlaybackService : MediaSessionService() {
                 .add(SessionCommand(CMD_PLAY_NEXT, Bundle.EMPTY))
                 .add(SessionCommand(CMD_ADD_TO_QUEUE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                .add(SessionCommand(CMD_MOVE_NEXT, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -293,6 +306,7 @@ class PlaybackService : MediaSessionService() {
                 CMD_PLAY_NEXT -> scope.launch { insertSongs(args.getStringArrayList(ARG_SONG_IDS).orEmpty(), next = true) }
                 CMD_ADD_TO_QUEUE -> scope.launch { insertSongs(args.getStringArrayList(ARG_SONG_IDS).orEmpty(), next = false) }
                 CMD_TOGGLE_SHUFFLE -> toggleShuffle()
+                CMD_MOVE_NEXT -> moveToNext(args.getInt(ARG_INDEX, -1))
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -390,6 +404,8 @@ class PlaybackService : MediaSessionService() {
         const val CMD_PLAY_NEXT = "hearth.PLAY_NEXT"
         const val CMD_ADD_TO_QUEUE = "hearth.ADD_TO_QUEUE"
         const val CMD_TOGGLE_SHUFFLE = "hearth.TOGGLE_SHUFFLE"
+        const val CMD_MOVE_NEXT = "hearth.MOVE_NEXT"
+        const val ARG_INDEX = "index"
         const val ARG_SOURCE = "source"
         const val ARG_START_ID = "startId"
         const val ARG_SHUFFLE = "shuffle"

@@ -114,6 +114,8 @@ class PlayerConnection(private val context: Context) {
         putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(songIds))
     })
 
+    fun moveToNext(index: Int) = send(PlaybackService.CMD_MOVE_NEXT, Bundle().apply { putInt(PlaybackService.ARG_INDEX, index) })
+
     fun toggleShuffle() = send(PlaybackService.CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)
 
     fun playPause() {

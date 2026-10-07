@@ -137,6 +137,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             if (file != null && dao.get(next.songId) != null) {
                 dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
                 c.downloads.markDone(next.songId, file.absolutePath)
+                c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) }
                 completed++
                 failuresInRow = 0
                 runCatching { setForeground(foregroundInfo(completed)) }

@@ -22,6 +22,8 @@ data class SubsonicResponse(
     val playlists: Playlists? = null,
     val playlist: PlaylistDto? = null,
     val scanStatus: ScanStatus? = null,
+    val lyricsList: LyricsList? = null,
+    val lyrics: PlainLyrics? = null,
 )
 
 @Serializable
@@ -113,3 +115,22 @@ data class ScanStatus(
     val count: Long? = null,
     val lastScan: String? = null,
 )
+
+/** OpenSubsonic getLyricsBySongId. [LyricLine.start] is in ms and only present when synced. */
+@Serializable
+data class LyricsList(val structuredLyrics: List<StructuredLyrics> = emptyList())
+
+@Serializable
+data class StructuredLyrics(
+    val lang: String? = null,
+    val synced: Boolean = false,
+    val offset: Long = 0,
+    val line: List<LyricLine> = emptyList(),
+)
+
+@Serializable
+data class LyricLine(val start: Long? = null, val value: String = "")
+
+/** Legacy Subsonic getLyrics (plain text). */
+@Serializable
+data class PlainLyrics(val artist: String? = null, val title: String? = null, val value: String? = null)

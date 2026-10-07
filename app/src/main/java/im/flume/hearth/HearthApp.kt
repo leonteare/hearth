@@ -11,6 +11,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.LibraryRepository
+import im.flume.hearth.data.LyricsRepository
 import im.flume.hearth.data.NetworkMonitor
 import im.flume.hearth.data.SessionStore
 import im.flume.hearth.download.DownloadRepository
@@ -63,6 +64,7 @@ class AppContainer(context: Context) {
     val network = NetworkMonitor(context, api, session, appScope)
     val downloads = DownloadRepository(context, db, session, appScope)
     val library = LibraryRepository(db, api, downloads)
+    val lyrics = LyricsRepository(api, db.lyrics())
     val sync = LibrarySync(api, db, session, onPlaylistsSynced = { downloads.refreshPinned() })
     val player = PlayerConnection(context)
 
