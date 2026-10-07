@@ -6,6 +6,7 @@ import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.PlaylistSongEntity
 import im.flume.hearth.data.SessionStore
 import im.flume.hearth.data.toEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,9 @@ class LibrarySync(
             if (lastScan != null) session.lastScan = lastScan
             onPlaylistsSynced()
             _state.value = SyncState.Idle
+        } catch (e: CancellationException) {
+            _state.value = SyncState.Idle
+            throw e
         } catch (e: Exception) {
             _state.value = SyncState.Failed(e.message ?: "Sync failed")
         }

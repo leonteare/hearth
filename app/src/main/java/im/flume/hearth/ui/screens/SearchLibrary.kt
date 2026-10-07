@@ -200,7 +200,6 @@ fun LibraryScreen() {
     val c = LocalContext.current.container
     val dao = c.db.library()
     val actions = LocalActions.current
-    val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
     val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
     val artists by remember { dao.artists() }.collectAsStateWithLifecycle(emptyList())
@@ -226,7 +225,7 @@ fun LibraryScreen() {
         }
         PullToRefreshBox(
             isRefreshing = sync is SyncState.Running,
-            onRefresh = { scope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } },
+            onRefresh = { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } },
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(Modifier.fillMaxSize()) {

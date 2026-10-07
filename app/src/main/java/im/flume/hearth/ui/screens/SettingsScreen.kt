@@ -113,7 +113,6 @@ fun SettingsScreen() {
 fun GeneralSettings() {
     val c = LocalContext.current.container
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val settings by c.session.settings.collectAsStateWithLifecycle()
     val creds by c.session.credentials.collectAsStateWithLifecycle()
     val songCount by remember { c.db.library().songCount() }.collectAsStateWithLifecycle(0)
@@ -133,7 +132,7 @@ fun GeneralSettings() {
         Clickable(
             title = if (sync is SyncState.Running) "Syncing…" else "Resync library now",
             subtitle = (sync as? SyncState.Failed)?.message ?: "Fetches any changes from Navidrome",
-        ) { scope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } }
+        ) { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } }
 
         Section("Streaming")
         Choice("Quality on Wi-Fi", settings.wifiBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(wifiBitrate = v) } }

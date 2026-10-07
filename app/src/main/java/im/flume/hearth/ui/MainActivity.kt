@@ -11,7 +11,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import im.flume.hearth.container
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.HearthTheme
@@ -47,7 +46,7 @@ class MainActivity : ComponentActivity() {
         c.updater.checkIfDue()
         if (c.session.credentials.value != null) {
             c.network.checkServer()
-            lifecycleScope.launch { runCatching { c.sync.syncIfNeeded() } }
+            c.appScope.launch { runCatching { c.sync.syncIfNeeded() } }
         }
     }
 
