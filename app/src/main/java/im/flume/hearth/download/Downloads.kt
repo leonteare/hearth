@@ -12,6 +12,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import im.flume.hearth.AppContainer
@@ -36,9 +37,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Call
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -133,12 +136,25 @@ class DownloadRepository(
         remove(ids)
     }
 
+    /** True when downloads are waiting to retry after connection problems. */
+    val pausedAfterErrors: Flow<Boolean> = WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(WORK_NAME)
+        .map { infos -> infos.any { it.state == WorkInfo.State.ENQUEUED && it.runAttemptCount > 0 } }
+
+    /**
+     * Starts the download worker. A running worker keeps going (it picks up newly queued songs);
+     * one that's waiting out a retry back-off is replaced so it starts straight away.
+     */
     fun schedule() {
-        val network = if (session.settings.value.wifiOnlyDownloads) NetworkType.UNMETERED else NetworkType.CONNECTED
-        val request = OneTimeWorkRequestBuilder<DownloadWorker>()
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        scope.launch(Dispatchers.IO) {
+            val wm = WorkManager.getInstance(context)
+            val running = runCatching { wm.getWorkInfosForUniqueWork(WORK_NAME).get() }.getOrDefault(emptyList())
+                .any { it.state == WorkInfo.State.RUNNING }
+            val network = if (session.settings.value.wifiOnlyDownloads) NetworkType.UNMETERED else NetworkType.CONNECTED
+            val request = OneTimeWorkRequestBuilder<DownloadWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
+                .build()
+            wm.enqueueUniqueWork(WORK_NAME, if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE, request)
+        }
     }
 
     companion object {
@@ -153,6 +169,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         val c = (applicationContext as HearthApp).container
         val dao = c.db.downloads()
+        // The server may take a while to start sending a song it has to convert first.
+        val http = c.http.newBuilder().readTimeout(2, TimeUnit.MINUTES).build()
         val claim = Mutex()
         val completed = AtomicInteger(0)
         val failuresInRow = AtomicInteger(0)
@@ -167,7 +185,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                             dao.nextQueued()?.also { dao.upsert(it.copy(state = DownloadState.DOWNLOADING)) }
                         } ?: break
                         val file = runCatching {
-                            fetch(c, next.songId, c.downloads.dir, c.session.settings.value.downloadBitrate)
+                            fetch(c, http, next.songId, c.downloads.dir, c.session.settings.value.downloadBitrate)
                         }.getOrNull()
                         val stillWanted = dao.get(next.songId) != null
                         when {
@@ -193,11 +211,11 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         return if (backOff.get()) Result.retry() else Result.success()
     }
 
-    private suspend fun fetch(c: AppContainer, songId: String, dir: File, bitrate: Int): File =
+    private suspend fun fetch(c: AppContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {
             val url = c.api.streamUrl(songId, bitrate) ?: error("Not logged in")
             val tmp = File(dir, "$songId.part")
-            val call = c.http.newCall(Request.Builder().url(url).build())
+            val call = http.newCall(Request.Builder().url(url).build())
             c.downloads.active[songId] = call
             try {
                 call.execute().use { resp ->

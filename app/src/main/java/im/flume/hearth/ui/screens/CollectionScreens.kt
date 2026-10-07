@@ -200,10 +200,12 @@ fun AlbumScreen(id: String) {
 fun PlaylistScreen(id: String) {
     val dao = LocalContext.current.container.db.library()
     val playlist by remember(id) { dao.playlist(id) }.collectAsStateWithLifecycle(null)
+    val me = LocalContext.current.container.session.credentials.collectAsStateWithLifecycle().value?.username
     val songs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
     CollectionScreen(
         title = playlist?.name.orEmpty(),
-        subtitle = playlist?.owner.orEmpty(),
+        // Only name the owner when it's someone else's playlist.
+        subtitle = playlist?.owner?.takeIf { !it.equals(me, ignoreCase = true) }.orEmpty(),
         cover = playlist?.coverArt,
         songs = songs,
         source = PlaySource(PlaySource.Kind.PLAYLIST, id, playlist?.name.orEmpty()),
@@ -298,6 +300,7 @@ fun DownloadsScreen() {
     val queued = pending.filter { states[it.id] != DownloadState.FAILED }
     val failed = pending.filter { states[it.id] == DownloadState.FAILED }
     val waitingForWifi = queued.isNotEmpty() && progress == null && settings.wifiOnlyDownloads && c.network.isMetered()
+    val paused by remember { c.downloads.pausedAfterErrors }.collectAsStateWithLifecycle(false)
 
     CollectionScreen(
         title = "Downloads",
@@ -312,6 +315,12 @@ fun DownloadsScreen() {
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Downloading · ${queued.size} left", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                         TextButton(onClick = { c.downloads.cancelPending() }) { Text("Cancel all", color = TextSecondary) }
+                    }
+                    if (paused && !waitingForWifi) {
+                        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Paused after a connection problem", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now", color = Accent) }
+                        }
                     }
                     if (waitingForWifi) {
                         Text(

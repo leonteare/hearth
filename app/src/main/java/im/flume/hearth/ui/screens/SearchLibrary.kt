@@ -1,6 +1,16 @@
 package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.History
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,8 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +90,22 @@ fun SearchScreen() {
     var artists by remember { mutableStateOf<List<ArtistEntity>>(emptyList()) }
     val genres by remember { dao.genres() }.collectAsStateWithLifecycle(emptyList())
 
+    val context = LocalContext.current
+    val recentPrefs = remember { context.getSharedPreferences("search", android.content.Context.MODE_PRIVATE) }
+    var recent by remember { mutableStateOf(recentPrefs.getString("recent", "").orEmpty().split('\n').filter { it.isNotBlank() }) }
+    fun saveRecent(q: String) {
+        val t = q.trim().takeIf { it.length >= 2 } ?: return
+        recent = (listOf(t) + recent.filterNot { it.equals(t, ignoreCase = true) }).take(10)
+        recentPrefs.edit().putString("recent", recent.joinToString("\n")).apply()
+    }
+    // Searches that found something are remembered when you leave the page.
+    val latestQuery by rememberUpdatedState(query)
+    val hadResults by rememberUpdatedState(songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty())
+    DisposableEffect(Unit) { onDispose { if (hadResults) saveRecent(latestQuery) } }
+
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+
     LaunchedEffect(query) {
         val q = query.trim()
         if (q.isEmpty()) {
@@ -94,29 +119,63 @@ fun SearchScreen() {
 
     Column(Modifier.fillMaxSize()) {
         Text("Search", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.statusBarsPadding().padding(16.dp))
-        TextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("Songs, artists or albums") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear") } },
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.White, unfocusedContainerColor = Color.White,
-                focusedTextColor = Color.Black, unfocusedTextColor = Color.Black,
-                focusedLeadingIconColor = Color.Black, unfocusedLeadingIconColor = Color.Black,
-                focusedTrailingIconColor = Color.Black, unfocusedTrailingIconColor = Color.Black,
-                focusedPlaceholderColor = Color.DarkGray, unfocusedPlaceholderColor = Color.DarkGray,
-                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = Color.Black,
-            ),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White)
+                .padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Search, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Black),
+                cursorBrush = SolidColor(Color.Black),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { saveRecent(query) }),
+                modifier = Modifier.weight(1f).focusRequester(focus),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) Text("Songs, artists or albums", color = Color.DarkGray, style = MaterialTheme.typography.bodyLarge)
+                    inner()
+                },
+            )
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear", tint = Color.Black) }
+            } else {
+                Spacer(Modifier.width(12.dp))
+            }
+        }
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
             if (query.isBlank()) {
-                item { SectionHeader("Browse genres") }
+                if (recent.isNotEmpty()) {
+                    item {
+                        Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { SectionHeader("Recent searches") }
+                            TextButton(onClick = {
+                                recent = emptyList()
+                                recentPrefs.edit().remove("recent").apply()
+                            }) { Text("Clear", color = TextSecondary) }
+                        }
+                    }
+                    items(recent, key = { "r:$it" }) { r ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { query = r }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Default.History, null, tint = TextSecondary)
+                            Spacer(Modifier.width(16.dp))
+                            Text(r, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
                 items(genres.chunked(2)) { pair ->
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         pair.forEach { g ->
