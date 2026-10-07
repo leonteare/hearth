@@ -26,6 +26,9 @@ import im.flume.hearth.data.SongEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,6 +56,23 @@ class DownloadRepository(
     private val done = ConcurrentHashMap<String, String>()
     /** In-flight HTTP calls by song id, so removing a download stops it immediately. */
     internal val active = ConcurrentHashMap<String, Call>()
+
+    /** Song currently downloading and how far along it is (0..1, or null if the size isn't known). */
+    private val _progress = MutableStateFlow<Pair<String, Float?>?>(null)
+    val progress: StateFlow<Pair<String, Float?>?> = _progress.asStateFlow()
+    internal fun setProgress(value: Pair<String, Float?>?) { _progress.value = value }
+
+    /** Try failed downloads again. */
+    fun retryFailed() = scope.launch {
+        dao.requeueStale()
+        schedule()
+    }
+
+    /** Drop everything that hasn't finished yet; finished downloads are kept. */
+    fun cancelPending() = scope.launch {
+        active.values.forEach { it.cancel() }
+        dao.deletePending()
+    }
     val dir: File = File(context.filesDir, "music").apply { mkdirs() }
 
     val states: Flow<Map<String, DownloadState>> = dao.all().map { list -> list.associate { it.songId to it.state } }
@@ -184,13 +204,32 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     check(resp.isSuccessful) { "HTTP ${resp.code}" }
                     val type = resp.header("Content-Type").orEmpty()
                     check(!type.contains("json") && !type.contains("xml")) { "Server returned an error instead of audio" }
-                    resp.body!!.byteStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                    val body = resp.body!!
+                    val total = body.contentLength().takeIf { it > 0 }
+                    body.byteStream().use { input ->
+                        tmp.outputStream().use { out ->
+                            val buf = ByteArray(64 * 1024)
+                            var done = 0L
+                            var lastReport = 0L
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                out.write(buf, 0, n)
+                                done += n
+                                if (done - lastReport > 256 * 1024) {
+                                    lastReport = done
+                                    c.downloads.setProgress(songId to total?.let { (done.toFloat() / it).coerceAtMost(1f) })
+                                }
+                            }
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 tmp.delete()
                 throw e
             } finally {
                 c.downloads.active.remove(songId)
+                c.downloads.setProgress(null)
             }
             File(dir, songId).also { dest -> dest.delete(); check(tmp.renameTo(dest)) { "Rename failed" } }
         }
@@ -217,6 +256,6 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     companion object {
         private const val CHANNEL = "downloads"
         private const val NOTIFICATION_ID = 42
-        private const val PARALLEL = 3
+        private const val PARALLEL = 1
     }
 }

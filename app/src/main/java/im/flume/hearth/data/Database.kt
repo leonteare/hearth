@@ -73,6 +73,16 @@ interface LibraryDao {
     @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
     suspend fun downloadedSongsOnce(): List<SongEntity>
 
+    @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
+    fun downloadedSongs(): Flow<List<SongEntity>>
+
+    /** Not-yet-finished downloads: the one in progress first, then the queue in order, failures last. */
+    @Query(
+        """SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state != 'DONE'
+           ORDER BY CASE d.state WHEN 'DOWNLOADING' THEN 0 WHEN 'QUEUED' THEN 1 ELSE 2 END, d.addedAt"""
+    )
+    fun pendingDownloadSongs(): Flow<List<SongEntity>>
+
     @Query(
         """SELECT * FROM songs
            WHERE title LIKE '%' || :q || '%' OR artist LIKE '%' || :q || '%' OR album LIKE '%' || :q || '%'
@@ -186,6 +196,7 @@ interface DownloadDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertIgnore(items: List<DownloadEntity>)
     @Query("DELETE FROM downloads WHERE songId IN (:ids)") suspend fun delete(ids: List<String>)
     @Query("UPDATE downloads SET state = 'QUEUED' WHERE state IN ('DOWNLOADING', 'FAILED')") suspend fun requeueStale()
+    @Query("DELETE FROM downloads WHERE state != 'DONE'") suspend fun deletePending()
     @Query("SELECT COALESCE(SUM(bytes), 0) FROM downloads WHERE state = 'DONE'") fun totalBytes(): Flow<Long>
 
     @Query("SELECT * FROM pinned") suspend fun pinned(): List<PinnedEntity>

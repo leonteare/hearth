@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,6 +86,7 @@ fun CollectionScreen(
     showTrackNumbers: Boolean = false,
     headerIcon: (@Composable () -> Unit)? = null,
     extraContent: LazyListScope.() -> Unit = {},
+    topContent: LazyListScope.() -> Unit = {},
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -153,6 +155,7 @@ fun CollectionScreen(
                 },
             )
         }
+        topContent()
         itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { _, song ->
             SongRow(
                 song,
@@ -286,8 +289,16 @@ fun LikedScreen() {
 @Composable
 fun DownloadsScreen() {
     val c = LocalContext.current.container
-    val songs by remember { c.db.library().downloadedOrQueuedSongs() }.collectAsStateWithLifecycle(emptyList())
+    val songs by remember { c.db.library().downloadedSongs() }.collectAsStateWithLifecycle(emptyList())
+    val pending by remember { c.db.library().pendingDownloadSongs() }.collectAsStateWithLifecycle(emptyList())
     val bytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    val progress by c.downloads.progress.collectAsStateWithLifecycle()
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val states = LocalRowContext.current.downloads
+    val queued = pending.filter { states[it.id] != DownloadState.FAILED }
+    val failed = pending.filter { states[it.id] == DownloadState.FAILED }
+    val waitingForWifi = queued.isNotEmpty() && progress == null && settings.wifiOnlyDownloads && c.network.isMetered()
+
     CollectionScreen(
         title = "Downloads",
         subtitle = formatBytes(bytes),
@@ -295,6 +306,53 @@ fun DownloadsScreen() {
         songs = songs,
         source = PlaySource.Downloads,
         headerIcon = { BigIcon(Icons.Default.DownloadDone, Color(0xFF1E6B52)) },
+        topContent = {
+            if (queued.isNotEmpty()) {
+                item(key = "q-head") {
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Downloading · ${queued.size} left", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { c.downloads.cancelPending() }) { Text("Cancel all", color = TextSecondary) }
+                    }
+                    if (waitingForWifi) {
+                        Text(
+                            "Waiting for Wi-Fi. Turn off \"Download on Wi-Fi only\" in Settings → Storage to use mobile data.",
+                            color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+                items(queued.take(50), key = { "q:${it.id}" }) { song ->
+                    val p = progress?.takeIf { it.first == song.id }
+                    Column {
+                        SongRow(song, onClick = {})
+                        if (p != null) {
+                            LinearProgressIndicator(
+                                progress = { p.second ?: 0f },
+                                modifier = Modifier.fillMaxWidth().padding(start = 76.dp, end = 16.dp).height(3.dp),
+                                color = Accent,
+                                trackColor = TextSecondary.copy(alpha = 0.25f),
+                                gapSize = 0.dp,
+                                drawStopIndicator = {},
+                            )
+                        }
+                    }
+                }
+                if (queued.size > 50) {
+                    item(key = "q-more") { Text("+ ${queued.size - 50} more waiting", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
+                }
+            }
+            if (failed.isNotEmpty()) {
+                item(key = "f-head") {
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${failed.size} couldn't download", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry", color = Accent) }
+                    }
+                }
+            }
+            if (songs.isNotEmpty() && (queued.isNotEmpty() || failed.isNotEmpty())) {
+                item(key = "d-head") { SectionHeader("Downloaded") }
+            }
+        },
         extraContent = {
             if (songs.isNotEmpty()) {
                 item {
@@ -302,7 +360,7 @@ fun DownloadsScreen() {
                         Text("Remove all downloads", color = MaterialTheme.colorScheme.error)
                     }
                 }
-            } else {
+            } else if (pending.isEmpty()) {
                 item {
                     Text(
                         "Nothing downloaded yet. Tap the download icon on an album or playlist to keep it on your phone.",
