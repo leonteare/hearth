@@ -16,6 +16,7 @@ coroutines = "1.10.2"
 coil = "3.3.0"
 reorderable = "2.5.1"
 junit = "4.13.2"
+palette = "1.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
+palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

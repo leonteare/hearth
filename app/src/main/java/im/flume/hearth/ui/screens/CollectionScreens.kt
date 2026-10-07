@@ -48,6 +48,8 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.AlbumCard
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.DownloadToggle
+import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.LocalRowContext
 import im.flume.hearth.ui.components.PlayShuffleButtons
@@ -88,12 +90,14 @@ fun CollectionScreen(
     val isPinned = pin != null && "${pin.kind}:${pin.id}" in pinned
     val allDownloaded = songs.isNotEmpty() && songs.all { downloads[it.id] == DownloadState.DONE }
     val anyDownloading = songs.any { downloads[it.id] == DownloadState.QUEUED || downloads[it.id] == DownloadState.DOWNLOADING }
+    val doneCount = songs.count { downloads[it.id] == DownloadState.DONE }
+    val headerColor = rememberCoverColor(cover)
     val totalSec = songs.sumOf { it.durationSec.toLong() }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Box(
-                Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Accent.copy(alpha = 0.35f), Color.Transparent)))
+                Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))
             ) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth()) { BackButton() }
@@ -115,19 +119,16 @@ fun CollectionScreen(
                 onPlay = { actions.play(source) },
                 onShuffle = { actions.play(source, shuffle = true) },
                 extra = {
-                    IconButton(onClick = {
+                    DownloadToggle(
+                        downloaded = allDownloaded || (isPinned && !anyDownloading),
+                        progress = if (anyDownloading) doneCount.toFloat() / songs.size.coerceAtLeast(1) else null,
+                    ) {
                         when {
                             pin != null && (isPinned || allDownloaded) -> c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
                             pin != null -> c.downloads.pinAndDownload(pin.kind, pin.id, songs)
                             allDownloaded -> actions.removeDownload(songs.map { it.id })
                             else -> actions.download(songs)
                         }
-                    }) {
-                        Icon(
-                            if (allDownloaded || isPinned) Icons.Default.DownloadDone else Icons.Default.Download,
-                            if (allDownloaded) "Remove download" else "Download",
-                            tint = if (allDownloaded || isPinned || anyDownloading) Accent else TextSecondary,
-                        )
                     }
                 },
             )
@@ -198,7 +199,8 @@ fun ArtistScreen(id: String) {
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Accent.copy(alpha = 0.35f), Color.Transparent)))) {
+            val artistColor = rememberCoverColor(artist?.coverArt ?: albums.firstOrNull()?.coverArt)
+            Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(artistColor, Color.Transparent)))) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth()) { BackButton() }
                     CoverArt(artist?.coverArt ?: albums.firstOrNull()?.coverArt, 180.dp, Modifier.clip(CircleShape), requestSize = 600)

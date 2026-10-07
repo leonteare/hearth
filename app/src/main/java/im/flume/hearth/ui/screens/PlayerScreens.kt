@@ -6,7 +6,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.DropdownMenu
@@ -99,6 +100,7 @@ import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.playback.QueueEntry
 import im.flume.hearth.playback.isManual
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatDuration
 import im.flume.hearth.ui.theme.Accent
@@ -172,11 +174,12 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     val songId = current.mediaId
     val song by remember(songId) { c.db.library().songFlow(songId) }.collectAsStateWithLifecycle(null)
     var showLyrics by rememberSaveable { mutableStateOf(false) }
+    val topColor = rememberCoverColor(state.coverArt)
 
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF5A3A26), Background, Background)))
+            .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
             .clickable(enabled = false) {}
             .safeDrawingPadding()
     ) {
@@ -348,7 +351,7 @@ private fun NowPlayingMenu(song: SongEntity?, onClose: () -> Unit) {
             if (song != null) {
                 DropdownMenuItem(
                     text = { Text(if (downloaded) "Remove download" else "Download") },
-                    leadingIcon = { Icon(if (downloaded) Icons.Default.DownloadDone else Icons.Default.Download, null) },
+                    leadingIcon = { Icon(if (downloaded) Icons.Default.CheckCircle else Icons.Outlined.ArrowCircleDown, null) },
                     onClick = {
                         open = false
                         if (downloaded) actions.removeDownload(listOf(song.id)) else actions.download(listOf(song))

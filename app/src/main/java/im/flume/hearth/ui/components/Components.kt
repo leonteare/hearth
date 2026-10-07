@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.Favorite
@@ -151,7 +153,7 @@ fun SongRow(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (dl) {
-                    DownloadState.DONE -> Icon(Icons.Default.DownloadDone, null, Modifier.size(14.dp), tint = Accent)
+                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(14.dp), tint = Accent)
                     DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, null, Modifier.size(14.dp), tint = TextSecondary)
                     else -> {}
                 }
@@ -185,9 +187,9 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit) {
             if (song.starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
         ) { actions.setStarred(song.id, !song.starred); onDismiss() }
         if (dl == null) {
-            MenuItem("Download", Icons.Default.DownloadDone) { actions.download(listOf(song)); onDismiss() }
+            MenuItem("Download", Icons.Outlined.ArrowCircleDown) { actions.download(listOf(song)); onDismiss() }
         } else {
-            MenuItem("Remove download", Icons.Default.DownloadDone) { actions.removeDownload(listOf(song.id)); onDismiss() }
+            MenuItem("Remove download", Icons.Default.CheckCircle) { actions.removeDownload(listOf(song.id)); onDismiss() }
         }
         song.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { actions.openAlbum(id); onDismiss() } }
         song.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { actions.openArtist(id); onDismiss() } }
