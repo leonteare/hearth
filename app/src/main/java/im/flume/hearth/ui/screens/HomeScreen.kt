@@ -96,6 +96,8 @@ fun HomeScreen() {
             }
         }
 
+        item { UpdateBanner() }
+
         val running = sync as? SyncState.Running
         if (running != null && songCount <= 0) {
             item {

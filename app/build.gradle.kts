@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val versionProps = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
+
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -20,8 +22,9 @@ android {
         applicationId = "im.flume.hearth"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = versionProps.getProperty("versionCode").toInt()
+        versionName = versionProps.getProperty("versionName")
+        buildConfigField("String", "UPDATE_REPO", "\"leonteare/hearth\"")
     }
 
     signingConfigs {
@@ -52,6 +55,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

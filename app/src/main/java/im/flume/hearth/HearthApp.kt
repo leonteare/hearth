@@ -17,6 +17,7 @@ import im.flume.hearth.data.SessionStore
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.playback.PlayerConnection
 import im.flume.hearth.sync.LibrarySync
+import im.flume.hearth.update.Updater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,6 +68,7 @@ class AppContainer(context: Context) {
     val lyrics = LyricsRepository(api, db.lyrics())
     val sync = LibrarySync(api, db, session, onPlaylistsSynced = { downloads.refreshPinned() })
     val player = PlayerConnection(context)
+    val updater = Updater(context, http, appScope)
 
     /** Recently streamed audio, so replays are instant and work with no signal. One instance per process. */
     @androidx.annotation.OptIn(UnstableApi::class)

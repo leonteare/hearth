@@ -65,6 +65,9 @@ fun SettingsScreen() {
             Text("Settings", style = MaterialTheme.typography.titleLarge)
         }
 
+        Section("App")
+        UpdateSettingsRow()
+
         Section("Account")
         Info("Signed in as", creds?.username.orEmpty())
         Info("Server", creds?.serverUrl.orEmpty())
@@ -112,7 +115,7 @@ fun SettingsScreen() {
             confirmLogout = true
         }
         Text(
-            "Hearth 1.0 • cache size changes apply after the app restarts",
+            "Cache size changes apply after the app restarts",
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(16.dp),
         )
     }

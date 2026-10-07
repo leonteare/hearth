@@ -44,10 +44,16 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         val c = container
         c.player.connect()
+        c.updater.checkIfDue()
         if (c.session.credentials.value != null) {
             c.network.checkServer()
             lifecycleScope.launch { runCatching { c.sync.syncIfNeeded() } }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        container.updater.resumeAfterPermission()
     }
 
     override fun onStop() {
