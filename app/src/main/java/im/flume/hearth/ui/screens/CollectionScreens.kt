@@ -560,7 +560,8 @@ fun DownloadsScreen() {
     val states = LocalRowContext.current.downloads
     val queued = pending.filter { states[it.id] != DownloadState.FAILED }
     val failed = pending.filter { states[it.id] == DownloadState.FAILED }
-    val waitingForWifi = queued.isNotEmpty() && progress == null && settings.wifiOnlyDownloads && c.network.isMetered()
+    val waitingForWifi = queued.isNotEmpty() && progress == null && settings.wifiOnlyDownloads && !c.network.onWifi()
+    val lastError by c.downloads.lastError.collectAsStateWithLifecycle()
     val paused by remember { c.downloads.pausedAfterErrors }.collectAsStateWithLifecycle(false)
 
     CollectionScreen(
@@ -579,7 +580,10 @@ fun DownloadsScreen() {
                     }
                     if (paused && !waitingForWifi) {
                         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Paused after a connection problem", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Text(
+                                "Paused" + (lastError?.let { ": $it" } ?: ""),
+                                color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
+                            )
                             TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now", color = Accent) }
                         }
                     }
@@ -614,7 +618,10 @@ fun DownloadsScreen() {
             if (failed.isNotEmpty()) {
                 item(key = "f-head") {
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${failed.size} couldn't download", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Column(Modifier.weight(1f)) {
+                            Text("${failed.size} couldn't download", style = MaterialTheme.typography.titleMedium)
+                            lastError?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }
+                        }
                         TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry", color = Accent) }
                     }
                 }

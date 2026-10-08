@@ -220,6 +220,7 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads") fun all(): Flow<List<DownloadEntity>>
     @Query("SELECT * FROM downloads") suspend fun allOnce(): List<DownloadEntity>
     @Query("SELECT * FROM downloads WHERE state = 'QUEUED' ORDER BY addedAt LIMIT 1") suspend fun nextQueued(): DownloadEntity?
+    @Query("SELECT * FROM downloads WHERE state = 'FAILED' ORDER BY addedAt") suspend fun failed(): List<DownloadEntity>
     @Query("SELECT * FROM downloads WHERE songId = :songId") suspend fun get(songId: String): DownloadEntity?
     @Upsert suspend fun upsert(item: DownloadEntity)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertIgnore(items: List<DownloadEntity>)

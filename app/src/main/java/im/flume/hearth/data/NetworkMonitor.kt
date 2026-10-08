@@ -53,11 +53,18 @@ class NetworkMonitor(
         }
     }
 
-    /** True when the current connection is metered (mobile data). */
-    fun isMetered(): Boolean {
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return true
-        return !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    /**
+     * True when connected through Wi-Fi (or Ethernet), including with a VPN such as Tailscale on top.
+     * Android can report a VPN as "metered" even on Wi-Fi, so this looks at the actual transports.
+     */
+    fun onWifi(): Boolean = cm.allNetworks.any { n ->
+        val caps = cm.getNetworkCapabilities(n) ?: return@any false
+        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
     }
+
+    /** True when the current connection is metered (mobile data). */
+    fun isMetered(): Boolean = !onWifi()
 
     fun checkServer() {
         val creds = session.credentials.value ?: return
