@@ -75,6 +75,7 @@ import im.flume.hearth.ui.screens.HomeScreen
 import im.flume.hearth.ui.screens.LibraryScreen
 import im.flume.hearth.ui.screens.LikedScreen
 import im.flume.hearth.ui.screens.MiniPlayer
+import im.flume.hearth.ui.screens.MixScreen
 import im.flume.hearth.ui.screens.NowPlayingScreen
 import im.flume.hearth.ui.screens.PlaylistScreen
 import im.flume.hearth.ui.screens.QueueScreen
@@ -271,6 +272,7 @@ fun AppRoot() {
                         screen("playlist/{id}") { PlaylistScreen(it.arguments!!.getString("id")!!) }
                         screen("genre/{name}") { GenreScreen(it.arguments!!.getString("name")!!) }
                         screen("queue") { QueueScreen() }
+                        screen("mix/{index}") { MixScreen(it.arguments!!.getString("index")!!.toInt()) }
                     }
                 }
             }

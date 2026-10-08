@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -198,6 +199,27 @@ fun AlbumScreen(id: String) {
                 }
             }
         },
+    )
+}
+
+@Composable
+fun MixScreen(index: Int) {
+    val c = LocalContext.current.container
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
+    var mix by remember { mutableStateOf<im.flume.hearth.data.Mix?>(null) }
+    var songs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
+    LaunchedEffect(index) {
+        mix = c.mixes.today(online).getOrNull(index)
+        songs = mix?.let { c.library.songsByIds(it.songIds) }.orEmpty()
+    }
+    val m = mix ?: return
+    CollectionScreen(
+        title = m.title,
+        subtitle = m.subtitle,
+        cover = m.covers.firstOrNull(),
+        songs = songs,
+        source = PlaySource(PlaySource.Kind.SONGS, label = "${m.title} · ${m.subtitle}", songIds = m.songIds),
+        headerIcon = { MixCover(m, 220.dp) },
     )
 }
 

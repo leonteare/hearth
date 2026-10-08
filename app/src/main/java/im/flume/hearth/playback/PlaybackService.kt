@@ -10,7 +10,9 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.FileDataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -53,6 +55,8 @@ class PlaybackService : MediaSessionService() {
     private var shuffled = false
     private var sourceLabel = ""
     private var restoring: Job? = null
+    private lateinit var streamFactory: CacheDataSource.Factory
+    private var prefetchJob: Job? = null
     private var trimmed = 0
     private var sleepJob: Job? = null
     /** Epoch ms when playback will pause, [SLEEP_END_OF_SONG], or 0 for no timer. */
@@ -65,7 +69,7 @@ class PlaybackService : MediaSessionService() {
         store = QueueStore(filesDir)
         scrobbler = Scrobbler(c.api, c.db.library(), c.appScope)
 
-        val streamFactory = CacheDataSource.Factory()
+        streamFactory = CacheDataSource.Factory()
             .setCache(c.mediaCache)
             .setUpstreamDataSourceFactory(OkHttpDataSource.Factory(c.http))
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
@@ -73,11 +77,7 @@ class PlaybackService : MediaSessionService() {
             fileFactory = FileDataSource.Factory(),
             streamFactory = streamFactory,
             localFile = c.downloads::localFile,
-            streamTarget = { id ->
-                val s = c.session.settings.value
-                val bitrate = if (c.network.isMetered()) s.mobileBitrate else s.wifiBitrate
-                c.api.streamUrl(id, bitrate)?.let { SongDataSource.StreamTarget(it, "$id@$bitrate") }
-            },
+            streamTarget = ::streamTarget,
         )
 
         player = ExoPlayer.Builder(this)
@@ -183,6 +183,33 @@ class PlaybackService : MediaSessionService() {
         player.removeMediaItem(index)
         player.addMediaItem(cur + 1, manual)
         saveQueue()
+    }
+
+    private fun streamTarget(id: String): SongDataSource.StreamTarget? {
+        val s = c.session.settings.value
+        val bitrate = if (c.network.isMetered()) s.mobileBitrate else s.wifiBitrate
+        return c.api.streamUrl(id, bitrate)?.let { SongDataSource.StreamTarget(it, "$id@$bitrate") }
+    }
+
+    /**
+     * Saves the next few songs into the streaming cache in the background, so a tunnel or dead spot
+     * doesn't interrupt playback. Downloaded songs are skipped; already-cached ones cost nothing.
+     */
+    private fun prefetchUpcoming() {
+        prefetchJob?.cancel()
+        if (!c.network.isOnline.value) return
+        val next = (player.currentMediaItemIndex + 1 until minOf(player.mediaItemCount, player.currentMediaItemIndex + 1 + PREFETCH_COUNT))
+            .map { player.getMediaItemAt(it).mediaId }
+            .filterNot(c.downloads::isDownloaded)
+        if (next.isEmpty()) return
+        prefetchJob = scope.launch(Dispatchers.IO) {
+            for (id in next) {
+                val target = streamTarget(id) ?: continue
+                val spec = DataSpec.Builder().setUri(target.url).setKey(target.cacheKey).build()
+                runCatching { CacheWriter(streamFactory.createDataSource(), spec, null, null).cache() }
+                if (!isActive) break
+            }
+        }
     }
 
     /** [ms] > 0: pause after that long; [SLEEP_END_OF_SONG]: pause when this song ends; 0: cancel. */
@@ -410,6 +437,7 @@ class PlaybackService : MediaSessionService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem ?: return
             applyVolumeLevelling()
+            prefetchUpcoming()
             scrobbler.onTrackStarted(
                 mediaItem.mediaId,
                 mediaItem.mediaMetadata.extras?.getString(EXTRA_ALBUM_ID),
@@ -484,6 +512,7 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_SOURCE_LABEL = "sourceLabel"
         const val EXTRA_PENDING_COUNT = "pendingCount"
         private const val TICK_MS = 1000L
+        private const val PREFETCH_COUNT = 3
 
         private val NETWORK_ERRORS = setOf(
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,

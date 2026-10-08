@@ -34,6 +34,12 @@ interface LibraryDao {
     @Query("SELECT id FROM songs")
     suspend fun allSongIds(): List<String>
 
+    @Query("SELECT * FROM songs")
+    suspend fun allSongsOnce(): List<SongEntity>
+
+    @Query("SELECT songId FROM play_history WHERE playedAt >= :since")
+    suspend fun recentHistorySongIds(since: Long): List<String>
+
     @Query("SELECT id FROM songs WHERE id IN (SELECT songId FROM downloads WHERE state = 'DONE')")
     suspend fun downloadedSongIds(): List<String>
 

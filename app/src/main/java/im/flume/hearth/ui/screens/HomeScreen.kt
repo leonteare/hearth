@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.AlbumEntity
+import im.flume.hearth.data.Mix
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.AlbumRow
@@ -83,6 +84,8 @@ fun HomeScreen() {
         rediscover = dao.randomAlbums(15)
     }
     val recent = serverRecent.ifEmpty { localRecent }
+    var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
+    LaunchedEffect(songCount > 0) { if (songCount > 0) mixes = runCatching { c.mixes.today(online) }.getOrDefault(emptyList()) }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
@@ -123,6 +126,14 @@ fun HomeScreen() {
             )
         }
 
+        if (mixes.isNotEmpty()) {
+            item {
+                SectionHeader("Your mixes")
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(mixes.size) { i -> MixCard(mixes[i]) { actions.open("mix/$i") } }
+                }
+            }
+        }
         item { AlbumRow("Jump back in", recent) }
         item { AlbumRow("Recently added", added) }
         item { AlbumRow("Your most played", mostPlayed) }
@@ -160,6 +171,26 @@ fun HomeScreen() {
         }
 
         item { AlbumRow("Rediscover", rediscover) }
+    }
+}
+
+@Composable
+fun MixCover(mix: Mix, size: androidx.compose.ui.unit.Dp) {
+    val covers = (mix.covers + List(4) { null }).take(4)
+    Column(Modifier.size(size).clip(RoundedCornerShape(6.dp))) {
+        for (row in 0..1) Row(Modifier.weight(1f)) {
+            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = 200)
+        }
+    }
+}
+
+@Composable
+private fun MixCard(mix: Mix, onClick: () -> Unit) {
+    Column(Modifier.width(140.dp).clickable(onClick = onClick)) {
+        MixCover(mix, 140.dp)
+        Spacer(Modifier.height(8.dp))
+        Text(mix.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+        Text(mix.subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
     }
 }
 

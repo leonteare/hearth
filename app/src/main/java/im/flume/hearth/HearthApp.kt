@@ -68,6 +68,7 @@ class AppContainer(context: Context) {
     val downloads = DownloadRepository(context, db, session, appScope)
     val library = LibraryRepository(db, api, downloads)
     val lyrics = LyricsRepository(api, db.lyrics())
+    val mixes = im.flume.hearth.data.MixRepository(context, db, api, session)
     val sync = LibrarySync(api, db, session, onPlaylistsSynced = { downloads.refreshPinned() })
     val player = PlayerConnection(context)
     val queueInfo = kotlinx.coroutines.flow.MutableStateFlow(im.flume.hearth.playback.QueueInfo())
