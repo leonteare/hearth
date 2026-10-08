@@ -221,21 +221,27 @@ class DownloadRepository(
         download(songs)
     }
 
+    /** Songs still wanted by other downloaded albums, playlists or Liked Songs are kept. */
     fun unpinAndRemove(kind: String, id: String, songIds: List<String>) = scope.launch {
         dao.unpin(kind, id)
-        remove(songIds)
+        val stillWanted = dao.pinned().flatMapTo(HashSet()) { p -> songsFor(p).map { it.id } }
+        remove(songIds.filter { it !in stillWanted })
+    }
+
+    private suspend fun songsFor(p: PinnedEntity): List<SongEntity> {
+        val lib = db.library()
+        return when (p.kind) {
+            KIND_PLAYLIST -> lib.playlistSongsOnce(p.id)
+            KIND_ALBUM -> lib.albumSongsOnce(p.id)
+            KIND_LIKED -> lib.starredSongsOnce()
+            else -> emptyList()
+        }
     }
 
     /** After a library sync, fetch any new songs that appeared in pinned playlists. */
     suspend fun refreshPinned() {
-        val lib = db.library()
         for (p in dao.pinned()) {
-            val songs = when (p.kind) {
-                KIND_PLAYLIST -> lib.playlistSongsOnce(p.id)
-                KIND_ALBUM -> lib.albumSongsOnce(p.id)
-                KIND_LIKED -> lib.starredSongsOnce()
-                else -> emptyList()
-            }
+            val songs = songsFor(p)
             if (songs.isNotEmpty()) download(songs)
         }
     }

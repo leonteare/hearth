@@ -130,9 +130,6 @@ interface LibraryDao {
     @Query("SELECT * FROM albums WHERE artistId = :artistId ORDER BY year DESC, name")
     fun artistAlbums(artistId: String): Flow<List<AlbumEntity>>
 
-    @Query("SELECT * FROM albums ORDER BY created DESC LIMIT :limit")
-    fun recentlyAdded(limit: Int): Flow<List<AlbumEntity>>
-
     @Query("SELECT * FROM albums WHERE id IN (:ids)")
     suspend fun albumsByIds(ids: List<String>): List<AlbumEntity>
 

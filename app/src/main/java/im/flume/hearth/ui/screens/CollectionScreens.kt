@@ -149,8 +149,11 @@ fun CollectionScreen(
     val isPinned = pin != null && "${pin.kind}:${pin.id}" in pinned
     val doneCount = remember(songs, downloads) { songs.count { downloads[it.id] == DownloadState.DONE } }
     val allDownloaded = songs.isNotEmpty() && doneCount == songs.size
-    val anyDownloading = remember(songs, downloads) {
-        songs.any { downloads[it.id] == DownloadState.QUEUED || downloads[it.id] == DownloadState.DOWNLOADING }
+    // A song can be downloading because another album or playlist was downloaded; only show this
+    // collection as downloading if it was itself downloaded (or has no pin, e.g. a genre).
+    val anyDownloading = remember(songs, downloads, isPinned) {
+        (pin == null || isPinned) &&
+            songs.any { downloads[it.id] == DownloadState.QUEUED || downloads[it.id] == DownloadState.DOWNLOADING }
     }
     val headerColor = rememberCoverColor(cover)
     var confirmCancel by remember { mutableStateOf(false) }
@@ -158,7 +161,7 @@ fun CollectionScreen(
         AlertDialog(
             onDismissRequest = { confirmCancel = false },
             title = { Text("Stop downloading?") },
-            text = { Text("This removes \"$title\" from your downloads, including songs that already finished.") },
+            text = { Text("This removes \"$title\" from your downloads, including songs that already finished. Songs your other downloads need are kept.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmCancel = false

@@ -80,7 +80,6 @@ fun HomeScreen() {
     val sync by c.sync.state.collectAsStateWithLifecycle()
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
-    val added by remember { dao.recentlyAdded(15) }.collectAsStateWithLifecycle(emptyList())
     val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
 
     var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
@@ -141,7 +140,6 @@ fun HomeScreen() {
                 }
             }
         }
-        item { AlbumRow("Recently added", added) }
 
         if (playlists.isNotEmpty()) {
             item {
