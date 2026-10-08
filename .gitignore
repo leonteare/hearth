@@ -9,3 +9,4 @@ keystore.properties
 captures/
 dist/
 .claude/
+.vscode/
