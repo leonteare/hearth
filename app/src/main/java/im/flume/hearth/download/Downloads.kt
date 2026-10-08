@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.coroutineScope
@@ -72,10 +73,22 @@ class DownloadRepository(
     /** Tries per song this session, so a song that keeps failing doesn't loop forever. */
     internal val attempts = ConcurrentHashMap<String, Int>()
 
-    /** Song currently downloading and how far along it is (0..1, or null if the size isn't known). */
-    private val _progress = MutableStateFlow<Pair<String, Float?>?>(null)
-    val progress: StateFlow<Pair<String, Float?>?> = _progress.asStateFlow()
-    internal fun setProgress(value: Pair<String, Float?>?) { _progress.value = value }
+    /** Songs currently downloading and how far along each is (0..1, or null if the size isn't known). */
+    private val _progress = MutableStateFlow<Map<String, Float?>>(emptyMap())
+    val progress: StateFlow<Map<String, Float?>> = _progress.asStateFlow()
+    internal fun setProgress(songId: String, value: Float?) = _progress.update { it + (songId to value) }
+    internal fun clearProgress(songId: String) = _progress.update { it - songId }
+
+    /** Stop downloading but keep the queue; songs part-way through start again on resume. */
+    fun pause() {
+        session.updateSettings { it.copy(downloadsPaused = true) }
+        active.values.forEach { it.cancel() }
+    }
+
+    fun resume() {
+        session.updateSettings { it.copy(downloadsPaused = false) }
+        schedule()
+    }
 
     /** Try failed downloads again. */
     fun retryFailed() = scope.launch {
@@ -190,56 +203,76 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val dao = c.db.downloads()
         // The server may take a while to start sending a song it has to convert first.
         val http = c.http.newBuilder().readTimeout(2, TimeUnit.MINUTES).build()
-        var completed = 0
-        var failuresInRow = 0
+        val claim = Mutex()
+        val completed = AtomicInteger()
+        val failuresInRow = AtomicInteger()
+        val waitingForWifi = AtomicBoolean(false)
+        fun paused() = c.session.settings.value.downloadsPaused
         runCatching { setForeground(foregroundInfo(0)) }
 
-        while (true) {
-            if (c.session.settings.value.wifiOnlyDownloads && !c.network.onWifi()) {
-                c.downloads.reportError("Waiting for Wi-Fi")
-                return Result.retry()
-            }
-            val next = dao.nextQueued() ?: run {
-                // Queue done: give songs that failed another go, a little later, up to 3 tries each.
-                val retry = dao.failed().filter { (c.downloads.attempts[it.songId] ?: 0) < MAX_TRIES }
-                if (retry.isEmpty()) return Result.success()
-                delay(RETRY_DELAY_MS)
-                retry.forEach { dao.upsert(it.copy(state = DownloadState.QUEUED)) }
-                null
-            } ?: continue
+        /** One download lane: takes the next queued song until the queue is empty. Several run side by side. */
+        suspend fun lane(index: Int) {
+            while (true) {
+                val settings = c.session.settings.value
+                if (paused() || index >= settings.parallelDownloads) return
+                if (settings.wifiOnlyDownloads && !c.network.onWifi()) { waitingForWifi.set(true); return }
+                val next = claim.withLock {
+                    dao.nextQueued()?.copy(state = DownloadState.DOWNLOADING)?.also { dao.upsert(it) }
+                } ?: return
 
-            dao.upsert(next.copy(state = DownloadState.DOWNLOADING))
-            val file = try {
-                fetch(c, http, next.songId, c.downloads.dir, c.session.settings.value.downloadBitrate)
-            } catch (e: CancellationException) {
-                // Android stopped the job (or the user cancelled): not a failure, carry on next time.
-                if (dao.get(next.songId) != null) dao.upsert(next.copy(state = DownloadState.QUEUED))
-                throw e
-            } catch (e: Exception) {
-                c.downloads.reportError(describe(e))
-                null
-            }
-
-            when {
-                dao.get(next.songId) == null -> file?.delete() // removed while downloading
-                file != null -> {
-                    dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
-                    c.downloads.markDone(next.songId, file.absolutePath)
-                    runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
-                    failuresInRow = 0
-                    c.downloads.reportError(null)
-                    runCatching { setForeground(foregroundInfo(++completed)) }
+                val file = try {
+                    fetch(c, http, next.songId, c.downloads.dir, settings.downloadBitrate)
+                } catch (e: CancellationException) {
+                    // Android stopped the job: not a failure, carry on next time.
+                    if (dao.get(next.songId) != null) dao.upsert(next.copy(state = DownloadState.QUEUED))
+                    throw e
+                } catch (e: Exception) {
+                    if (paused()) {
+                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED)) }
+                        return
+                    }
+                    c.downloads.reportError(describe(e))
+                    null
                 }
-                else -> {
-                    c.downloads.attempts.merge(next.songId, 1, Int::plus)
-                    dao.upsert(next.copy(state = DownloadState.FAILED))
-                    // Several in a row usually means the server is briefly unreachable: pause, then carry on.
-                    if (++failuresInRow >= 3) {
-                        delay(RETRY_DELAY_MS)
-                        failuresInRow = 0
+
+                when {
+                    dao.get(next.songId) == null -> file?.delete() // removed while downloading
+                    file != null -> {
+                        dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
+                        c.downloads.markDone(next.songId, file.absolutePath)
+                        runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
+                        failuresInRow.set(0)
+                        c.downloads.reportError(null)
+                        runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
+                    }
+                    else -> {
+                        c.downloads.attempts.merge(next.songId, 1, Int::plus)
+                        dao.upsert(next.copy(state = DownloadState.FAILED))
+                        // Several in a row usually means the server is briefly unreachable: pause, then carry on.
+                        if (failuresInRow.incrementAndGet() >= 3) {
+                            delay(RETRY_DELAY_MS)
+                            failuresInRow.set(0)
+                        }
                     }
                 }
             }
+        }
+
+        while (true) {
+            if (paused()) return Result.success()
+            coroutineScope {
+                repeat(c.session.settings.value.parallelDownloads.coerceIn(1, MAX_PARALLEL)) { i -> launch { lane(i) } }
+            }
+            if (paused()) return Result.success()
+            if (waitingForWifi.get()) {
+                c.downloads.reportError("Waiting for Wi-Fi")
+                return Result.retry()
+            }
+            // Queue done: give songs that failed another go, a little later, up to 3 tries each.
+            val retry = dao.failed().filter { (c.downloads.attempts[it.songId] ?: 0) < MAX_TRIES }
+            if (retry.isEmpty()) return Result.success()
+            delay(RETRY_DELAY_MS)
+            retry.forEach { dao.upsert(it.copy(state = DownloadState.QUEUED)) }
         }
     }
 
@@ -280,7 +313,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                                 done += n
                                 if (done - lastReport > 256 * 1024) {
                                     lastReport = done
-                                    c.downloads.setProgress(songId to total?.let { (done.toFloat() / it).coerceAtMost(1f) })
+                                    c.downloads.setProgress(songId, total?.let { (done.toFloat() / it).coerceAtMost(1f) })
                                 }
                             }
                         }
@@ -291,7 +324,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 throw e
             } finally {
                 c.downloads.active.remove(songId)
-                c.downloads.setProgress(null)
+                c.downloads.clearProgress(songId)
             }
             File(dir, songId).also { dest -> dest.delete(); check(tmp.renameTo(dest)) { "Rename failed" } }
         }
@@ -319,6 +352,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         private const val CHANNEL = "downloads"
         private const val NOTIFICATION_ID = 42
         private const val MAX_TRIES = 3
+        const val MAX_PARALLEL = 4
         private const val RETRY_DELAY_MS = 30_000L
     }
 }

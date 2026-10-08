@@ -68,6 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val BITRATES = listOf(0 to "Original quality", 320 to "320 kbps", 256 to "256 kbps", 192 to "192 kbps", 128 to "128 kbps (saves data)")
+private val PARALLEL = listOf(1 to "1 (gentlest on the server)", 2 to "2", 3 to "3", 4 to "4 (fastest if the server has 4+ cores)")
 private val CACHE_SIZES = listOf(512 to "512 MB", 1024 to "1 GB", 2048 to "2 GB", 4096 to "4 GB", 8192 to "8 GB")
 
 @Composable
@@ -208,6 +209,9 @@ fun StorageSettings() {
         Section("Downloads")
         Info("Space used", formatBytes(downloadedBytes))
         Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } }
+        Choice("Downloads at once", settings.parallelDownloads, PARALLEL) { v ->
+            c.session.updateSettings { it.copy(parallelDownloads = v) }
+        }
         Toggle("Download on Wi-Fi only", settings.wifiOnlyDownloads) { v ->
             c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
             c.downloads.schedule()

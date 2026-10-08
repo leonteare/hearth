@@ -560,7 +560,7 @@ fun DownloadsScreen() {
     val states = LocalRowContext.current.downloads
     val queued = pending.filter { states[it.id] != DownloadState.FAILED }
     val failed = pending.filter { states[it.id] == DownloadState.FAILED }
-    val waitingForWifi = queued.isNotEmpty() && progress == null && settings.wifiOnlyDownloads && !c.network.onWifi()
+    val waitingForWifi = queued.isNotEmpty() && progress.isEmpty() && settings.wifiOnlyDownloads && !c.network.onWifi()
     val lastError by c.downloads.lastError.collectAsStateWithLifecycle()
     val paused by remember { c.downloads.pausedAfterErrors }.collectAsStateWithLifecycle(false)
 
@@ -575,10 +575,18 @@ fun DownloadsScreen() {
             if (queued.isNotEmpty()) {
                 item(key = "q-head") {
                     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Downloading · ${queued.size} left", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text(
+                            (if (settings.downloadsPaused) "Paused" else "Downloading") + " · ${queued.size} left",
+                            style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f),
+                        )
+                        if (settings.downloadsPaused) {
+                            TextButton(onClick = { c.downloads.resume() }) { Text("Resume", color = Accent) }
+                        } else {
+                            TextButton(onClick = { c.downloads.pause() }) { Text("Pause", color = Accent) }
+                        }
                         TextButton(onClick = { c.downloads.cancelPending() }) { Text("Cancel all", color = TextSecondary) }
                     }
-                    if (paused && !waitingForWifi) {
+                    if (paused && !waitingForWifi && !settings.downloadsPaused) {
                         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "Paused" + (lastError?.let { ": $it" } ?: ""),
@@ -587,7 +595,7 @@ fun DownloadsScreen() {
                             TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now", color = Accent) }
                         }
                     }
-                    if (waitingForWifi) {
+                    if (waitingForWifi && !settings.downloadsPaused) {
                         Text(
                             "Waiting for Wi-Fi. Turn off \"Download on Wi-Fi only\" in Settings → Storage to use mobile data.",
                             color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
@@ -596,12 +604,12 @@ fun DownloadsScreen() {
                     }
                 }
                 items(queued.take(50), key = { "q:${it.id}" }) { song ->
-                    val p = progress?.takeIf { it.first == song.id }
+                    val downloading = song.id in progress
                     Column {
                         SongRow(song, onClick = {})
-                        if (p != null) {
+                        if (downloading) {
                             LinearProgressIndicator(
-                                progress = { p.second ?: 0f },
+                                progress = { progress[song.id] ?: 0f },
                                 modifier = Modifier.fillMaxWidth().padding(start = 76.dp, end = 16.dp).height(3.dp),
                                 color = Accent,
                                 trackColor = TextSecondary.copy(alpha = 0.25f),

@@ -13,6 +13,10 @@ data class Settings(
     val mobileBitrate: Int = 0,
     val downloadBitrate: Int = 0,
     val wifiOnlyDownloads: Boolean = true,
+    /** Songs downloaded side by side; the server converts each on its own processor core. */
+    val parallelDownloads: Int = 1,
+    /** Downloads stopped by the user; the queue is kept until they resume. */
+    val downloadsPaused: Boolean = false,
     val cacheSizeMb: Int = 2048,
     val offlineMode: Boolean = false,
     /** ARGB of the app's accent colour. */
@@ -79,6 +83,8 @@ class SessionStore(context: Context) {
         mobileBitrate = prefs.getInt("mobileBitrate", 0),
         downloadBitrate = prefs.getInt("downloadBitrate", 0),
         wifiOnlyDownloads = prefs.getBoolean("wifiOnlyDownloads", true),
+        parallelDownloads = prefs.getInt("parallelDownloads", 1),
+        downloadsPaused = prefs.getBoolean("downloadsPaused", false),
         cacheSizeMb = prefs.getInt("cacheSizeMb", 2048),
         offlineMode = prefs.getBoolean("offlineMode", false),
         accent = prefs.getInt("accent", 0xFFFF8A3D.toInt()),
@@ -95,6 +101,8 @@ class SessionStore(context: Context) {
             putInt("mobileBitrate", s.mobileBitrate)
             putInt("downloadBitrate", s.downloadBitrate)
             putBoolean("wifiOnlyDownloads", s.wifiOnlyDownloads)
+            putInt("parallelDownloads", s.parallelDownloads)
+            putBoolean("downloadsPaused", s.downloadsPaused)
             putInt("cacheSizeMb", s.cacheSizeMb)
             putBoolean("offlineMode", s.offlineMode)
             putInt("accent", s.accent)
