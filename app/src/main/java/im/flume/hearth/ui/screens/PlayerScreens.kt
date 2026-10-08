@@ -38,6 +38,7 @@ import im.flume.hearth.ui.components.LocalRowContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -674,8 +675,41 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        TopBar("Queue", onBack = onBack)
+    // Part of the player: same cover-tinted backdrop and close arrow, and dragging the header down closes it.
+    val topColor = rememberCoverColor(state.coverArt)
+    val scope = rememberCoroutineScope()
+    val dragDown = remember { Animatable(0f) }
+    val closeAt = with(LocalDensity.current) { 120.dp.toPx() }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { translationY = dragDown.value }
+            .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
+            .clickable(enabled = false) {}
+            .safeDrawingPadding()
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp).pointerInput(Unit) {
+                var dy = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { dy = 0f },
+                    onDragEnd = { scope.launch { if (dy > closeAt) onBack?.invoke(); dragDown.animateTo(0f) } },
+                    onDragCancel = { scope.launch { dragDown.animateTo(0f) } },
+                ) { change, amount ->
+                    change.consume()
+                    dy += amount
+                    scope.launch { dragDown.snapTo(dy.coerceAtLeast(0f)) }
+                }
+            },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Default.KeyboardArrowDown, "Close queue", Modifier.size(32.dp)) }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("QUEUE", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Text(state.sourceLabel.ifBlank { "Your queue" }, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.size(48.dp)) // balances the close arrow so the title stays centred
+        }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (history.isNotEmpty()) {
                 item(key = "h-prev") { Box(Modifier.animateItem()) { QueueHeader("Previously played", 0.6f) } }

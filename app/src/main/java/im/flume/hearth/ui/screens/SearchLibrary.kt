@@ -515,7 +515,14 @@ fun BrowseSongsScreen() {
     val dao = LocalContext.current.container.db.library()
     val actions = LocalActions.current
     val songs by remember { dao.allSongs() }.collectAsStateWithLifecycle(emptyList())
-    BrowseList("All songs", "browse-SONGS", SONG_SORTS) { sort ->
+    BrowseList(
+        "All songs", "browse-SONGS", SONG_SORTS,
+        extraActions = {
+            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) {
+                Icon(Icons.Default.Shuffle, "Shuffle all songs", tint = MaterialTheme.colorScheme.primary)
+            }
+        },
+    ) { sort ->
         val sorted = when (sort) {
             1 -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track })
             2 -> songs.sortedByDescending { it.created.orEmpty() }
@@ -535,12 +542,19 @@ fun BrowseSongsScreen() {
 private val SONG_SORTS = listOf("A–Z", "Artist", "Recently added", "Most played")
 
 @Composable
-private fun BrowseList(title: String, prefKey: String, sortOptions: List<String>, content: LazyListScope.(sort: Int) -> Unit) {
+private fun BrowseList(
+    title: String,
+    prefKey: String,
+    sortOptions: List<String>,
+    extraActions: @Composable () -> Unit = {},
+    content: LazyListScope.(sort: Int) -> Unit,
+) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
     var sort by remember { mutableStateOf(prefs.getInt(prefKey, 0)) }
     Column(Modifier.fillMaxSize()) {
         TopBar(title) {
+            extraActions()
             SortMenu(sortOptions, sort) {
                 sort = it
                 prefs.edit().putInt(prefKey, it).apply()

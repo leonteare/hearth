@@ -415,11 +415,11 @@ fun AppRoot() {
 
             AnimatedVisibility(
                 visible = queueOpen && nowPlayingOpen && playerState.current != null,
-                enter = slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it },
-                exit = slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { it },
+                enter = slideInVertically(tween(SLIDE_MS, easing = ease)) { it },
+                exit = slideOutVertically(tween(SLIDE_MS, easing = ease)) { it },
             ) {
                 BackHandler(enabled = queueOpen) { queueOpen = false }
-                Box(Modifier.fillMaxSize().background(Background)) { QueueScreen(onBack = { queueOpen = false }) }
+                QueueScreen(onBack = { queueOpen = false })
             }
         }
     }
