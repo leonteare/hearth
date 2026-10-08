@@ -92,7 +92,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
             }
             if (release != null && isNewer(release.version, currentVersion)) UpdateState.Available(release) else UpdateState.UpToDate
         } catch (e: Exception) {
-            UpdateState.Failed("Couldn't check for updates (${e.message ?: e.javaClass.simpleName})")
+            UpdateState.Failed("Couldn't check for updates (${im.flume.hearth.util.userMessage(e)})")
         }
     }
 
@@ -137,7 +137,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
                 delay(INSTALL_TIMEOUT)
                 if (_state.value === installing) _state.value = UpdateState.Available(release)
             } catch (e: Exception) {
-                _state.value = UpdateState.Failed("Update failed (${e.message ?: e.javaClass.simpleName})", release)
+                _state.value = UpdateState.Failed("Update failed (${im.flume.hearth.util.userMessage(e)})", release)
             }
         }
     }
@@ -202,7 +202,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
             _state.value = if (status == PackageInstaller.STATUS_FAILURE_ABORTED && release != null) {
                 UpdateState.Available(release)
             } else {
-                UpdateState.Failed("Update failed: ${message ?: "status $status"}", release)
+                UpdateState.Failed("Update failed: ${message?.let { im.flume.hearth.util.scrubSecrets(it) } ?: "status $status"}", release)
             }
         }
     }

@@ -89,6 +89,7 @@ import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.ArtistEntity
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.SongEntity
+import im.flume.hearth.data.SongOrder
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
@@ -378,9 +379,9 @@ fun LibraryScreen() {
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Your Library") {
-            // Home's tile shuffles just your library; this one is for the whole server.
-            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) {
-                Icon(Icons.Default.Shuffle, "Shuffle everything", tint = MaterialTheme.colorScheme.primary)
+            // Same as Home's tile: your library. Browse → All songs shuffles the whole server.
+            IconButton(onClick = { actions.play(PlaySource.MyLibrary, shuffle = true) }) {
+                Icon(Icons.Default.Shuffle, "Shuffle your library", tint = MaterialTheme.colorScheme.primary)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -515,6 +516,7 @@ fun BrowseSongsScreen() {
     val dao = LocalContext.current.container.db.library()
     val actions = LocalActions.current
     val songs by remember { dao.allSongs() }.collectAsStateWithLifecycle(emptyList())
+    val sortedCache = remember(songs) { HashMap<SongOrder, List<SongEntity>>() }
     BrowseList(
         "All songs", "browse-SONGS", SONG_SORTS,
         extraActions = {
@@ -523,17 +525,14 @@ fun BrowseSongsScreen() {
             }
         },
     ) { sort ->
-        val sorted = when (sort) {
-            1 -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track })
-            2 -> songs.sortedByDescending { it.created.orEmpty() }
-            3 -> songs.sortedByDescending { it.playCount }
-            else -> songs
-        }
-        // Tapping a song plays everything, in this order, starting from that song.
-        val ids = sorted.map { it.id }
+        // Sorting ~7k songs is too slow to redo on every recomposition: once per list and order.
+        val order = SongOrder.fromMenu(sort)
+        val sorted = sortedCache.getOrPut(order) { order.sort(songs) }
+        // Tapping a song plays everything, in this order, starting from that song. The service sorts
+        // the library itself: thousands of ids in a Bundle can exceed the Binder limit.
         items(sorted, key = { it.id }) { song ->
             SongRow(song, onClick = {
-                actions.play(PlaySource(PlaySource.Kind.SONGS, label = "All songs", songIds = ids), startSongId = song.id)
+                actions.play(PlaySource(PlaySource.Kind.ALL, label = "All songs", order = order), startSongId = song.id)
             })
         }
     }

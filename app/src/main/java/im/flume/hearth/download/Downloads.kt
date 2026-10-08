@@ -505,7 +505,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         is java.net.ConnectException -> "Couldn't connect to the server"
         is javax.net.ssl.SSLException -> "Secure connection problem: ${e.message}"
         else -> e.message ?: e.javaClass.simpleName
-    }.replace(Regex("""https?://\S+"""), "the server") // URLs carry the login token; never show them
+    }.let { im.flume.hearth.util.scrubSecrets(it) } // URLs carry the login token; never show them
 
     private suspend fun fetch(c: AppContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {

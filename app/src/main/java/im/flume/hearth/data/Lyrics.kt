@@ -12,9 +12,26 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class Lyrics(val synced: Boolean, val lines: List<LyricLine>) {
+data class Lyrics(
+    val synced: Boolean,
+    val lines: List<LyricLine>,
+    /** Bumped when how lyrics are stored changes; older synced copies are fetched again (see [CURRENT]). */
+    val version: Int = 0,
+) {
     val isEmpty: Boolean get() = lines.none { it.value.isNotBlank() }
+
+    companion object {
+        /** 1: the server's offset is subtracted (earlier versions added it, so lyrics ran the wrong way). */
+        const val CURRENT = 1
+    }
 }
+
+/**
+ * Applies an OpenSubsonic lyrics offset. A positive offset means the lyrics should appear sooner,
+ * so it's subtracted from each start time (never going below zero).
+ */
+fun List<LyricLine>.withOffset(offsetMs: Long): List<LyricLine> =
+    if (offsetMs == 0L) this else map { it.copy(start = it.start?.let { s -> (s - offsetMs).coerceAtLeast(0) }) }
 
 /** A row on the lyrics screen: a sung line, or an instrumental break shown as animated dots. */
 data class LyricRow(val start: Long?, val end: Long?, val text: String, val isBreak: Boolean)
@@ -81,7 +98,8 @@ class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsD
         if (cached != null) {
             val (lyrics, at) = cached
             val age = System.currentTimeMillis() - at
-            val stale = age > (if (lyrics.isEmpty) WEEK else MONTH)
+            val stale = age > (if (lyrics.isEmpty) WEEK else MONTH) ||
+                (lyrics.synced && lyrics.version < Lyrics.CURRENT) // saved with the offset applied the wrong way
             if (!stale || !online) return lyrics
         }
         if (!online) return null
@@ -102,8 +120,8 @@ class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsD
             .filter { l -> l.line.any { it.value.isNotBlank() } }
         val best = structured.firstOrNull { it.synced } ?: structured.firstOrNull()
         if (best != null) {
-            val lines = if (best.synced) best.line.map { it.copy(start = it.start?.plus(best.offset)) } else best.line
-            return Lyrics(best.synced, lines)
+            val lines = if (best.synced) best.line.withOffset(best.offset) else best.line
+            return Lyrics(best.synced, lines, Lyrics.CURRENT)
         }
         val plain = answeredOrNull { api.lyricsByName(song.artist, song.title) }
         return Lyrics(false, plain?.lines()?.map { LyricLine(null, it) }.orEmpty())

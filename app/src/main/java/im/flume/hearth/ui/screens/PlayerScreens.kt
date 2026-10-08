@@ -630,10 +630,11 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
     }
 
     fun commitDrag(key: String) {
-        val entry = local.firstOrNull { it.key == key } ?: return
-        val newPos = local.indexOf(entry)
-        player.move(entry.index, state.currentIndex + 1 + newPos)
+        val newPos = local.indexOfFirst { it.key == key }
         draggingKey = null
+        if (newPos < 0) return
+        // By key, not position: the service may have trimmed played songs since this list was drawn.
+        player.moveAfter(local[newPos], local.getOrNull(newPos - 1))
     }
 
     // Songs already played (kept briefly in the player) and everything still to come beyond it.
@@ -657,18 +658,22 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
             SwipeableQueueRow(
                 revealed = revealedKey == e.key,
                 onRevealChange = { open -> revealedKey = if (open) e.key else if (revealedKey == e.key) null else revealedKey },
-                onPlayNext = { player.moveToNext(e.index) },
+                onPlayNext = { player.moveToNext(e) },
                 onRemove = {
                     revealedKey = null
-                    player.remove(e.index)
-                    actions.showUndo("Removed from queue") { player.insert(e.index, e.item) }
+                    // Neighbours in the full queue (the one before may be the current song), for undo.
+                    val pos = state.queue.indexOfFirst { it.key == e.key }
+                    val before = state.queue.getOrNull(pos - 1)
+                    val after = state.queue.getOrNull(pos + 1)
+                    player.remove(e)
+                    actions.showUndo("Removed from queue") { player.restore(e, after = before, before = after) }
                 },
             ) {
                 QueueRow(
                     e,
                     dragging = dragging,
                     alpha = upcomingAlpha,
-                    onClick = { if (revealedKey != null) revealedKey = null else player.skipTo(e.index) },
+                    onClick = { if (revealedKey != null) revealedKey = null else player.skipTo(e) },
                     handle = { Modifier.draggableHandle(onDragStarted = { draggingKey = e.key }, onDragStopped = { commitDrag(e.key) }) },
                 )
             }
@@ -713,7 +718,7 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (history.isNotEmpty()) {
                 item(key = "h-prev") { Box(Modifier.animateItem()) { QueueHeader("Previously played", 0.6f) } }
-                items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e.index) }, modifier = Modifier.animateItem()) }
+                items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e) }, modifier = Modifier.animateItem()) }
             }
             state.current?.let { cur ->
                 item(key = "h-now") {

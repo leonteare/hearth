@@ -33,7 +33,7 @@ data class Settings(
 
 /**
  * Login and preferences. Lives in private app storage; login uses the Subsonic token. The password is
- * only kept (encrypted, in [vault]) if the user agrees to it for playlist photos.
+ * kept only encrypted, in [vault] (saved at sign-in), for playlist photos.
  */
 class SessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)

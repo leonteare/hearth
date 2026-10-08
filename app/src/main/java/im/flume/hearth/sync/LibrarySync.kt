@@ -126,7 +126,7 @@ class LibrarySync(
                 is java.net.ConnectException, is java.net.SocketTimeoutException -> "Couldn't reach the server"
                 is java.io.IOException -> "Lost connection to the server"
                 else -> e.message ?: "Sync failed"
-            }.replace(Regex("""https?://\S+"""), "the server") // URLs can carry the login token
+            }.let { im.flume.hearth.util.scrubSecrets(it) } // URLs can carry the login token
             _state.value = SyncState.Failed(message)
         }
     }

@@ -26,4 +26,32 @@ object PlaybackErrors {
         errorCode in 3000..4999 -> ErrorAction.SKIP
         else -> ErrorAction.RETRY
     }
+
+    /** Recovery decision for a failed song; [online] is whether the server is known to be reachable. */
+    fun recover(action: ErrorAction, online: Boolean, nextPlayable: Int?): Recovery = when {
+        action == ErrorAction.SKIP -> Recovery.SkipNext
+        // A "temporary" failure while the server is away is really a connection problem.
+        action == ErrorAction.WAIT_FOR_CONNECTION || !online ->
+            if (nextPlayable != null) Recovery.JumpTo(nextPlayable) else Recovery.WaitForConnection
+        else -> Recovery.RetryLater
+    }
+
+    /** First index after [current] (of [count]) that [playable] says can play without the server, or null. */
+    fun nextPlayable(current: Int, count: Int, playable: (Int) -> Boolean): Int? =
+        (current + 1 until count).firstOrNull(playable)
+}
+
+/** What the service does after a failed song (see [PlaybackErrors.recover]). */
+sealed interface Recovery {
+    /** The song itself is broken: try the next one. */
+    data object SkipNext : Recovery
+
+    /** No connection: carry on straight away with the next song that's on the phone (downloaded or fully cached). */
+    data class JumpTo(val index: Int) : Recovery
+
+    /** No connection and nothing on the phone left to play: pause, and resume when the server is back. */
+    data object WaitForConnection : Recovery
+
+    /** A temporary server problem while still online: keep the song and try again shortly. */
+    data object RetryLater : Recovery
 }

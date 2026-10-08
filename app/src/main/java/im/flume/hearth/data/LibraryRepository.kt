@@ -5,10 +5,21 @@ import im.flume.hearth.api.NavidromeNativeApi
 import im.flume.hearth.api.SubsonicClient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import im.flume.hearth.download.DownloadRepository
 
-/** Something the user can press play on. Converted to a Bundle to travel to the playback service. */
-data class PlaySource(val kind: Kind, val id: String? = null, val label: String = "", val songIds: List<String> = emptyList()) {
+/**
+ * Something the user can press play on. Converted to a Bundle to travel to the playback service, so
+ * big lists are described ([kind] + [order]) and resolved by the service rather than sent as [songIds].
+ */
+data class PlaySource(
+    val kind: Kind,
+    val id: String? = null,
+    val label: String = "",
+    val songIds: List<String> = emptyList(),
+    /** For [Kind.ALL]: every song in this order (All songs' sort) instead of the plain library order. */
+    val order: SongOrder? = null,
+) {
     enum class Kind { ALL, MY_LIBRARY, ALBUM, ARTIST, PLAYLIST, GENRE, LIKED, DOWNLOADS, SONGS }
 
     fun toBundle() = Bundle().apply {
@@ -16,6 +27,7 @@ data class PlaySource(val kind: Kind, val id: String? = null, val label: String 
         putString("id", id)
         putString("label", label)
         putStringArrayList("songIds", ArrayList(songIds))
+        putString("order", order?.name)
     }
 
     companion object {
@@ -24,6 +36,7 @@ data class PlaySource(val kind: Kind, val id: String? = null, val label: String 
             id = b.getString("id"),
             label = b.getString("label").orEmpty(),
             songIds = b.getStringArrayList("songIds").orEmpty(),
+            order = SongOrder.entries.firstOrNull { it.name == b.getString("order") },
         )
 
         val All = PlaySource(Kind.ALL, label = "Everything")
@@ -57,7 +70,11 @@ class LibraryRepository(
     /** Songs for [source] in their natural order. When [offlineOnly], keeps just downloaded songs. */
     suspend fun resolve(source: PlaySource, offlineOnly: Boolean): List<SongEntity> {
         val songs = when (source.kind) {
-            PlaySource.Kind.ALL -> if (offlineOnly) dao.downloadedSongsOnce() else songsByIds(dao.allSongIds())
+            PlaySource.Kind.ALL -> when {
+                source.order != null -> source.order.sort(dao.allSongs().first())
+                offlineOnly -> dao.downloadedSongsOnce()
+                else -> songsByIds(dao.allSongIds())
+            }
             PlaySource.Kind.MY_LIBRARY -> {
                 val mine = dao.myLibrarySongsOnce().let { if (offlineOnly) it.filter { s -> downloads.isDownloaded(s.id) } else it }
                 return mine.ifEmpty { resolve(PlaySource.All, offlineOnly) }
@@ -226,6 +243,29 @@ class LibraryRepository(
         val remote = api.albumList("recent", limit)
         val local = dao.albumsByIds(remote.map { it.id }).associateBy { it.id }
         return remote.map { local[it.id] ?: it.toEntity() }
+    }
+}
+
+/** All songs' sort orders. The screen and the service sort the same way, so only the order is sent. */
+enum class SongOrder {
+    /** As the database lists them (by title). */
+    TITLE,
+    ARTIST,
+    RECENT,
+    PLAYS;
+
+    fun sort(songs: List<SongEntity>): List<SongEntity> = when (this) {
+        TITLE -> songs
+        ARTIST -> songs.sortedWith(
+            compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track }
+        )
+        RECENT -> songs.sortedByDescending { it.created.orEmpty() }
+        PLAYS -> songs.sortedByDescending { it.playCount }
+    }
+
+    companion object {
+        /** The All songs sort menu position (see SONG_SORTS). */
+        fun fromMenu(index: Int): SongOrder = entries.getOrElse(index) { TITLE }
     }
 }
 

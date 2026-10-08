@@ -1,10 +1,8 @@
 package im.flume.hearth.playback
 
 import android.os.Bundle
-import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
-import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.data.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,11 +23,17 @@ const val EXTRA_COVER_ART = "coverArt"
 const val EXTRA_TRACK_GAIN = "trackGain"
 const val EXTRA_ALBUM_GAIN = "albumGain"
 const val EXTRA_TRACK_PEAK = "trackPeak"
+/** Identifies one entry in the queue (the same song can be queued twice), so the UI can address it safely. */
+const val EXTRA_QUEUE_KEY = "queueKey"
+
+private val queueKeys = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+
+fun newQueueKey(): String = queueKeys.incrementAndGet().toString(36)
 
 /** Live queue details the UI shows ("12 of 300", the full upcoming list). Service and UI share a process. */
 data class QueueInfo(val pending: List<String> = emptyList(), val trimmed: Int = 0)
 
-fun SongEntity.toMediaItem(api: SubsonicClient, manual: Boolean = false): MediaItem =
+fun SongEntity.toMediaItem(manual: Boolean = false, queueKey: String = newQueueKey()): MediaItem =
     MediaItem.Builder()
         .setMediaId(id)
         .setUri(SongDataSource.uriFor(id))
@@ -42,12 +46,14 @@ fun SongEntity.toMediaItem(api: SubsonicClient, manual: Boolean = false): MediaI
                 .setGenre(genre)
                 .setTrackNumber(track)
                 .setDurationMs(durationSec * 1000L)
-                .setArtworkUri(api.coverArtUrl(coverArt)?.toUri())
+                // Never the real cover URL: it carries the login token (see CoverArt).
+                .setArtworkUri(CoverArt.uriFor(coverArt))
                 .setIsPlayable(true)
                 .setIsBrowsable(false)
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
                 .setExtras(Bundle().apply {
                     putBoolean(EXTRA_MANUAL, manual)
+                    putString(EXTRA_QUEUE_KEY, queueKey)
                     putString(EXTRA_ALBUM_ID, albumId)
                     putString(EXTRA_ARTIST_ID, artistId)
                     putString(EXTRA_COVER_ART, coverArt)
@@ -60,6 +66,14 @@ fun SongEntity.toMediaItem(api: SubsonicClient, manual: Boolean = false): MediaI
         .build()
 
 val MediaItem.isManual: Boolean get() = mediaMetadata.extras?.getBoolean(EXTRA_MANUAL) == true
+
+val MediaItem.queueKey: String? get() = mediaMetadata.extras?.getString(EXTRA_QUEUE_KEY)
+
+/** A copy of this item with the "added by you" flag set to [manual]. */
+fun MediaItem.withManual(manual: Boolean): MediaItem {
+    val extras = Bundle(mediaMetadata.extras ?: Bundle.EMPTY).apply { putBoolean(EXTRA_MANUAL, manual) }
+    return buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setExtras(extras).build()).build()
+}
 
 /** Snapshot of the full queue so it survives the app being killed (and so the car can resume it). */
 @Serializable
