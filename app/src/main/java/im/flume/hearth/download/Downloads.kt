@@ -224,7 +224,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 if (paused() || index >= settings.parallelDownloads) return
                 if (settings.wifiOnlyDownloads && !c.network.onWifi()) { waitingForWifi.set(true); return }
                 val wait = backoffUntil.get() - System.currentTimeMillis()
-                if (wait > 0 || (index > 0 && struggling.get())) { delay(wait.coerceIn(5_000, RETRY_DELAY_MS)); continue }
+                if (wait > 0 || (index > 0 && struggling.get())) { delay(wait.coerceIn(2_000, MAX_BACKOFF_MS)); continue }
                 val next = claim.withLock {
                     dao.nextQueued()?.copy(state = DownloadState.DOWNLOADING)?.also { dao.upsert(it) }
                 } ?: return
@@ -241,14 +241,19 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                         return
                     }
                     if (e is java.io.IOException && (c.downloads.attempts.merge(next.songId, 1, Int::plus) ?: 0) < MAX_CONNECTION_TRIES) {
-                        // The connection dropped (server busy or restarting): not this song's fault. Put it back,
-                        // slow down, and wait longer each time it keeps happening.
-                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED)) }
-                        struggling.set(true)
-                        val n = failuresInRow.incrementAndGet().coerceAtMost(6)
-                        val pause = RETRY_DELAY_MS shl (n - 1) // 30s, 1m, 2m, 4m, 8m, 16m
-                        backoffUntil.set(System.currentTimeMillis() + pause)
-                        c.downloads.reportError("${describe(e)}. Server busy, trying again in ${pause / 60_000.0} min".replace(".0 min", " min"))
+                        // The connection dropped: send the song to the back of the queue and move straight on.
+                        // Only if several in a row drop is the server struggling: then go one at a time and
+                        // wait briefly (10s, 20s, 40s… up to 2 min).
+                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED, addedAt = System.currentTimeMillis())) }
+                        val n = failuresInRow.incrementAndGet()
+                        if (n >= 3) {
+                            struggling.set(true)
+                            val pause = (BACKOFF_MS shl (n - 3).coerceAtMost(4)).coerceAtMost(MAX_BACKOFF_MS)
+                            backoffUntil.set(System.currentTimeMillis() + pause)
+                            c.downloads.reportError("${describe(e)}. Server busy, trying again in ${pause / 1000}s")
+                        } else {
+                            c.downloads.reportError("${describe(e)}. Will try that song again later")
+                        }
                         continue
                     }
                     c.downloads.reportError(describe(e))
@@ -271,7 +276,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                         dao.upsert(next.copy(state = DownloadState.FAILED))
                         // Several in a row usually means the server is briefly unreachable: pause, then carry on.
                         if (failuresInRow.incrementAndGet() >= 3) {
-                            delay(RETRY_DELAY_MS)
+                            delay(BACKOFF_MS)
                             failuresInRow.set(0)
                         }
                     }
@@ -376,6 +381,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         private const val MAX_TRIES = 3
         const val MAX_PARALLEL = 4
         private const val MAX_CONNECTION_TRIES = 6
+        private const val BACKOFF_MS = 10_000L
+        private const val MAX_BACKOFF_MS = 120_000L
         private const val RETRY_DELAY_MS = 30_000L
     }
 }
