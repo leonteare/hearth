@@ -34,7 +34,19 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import im.flume.hearth.data.SearchIndex
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Close
@@ -91,6 +103,8 @@ interface Actions {
     fun startArtistRadio(artistId: String, name: String)
     /** Opens the "Add to playlist" picker for these songs. */
     fun addToPlaylist(songIds: List<String>)
+    /** Shows [message] with an Undo button that runs [undo]. */
+    fun showUndo(message: String, undo: suspend () -> Unit)
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }
@@ -101,23 +115,82 @@ data class RowContext(val playingId: String?, val online: Boolean, val downloads
 val LocalRowContext = compositionLocalOf { RowContext(null, true, emptyMap()) }
 
 @Composable
-fun CoverArt(coverArt: String?, size: Dp?, modifier: Modifier = Modifier, corner: Dp = 4.dp, requestSize: Int = 300) {
+fun CoverArt(
+    coverArt: String?,
+    size: Dp?,
+    modifier: Modifier = Modifier,
+    corner: Dp = 4.dp,
+    requestSize: Int = 300,
+    /** Album / playlist / artist name, shown as initials on a coloured tile when there's no artwork. */
+    fallback: String? = null,
+) {
     val actions = LocalActions.current
     val m = (if (size != null) modifier.size(size) else modifier).clip(RoundedCornerShape(corner)).background(SurfaceHigh)
+    val url = actions.coverUrl(coverArt, requestSize)
+    if (url == null) {
+        Box(m) { Placeholder(fallback) }
+        return
+    }
     SubcomposeAsyncImage(
-        model = actions.coverUrl(coverArt, requestSize),
+        model = url,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = m,
-        error = { Placeholder() },
-        loading = { Placeholder() },
+        error = { Placeholder(fallback) },
+        loading = { Placeholder(null) },
     )
 }
 
+private val PLACEHOLDER_COLOURS = listOf(0xFF4A3B6B, 0xFF2F5D62, 0xFF6B3B3B, 0xFF3B4F6B, 0xFF5E5A2E, 0xFF3E6B3B, 0xFF6B4A2E, 0xFF55305E)
+
 @Composable
-private fun Placeholder() {
-    Box(Modifier.fillMaxSize().background(SurfaceHigh), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.MusicNote, null, tint = TextSecondary)
+private fun Placeholder(text: String?) {
+    val initials = text?.let { t ->
+        SearchIndex.norm(t).split(' ').filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1) }.uppercase()
+    }.orEmpty()
+    if (initials.isEmpty()) {
+        Box(Modifier.fillMaxSize().background(SurfaceHigh), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.MusicNote, null, tint = TextSecondary)
+        }
+        return
+    }
+    val colour = Color(PLACEHOLDER_COLOURS[(text.hashCode() and 0x7fffffff) % PLACEHOLDER_COLOURS.size])
+    BoxWithConstraints(Modifier.fillMaxSize().background(colour), contentAlignment = Alignment.Center) {
+        val fontSize = with(LocalDensity.current) { (maxWidth * 0.36f).toSp() }
+        Text(initials, color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = fontSize)
+    }
+}
+
+/** Bottom sheet for song / player options, with an optional header showing what it's about. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActionSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    title: String? = null,
+    subtitle: String? = null,
+    coverArt: String? = null,
+    fallback: String? = subtitle,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (!open) return
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = SurfaceHigh,
+    ) {
+        if (title != null) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    subtitle?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Color.White.copy(alpha = 0.08f))
+        }
+        Column(Modifier.padding(bottom = 16.dp), content = content)
     }
 }
 
@@ -129,9 +202,12 @@ fun SongRow(
     showCover: Boolean = true,
     leading: String? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
+    /** Null when not selecting; otherwise whether this row is selected. */
+    selected: Boolean? = null,
+    onLongPress: (() -> Unit)? = null,
 ) {
-    val actions = LocalActions.current
     val ctx = LocalRowContext.current
+    val haptics = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
     val dl = ctx.downloads[song.id]
     val playable = ctx.online || dl == DownloadState.DONE
@@ -139,15 +215,31 @@ fun SongRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .combinedClickable(enabled = playable, onClick = onClick, onLongClick = { menu = true })
+            .background(if (selected == true) Accent.copy(alpha = 0.12f) else Color.Transparent)
+            .combinedClickable(
+                enabled = playable || selected != null,
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (onLongPress != null) onLongPress() else menu = true
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selected != null) {
+            Icon(
+                if (selected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                if (selected) "Selected" else "Not selected",
+                tint = if (selected) Accent else TextSecondary,
+                modifier = Modifier.padding(end = 12.dp).size(24.dp),
+            )
+        }
         if (leading != null) {
             Text(leading, Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
         }
         if (showCover) {
-            CoverArt(song.coverArt, 48.dp, requestSize = 150)
+            CoverArt(song.coverArt, 48.dp, requestSize = 150, fallback = song.album)
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
@@ -179,7 +271,7 @@ fun SongRow(
             }
         }
         if (song.starred) Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = Accent)
-        Box {
+        if (selected == null) {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
             SongMenu(song, menu, onDismiss = { menu = false }, onRemoveFromPlaylist = onRemoveFromPlaylist)
         }
@@ -191,7 +283,7 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemov
     val actions = LocalActions.current
     val dl = LocalRowContext.current.downloads[song.id]
     var info by remember { mutableStateOf(false) }
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    ActionSheet(expanded, onDismiss, title = song.title, subtitle = song.artist, coverArt = song.coverArt, fallback = song.album) {
         MenuItem("Play next", Icons.AutoMirrored.Filled.QueueMusic) { actions.playNext(listOf(song.id)); onDismiss() }
         MenuItem("Start radio", Icons.Default.Radio) { actions.startRadio(song); onDismiss() }
         MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
@@ -248,8 +340,15 @@ fun SongInfoDialog(song: SongEntity, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun MenuItem(text: String, icon: ImageVector, onClick: () -> Unit) {
-    DropdownMenuItem(text = { Text(text) }, leadingIcon = { Icon(icon, null) }, onClick = onClick)
+fun MenuItem(text: String, icon: ImageVector, tint: Color = Color.White, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = tint)
+        Spacer(Modifier.width(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable
@@ -261,7 +360,7 @@ fun AlbumCard(album: AlbumEntity, width: Dp = 140.dp, subtitle: String = album.a
             .clip(RoundedCornerShape(6.dp))
             .combinedClickableCompat { actions.openAlbum(album.id) }
     ) {
-        CoverArt(album.coverArt, width)
+        CoverArt(album.coverArt, width, fallback = album.name)
         Spacer(Modifier.height(8.dp))
         Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, color = TextSecondary)

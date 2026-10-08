@@ -29,6 +29,29 @@ import androidx.compose.foundation.layout.width
 import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.outlined.ArrowCircleDown
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
+import im.flume.hearth.ui.theme.Background
+import im.flume.hearth.ui.theme.SurfaceHigh
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -92,6 +115,7 @@ fun CollectionScreen(
     extraContent: LazyListScope.() -> Unit = {},
     topContent: LazyListScope.() -> Unit = {},
     onRemoveSong: ((index: Int) -> Unit)? = null,
+    headerActions: @Composable () -> Unit = {},
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -120,14 +144,26 @@ fun CollectionScreen(
     }
     val totalSec = songs.sumOf { it.durationSec.toLong() }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    // Long-press a song to start selecting; tap to add or remove songs from the selection.
+    var selection by remember(songs) { mutableStateOf<Set<Int>?>(null) }
+    val usage = c.usage
+    androidx.activity.compose.BackHandler(enabled = selection != null) { selection = null }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val collapsed by remember { androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+
+    Box(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Box(
                 Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))
             ) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.fillMaxWidth()) { BackButton() }
-                    if (headerIcon != null) headerIcon() else CoverArt(cover, 220.dp, requestSize = 600)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        BackButton()
+                        Spacer(Modifier.weight(1f))
+                        Box(Modifier.statusBarsPadding()) { headerActions() }
+                    }
+                    if (headerIcon != null) headerIcon() else CoverArt(cover, 220.dp, requestSize = 600, fallback = title)
                     Spacer(Modifier.height(16.dp))
                     Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
                     Text(
@@ -161,16 +197,94 @@ fun CollectionScreen(
             )
         }
         topContent()
+        val multiDisc = showTrackNumbers && songs.map { it.disc }.distinct().size > 1
         itemsIndexed(songs, key = { i, s -> "$i:${s.id}" }) { index, song ->
+            if (multiDisc && (index == 0 || songs[index - 1].disc != song.disc)) {
+                Text(
+                    "Disc ${song.disc}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(start = 16.dp, top = if (index == 0) 4.dp else 16.dp, bottom = 4.dp),
+                )
+            }
             SongRow(
                 song,
-                onClick = { actions.play(source, startSongId = song.id) },
+                onClick = {
+                    val sel = selection
+                    if (sel != null) selection = (if (index in sel) sel - index else sel + index).takeIf { it.isNotEmpty() }
+                    else actions.play(source, startSongId = song.id)
+                },
                 onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
                 showCover = !showTrackNumbers,
                 leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
+                selected = selection?.let { index in it },
+                onLongPress = {
+                    if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
+                    selection = (selection ?: emptySet()) + index
+                },
             )
         }
         extraContent()
+    }
+
+    val sel = selection
+    if (sel != null) {
+        val picked = sel.sorted().mapNotNull { songs.getOrNull(it) }
+        SelectionBar(
+            count = picked.size,
+            onClose = { selection = null },
+            onPlayNext = { actions.playNext(picked.map { it.id }); selection = null },
+            onQueue = { actions.addToQueue(picked.map { it.id }); selection = null },
+            onPlaylist = { actions.addToPlaylist(picked.map { it.id }); selection = null },
+            onDownload = { actions.download(picked); selection = null },
+            onSelectAll = { selection = songs.indices.toSet() },
+        )
+    } else {
+        // Slim bar with the title and a play button once the big header has scrolled away.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = collapsed,
+            enter = androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.fadeOut(),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().background(lerp(headerColor, Background, 0.35f)).statusBarsPadding().padding(end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BackButton()
+                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                FilledIconButton(
+                    onClick = { actions.play(source) },
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = Color.Black),
+                ) { Icon(Icons.Default.PlayArrow, "Play") }
+            }
+        }
+    }
+    }
+}
+
+@Composable
+private fun SelectionBar(
+    count: Int,
+    onClose: () -> Unit,
+    onPlayNext: () -> Unit,
+    onQueue: () -> Unit,
+    onPlaylist: () -> Unit,
+    onDownload: () -> Unit,
+    onSelectAll: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().background(SurfaceHigh).statusBarsPadding().padding(end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Stop selecting") }
+        Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Select all") }
+        IconButton(onClick = onPlayNext) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Play next") }
+        IconButton(onClick = onQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Add to queue") }
+        IconButton(onClick = onPlaylist) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist") }
+        IconButton(onClick = onDownload) { Icon(Icons.Outlined.ArrowCircleDown, "Download") }
     }
 }
 
@@ -228,6 +342,7 @@ fun PlaylistScreen(id: String) {
     val dao = LocalContext.current.container.db.library()
     val playlist by remember(id) { dao.playlist(id) }.collectAsStateWithLifecycle(null)
     val c = LocalContext.current.container
+    val actions = LocalActions.current
     val me = c.session.credentials.collectAsStateWithLifecycle().value?.username
     val songs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
     CollectionScreen(
@@ -235,13 +350,115 @@ fun PlaylistScreen(id: String) {
         // Only name the owner when it's someone else's playlist.
         subtitle = playlist?.owner?.takeIf { !it.equals(me, ignoreCase = true) }.orEmpty(),
         onRemoveSong = if (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true)) { index ->
+            val before = songs.map { it.id }
             c.appScope.launch { runCatching { c.library.removeFromPlaylist(id, index) } }
+            actions.showUndo("Removed from playlist") { c.library.setPlaylistSongs(id, before) }
         } else null,
         cover = playlist?.coverArt,
         songs = songs,
         source = PlaySource(PlaySource.Kind.PLAYLIST, id, playlist?.name.orEmpty()),
         pin = PinTarget(DownloadRepository.KIND_PLAYLIST, id),
+        headerActions = {
+            if (playlist != null && (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true))) {
+                PlaylistMenu(id, playlist!!.name, songs.map { it.id })
+            }
+        },
     )
+}
+
+@Composable
+private fun PlaylistMenu(id: String, name: String, songIds: List<String>) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    var open by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var newName by remember(name) { mutableStateOf(name) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { open = false; renaming = true })
+            DropdownMenuItem(text = { Text("Edit order") }, leadingIcon = { Icon(Icons.Default.SwapVert, null) }, onClick = { open = false; actions.open("playlist-edit/$id") })
+            DropdownMenuItem(text = { Text("Delete playlist") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { open = false; deleting = true })
+        }
+    }
+    if (renaming) {
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("Rename playlist") },
+            text = { OutlinedTextField(newName, { newName = it }, singleLine = true) },
+            confirmButton = {
+                TextButton(enabled = newName.isNotBlank(), onClick = {
+                    renaming = false
+                    c.appScope.launch { runCatching { c.library.renamePlaylist(id, newName.trim()) } }
+                }) { Text("Save", color = Accent) }
+            },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+        )
+    }
+    if (deleting) {
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text("Delete \"$name\"?") },
+            text = { Text("The playlist is removed from Navidrome for good. The songs stay in your library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleting = false
+                    c.appScope.launch {
+                        runCatching { c.library.deletePlaylist(id) }
+                        c.downloads.unpinAndRemove(DownloadRepository.KIND_PLAYLIST, id, emptyList())
+                    }
+                    back?.onBackPressed()
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** Drag songs into a new order, then save it to Navidrome. */
+@Composable
+fun PlaylistEditScreen(id: String) {
+    val c = LocalContext.current.container
+    val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val original by remember(id) { c.db.library().playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
+    var order by remember { mutableStateOf<List<Pair<Int, SongEntity>>>(emptyList()) }
+    LaunchedEffect(original) { if (order.isEmpty()) order = original.mapIndexed { i, s -> i to s } }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(listState) { from, to ->
+        order = order.toMutableList().apply { add(to.index, removeAt(from.index)) }
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            BackButton()
+            Text("Edit order", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            TextButton(onClick = {
+                c.appScope.launch { runCatching { c.library.setPlaylistSongs(id, order.map { it.second.id }) } }
+                back?.onBackPressed()
+            }) { Text("Save", color = Accent) }
+        }
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            items(order, key = { it.first }) { (key, song) ->
+                ReorderableItem(reorder, key = key) { dragging ->
+                    Row(
+                        Modifier.fillMaxWidth().background(if (dragging) SurfaceHigh else Background).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CoverArt(song.coverArt, 44.dp, requestSize = 150, fallback = song.album)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(song.title, maxLines = 1)
+                            Text(song.artist, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
+                        Box(Modifier.draggableHandle().size(48.dp), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

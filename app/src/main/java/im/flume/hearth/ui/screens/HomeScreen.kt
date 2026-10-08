@@ -74,15 +74,11 @@ fun HomeScreen() {
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
     val added by remember { dao.recentlyAdded(15) }.collectAsStateWithLifecycle(emptyList())
-    val mostPlayed by remember { dao.mostPlayed(15) }.collectAsStateWithLifecycle(emptyList())
     val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
-    val genres by remember { dao.genres() }.collectAsStateWithLifecycle(emptyList())
 
     var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
-    var rediscover by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
     LaunchedEffect(online, songCount > 0) {
         if (online) serverRecent = runCatching { c.library.serverRecentAlbums(12) }.getOrDefault(emptyList())
-        rediscover = dao.randomAlbums(15)
     }
     val recent = serverRecent.ifEmpty { localRecent }
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
@@ -137,9 +133,7 @@ fun HomeScreen() {
                 }
             }
         }
-        item { AlbumRow("Jump back in", recent) }
         item { AlbumRow("Recently added", added) }
-        item { AlbumRow("Your most played", mostPlayed) }
 
         if (playlists.isNotEmpty()) {
             item {
@@ -147,7 +141,7 @@ fun HomeScreen() {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(playlists, key = { it.id }) { p ->
                         Column(Modifier.width(140.dp).clickable { actions.openPlaylist(p.id) }) {
-                            CoverArt(p.coverArt, 140.dp)
+                            CoverArt(p.coverArt, 140.dp, fallback = p.name)
                             Spacer(Modifier.height(8.dp))
                             Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                             Text("${p.songCount} songs", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
@@ -156,24 +150,6 @@ fun HomeScreen() {
                 }
             }
         }
-
-        if (genres.isNotEmpty()) {
-            item {
-                SectionHeader("Shuffle a genre")
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(genres.take(20), key = { it.genre }) { g ->
-                        AssistChip(
-                            onClick = { actions.play(PlaySource(PlaySource.Kind.GENRE, g.genre, g.genre), shuffle = true) },
-                            label = { Text(g.genre) },
-                            leadingIcon = { Icon(Icons.Default.Shuffle, null, Modifier.size(16.dp)) },
-                            colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceHigh),
-                        )
-                    }
-                }
-            }
-        }
-
-        item { AlbumRow("Rediscover", rediscover) }
     }
 }
 
@@ -228,7 +204,7 @@ private fun QuickTileView(t: QuickTile, modifier: Modifier) {
                 Icon(t.icon, null, tint = if (t.color == Accent) Color.Black else Color.White)
             }
         } else {
-            CoverArt(t.cover, 56.dp, corner = 0.dp, requestSize = 150)
+            CoverArt(t.cover, 56.dp, corner = 0.dp, requestSize = 150, fallback = t.title)
         }
         Text(
             t.title,

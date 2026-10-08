@@ -51,6 +51,16 @@ class LibraryRepository(
         return if (offlineOnly) songs.filter { downloads.isDownloaded(it.id) } else songs
     }
 
+    private var index: Pair<Long, SearchIndex>? = null
+
+    /** Search index over the local library, rebuilt after each sync. */
+    suspend fun searchIndex(syncedAt: Long): SearchIndex {
+        index?.takeIf { it.first == syncedAt }?.let { return it.second }
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            SearchIndex(dao.allSongsOnce(), dao.allAlbumsOnce(), dao.allArtistsOnce())
+        }.also { index = syncedAt to it }
+    }
+
     /** Looks up songs keeping the order of [ids]. Chunked to stay under SQLite's variable limit. */
     suspend fun songsByIds(ids: List<String>): List<SongEntity> {
         val byId = HashMap<String, SongEntity>(ids.size)
@@ -97,6 +107,22 @@ class LibraryRepository(
     suspend fun createPlaylist(name: String, songIds: List<String>) {
         val id = api.createPlaylist(name, songIds) ?: api.playlists().firstOrNull { it.name == name }?.id ?: return
         refreshPlaylist(id)
+    }
+
+    suspend fun renamePlaylist(playlistId: String, name: String) {
+        api.renamePlaylist(playlistId, name)
+        refreshPlaylist(playlistId)
+    }
+
+    suspend fun setPlaylistSongs(playlistId: String, songIds: List<String>) {
+        api.setPlaylistSongs(playlistId, songIds)
+        refreshPlaylist(playlistId)
+    }
+
+    suspend fun deletePlaylist(playlistId: String) {
+        api.deletePlaylist(playlistId)
+        dao.clearPlaylistSongs(playlistId)
+        dao.deletePlaylistRow(playlistId)
     }
 
     suspend fun removeFromPlaylist(playlistId: String, index: Int) {

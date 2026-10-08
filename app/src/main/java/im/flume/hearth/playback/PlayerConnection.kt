@@ -136,6 +136,18 @@ class PlayerConnection(private val context: Context) {
     fun seekTo(ms: Long) = controller?.seekTo(ms)
     fun skipTo(index: Int) = controller?.let { it.seekTo(index, 0); it.play() }
     fun remove(index: Int) = controller?.removeMediaItem(index)
+    fun insert(index: Int, item: MediaItem) = controller?.addMediaItem(index.coerceAtMost(controller?.mediaItemCount ?: 0), item)
+
+    /** Undo for "Play next" / "Add to queue": removes the most recently queued copies of these songs. */
+    fun removeQueued(songIds: List<String>) {
+        val c = controller ?: return
+        val remaining = songIds.toMutableList()
+        for (i in c.mediaItemCount - 1 downTo c.currentMediaItemIndex + 1) {
+            val item = c.getMediaItemAt(i)
+            if (item.isManual && remaining.remove(item.mediaId)) c.removeMediaItem(i)
+            if (remaining.isEmpty()) break
+        }
+    }
     fun move(from: Int, to: Int) = controller?.moveMediaItem(from, to)
 
     fun cycleRepeat() {

@@ -24,7 +24,10 @@ import im.flume.hearth.data.rows
 import im.flume.hearth.ui.components.LocalRowContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -91,6 +94,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -108,7 +112,9 @@ import im.flume.hearth.playback.EXTRA_COVER_ART
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.playback.QueueEntry
 import im.flume.hearth.playback.isManual
+import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatDuration
@@ -143,19 +149,48 @@ private fun rememberPosition(state: PlayerUiState): Long {
 
 @Composable
 fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
-    val player = LocalContext.current.container.player
+    val c = LocalContext.current.container
+    val player = c.player
     val meta = state.current?.mediaMetadata ?: return
     val pos = rememberPosition(state)
+    val tint = lerp(rememberCoverColor(state.coverArt, AccentDeep), Color.Black, 0.35f)
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val swipe = remember { Animatable(0f) }
+    val threshold = with(LocalDensity.current) { 72.dp.toPx() }
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(AccentDeep)
+            .background(tint)
             .clickable(onClick = onOpen)
+            // Swipe sideways to skip, like Spotify.
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            val v = swipe.value
+                            if (kotlin.math.abs(v) > threshold) {
+                                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                                c.usage.track(im.flume.hearth.data.Usage.SWIPE_SKIP)
+                                if (v < 0) player.next() else player.previous()
+                            }
+                            swipe.animateTo(0f)
+                        }
+                    },
+                    onDragCancel = { scope.launch { swipe.animateTo(0f) } },
+                ) { change, drag -> change.consume(); scope.launch { swipe.snapTo(swipe.value + drag) } }
+            }
     ) {
-        Row(Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CoverArt(state.coverArt, 42.dp, requestSize = 150)
+        Row(
+            Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp).graphicsLayer {
+                translationX = swipe.value * 0.6f
+                alpha = 1f - (kotlin.math.abs(swipe.value) / (threshold * 3)).coerceAtMost(0.6f)
+            },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CoverArt(state.coverArt, 42.dp, requestSize = 150, fallback = meta.albumTitle?.toString())
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(meta.title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -187,25 +222,75 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     val topColor = rememberCoverColor(state.coverArt, lerp(Accent, Color.Black, 0.6f))
 
+    val player = c.player
+    val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val dragDown = remember { Animatable(0f) }
+    val coverSwipe = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val closeAt = with(density) { 140.dp.toPx() }
+    val skipAt = with(density) { 90.dp.toPx() }
+
+    // Drag down anywhere on the header or cover to close; drag the cover sideways to skip.
+    fun Modifier.playerGestures(allowSkip: Boolean) = pointerInput(allowSkip) {
+        var dx = 0f
+        var dy = 0f
+        detectDragGestures(
+            onDragStart = { dx = 0f; dy = 0f },
+            onDragEnd = {
+                scope.launch {
+                    when {
+                        dy > closeAt && kotlin.math.abs(dy) > kotlin.math.abs(dx) -> onClose()
+                        allowSkip && kotlin.math.abs(dx) > skipAt -> {
+                            haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
+                            c.usage.track(im.flume.hearth.data.Usage.SWIPE_SKIP)
+                            if (dx < 0) player.next() else player.previous()
+                        }
+                    }
+                    launch { coverSwipe.animateTo(0f) }
+                    dragDown.animateTo(0f)
+                }
+            },
+            onDragCancel = { scope.launch { coverSwipe.animateTo(0f); dragDown.animateTo(0f) } },
+        ) { change, drag ->
+            change.consume()
+            dx += drag.x
+            dy += drag.y
+            scope.launch {
+                if (kotlin.math.abs(dy) > kotlin.math.abs(dx)) dragDown.snapTo(dy.coerceAtLeast(0f))
+                else if (allowSkip) coverSwipe.snapTo(dx)
+            }
+        }
+    }
+
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
+            .graphicsLayer { translationY = dragDown.value }
             .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
             .clickable(enabled = false) {}
             .safeDrawingPadding()
     ) {
         val landscape = maxWidth > maxHeight
         val artOrLyrics: @Composable (Modifier) -> Unit = { m ->
-            Box(m, contentAlignment = Alignment.Center) {
+            Box(if (showLyrics) m else m.playerGestures(allowSkip = true), contentAlignment = Alignment.Center) {
                 if (showLyrics) {
                     LyricsView(song, state, Modifier.fillMaxSize())
                 } else {
-                    CoverArt(state.coverArt, null, Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true), corner = 8.dp, requestSize = 900)
+                    CoverArt(
+                        state.coverArt, null,
+                        Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).graphicsLayer {
+                            translationX = coverSwipe.value
+                            rotationZ = coverSwipe.value / 60f
+                            alpha = 1f - (kotlin.math.abs(coverSwipe.value) / (skipAt * 4)).coerceAtMost(0.5f)
+                        },
+                        corner = 8.dp, requestSize = 900, fallback = current.mediaMetadata.albumTitle?.toString(),
+                    )
                 }
             }
         }
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.playerGestures(allowSkip = false), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("PLAYING FROM", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
@@ -305,7 +390,8 @@ private fun PlayerControls(
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = onToggleLyrics) {
+        val usage = LocalContext.current.container.usage
+        IconButton(onClick = { if (!showLyrics) usage.track(im.flume.hearth.data.Usage.LYRICS); onToggleLyrics() }) {
             Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, "Lyrics", tint = if (showLyrics) Accent else Color.White)
         }
         IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
@@ -345,52 +431,25 @@ private fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit
     val downloaded = song != null && LocalRowContext.current.downloads[song.id] != null
     var open by remember { mutableStateOf(false) }
     var sleepPicker by remember { mutableStateOf(false) }
+    val usage = LocalContext.current.container.usage
     if (sleepPicker) {
-        SleepTimerDialog(active = sleepAt != 0L, onPick = { player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
+        SleepTimerDialog(active = sleepAt != 0L, onPick = { if (it != 0L) usage.track(im.flume.hearth.data.Usage.SLEEP); player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
     }
-    Box {
-        IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            if (song != null) {
-                DropdownMenuItem(
-                    text = { Text("Start radio") },
-                    leadingIcon = { Icon(Icons.Default.Radio, null) },
-                    onClick = { open = false; actions.startRadio(song) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Add to playlist") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },
-                    onClick = { open = false; actions.addToPlaylist(listOf(song.id)) },
-                )
-            }
-            DropdownMenuItem(
-                text = { Text(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer") },
-                leadingIcon = { Icon(Icons.Outlined.Bedtime, null, tint = if (sleepAt != 0L) Accent else LocalContentColor.current) },
-                onClick = { open = false; sleepPicker = true },
-            )
-            song?.albumId?.let { id ->
-                DropdownMenuItem(
-                    text = { Text("Go to album") },
-                    leadingIcon = { Icon(Icons.Default.Album, null) },
-                    onClick = { open = false; onClose(); actions.openAlbum(id) },
-                )
-            }
-            song?.artistId?.let { id ->
-                DropdownMenuItem(
-                    text = { Text("Go to artist") },
-                    leadingIcon = { Icon(Icons.Default.Person, null) },
-                    onClick = { open = false; onClose(); actions.openArtist(id) },
-                )
-            }
-            if (song != null) {
-                DropdownMenuItem(
-                    text = { Text(if (downloaded) "Remove download" else "Download") },
-                    leadingIcon = { Icon(if (downloaded) Icons.Default.CheckCircle else Icons.Outlined.ArrowCircleDown, null) },
-                    onClick = {
-                        open = false
-                        if (downloaded) actions.removeDownload(listOf(song.id)) else actions.download(listOf(song))
-                    },
-                )
+    IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
+    ActionSheet(open, { open = false }, title = song?.title, subtitle = song?.artist, coverArt = song?.coverArt, fallback = song?.album) {
+        if (song != null) {
+            MenuItem("Start radio", Icons.Default.Radio) { open = false; actions.startRadio(song) }
+            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(listOf(song.id)) }
+        }
+        MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", Icons.Outlined.Bedtime, tint = if (sleepAt != 0L) Accent else Color.White) {
+            open = false; sleepPicker = true
+        }
+        song?.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { open = false; onClose(); actions.openAlbum(id) } }
+        song?.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { open = false; onClose(); actions.openArtist(id) } }
+        if (song != null) {
+            MenuItem(if (downloaded) "Remove download" else "Download", if (downloaded) Icons.Default.CheckCircle else Icons.Outlined.ArrowCircleDown) {
+                open = false
+                if (downloaded) actions.removeDownload(listOf(song.id)) else actions.download(listOf(song))
             }
         }
     }
@@ -507,6 +566,7 @@ private fun BreakDots(active: Boolean, progress: Float, modifier: Modifier = Mod
 @Composable
 fun QueueScreen() {
     val c = LocalContext.current.container
+    val actions = LocalActions.current
     val player = c.player
     val state by player.state.collectAsStateWithLifecycle()
     val upcoming = state.queue.drop(state.currentIndex + 1)
@@ -553,7 +613,11 @@ fun QueueScreen() {
                 revealed = revealedKey == e.key,
                 onRevealChange = { open -> revealedKey = if (open) e.key else if (revealedKey == e.key) null else revealedKey },
                 onPlayNext = { player.moveToNext(e.index) },
-                onRemove = { revealedKey = null; player.remove(e.index) },
+                onRemove = {
+                    revealedKey = null
+                    player.remove(e.index)
+                    actions.showUndo("Removed from queue") { player.insert(e.index, e.item) }
+                },
             ) {
                 QueueRow(
                     e,
@@ -718,7 +782,7 @@ private fun SwipeableQueueRow(
 @Composable
 private fun LaterRow(song: SongEntity, alpha: Float) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        CoverArt(song.coverArt, 44.dp, requestSize = 150)
+        CoverArt(song.coverArt, 44.dp, requestSize = 150, fallback = song.album)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = alpha * 0.85f))
@@ -755,7 +819,7 @@ private fun QueueRow(
             .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CoverArt(meta.extras?.getString(EXTRA_COVER_ART), 44.dp, requestSize = 150)
+        CoverArt(meta.extras?.getString(EXTRA_COVER_ART), 44.dp, requestSize = 150, fallback = meta.albumTitle?.toString())
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(

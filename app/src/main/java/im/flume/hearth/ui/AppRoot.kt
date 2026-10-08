@@ -35,7 +35,12 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -76,6 +81,7 @@ import im.flume.hearth.ui.screens.LibraryScreen
 import im.flume.hearth.ui.screens.LikedScreen
 import im.flume.hearth.ui.screens.MiniPlayer
 import im.flume.hearth.ui.screens.MixScreen
+import im.flume.hearth.ui.screens.PlaylistEditScreen
 import im.flume.hearth.ui.screens.StatsScreen
 import im.flume.hearth.ui.screens.NowPlayingScreen
 import im.flume.hearth.ui.screens.PlaylistScreen
@@ -98,30 +104,49 @@ private class AppActions(
     private val snackbar: SnackbarHostState,
 ) : Actions {
     override fun play(source: PlaySource, startSongId: String?, shuffle: Boolean) {
+        if (shuffle) c.usage.track(im.flume.hearth.data.Usage.SHUFFLE)
         if (!c.network.isOnline.value) {
             scope.launch { snackbar.showSnackbar("Offline: playing downloaded songs only") }
         }
         c.player.play(source, startSongId, shuffle)
     }
 
+    override fun showUndo(message: String, undo: suspend () -> Unit) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) c.appScope.launch { runCatching { undo() } }
+        }
+    }
+
+    private fun plural(n: Int) = if (n == 1) "" else "$n songs "
+
     override fun playNext(songIds: List<String>) {
+        haptic(HapticFeedbackType.Confirm)
         c.player.playNext(songIds)
-        scope.launch { snackbar.showSnackbar("Playing next") }
+        showUndo("${plural(songIds.size).ifEmpty { "" }}Playing next".replaceFirstChar { it.uppercase() }) { c.player.removeQueued(songIds) }
     }
 
     override fun addToQueue(songIds: List<String>) {
+        haptic(HapticFeedbackType.Confirm)
         c.player.addToQueue(songIds)
-        scope.launch { snackbar.showSnackbar("Added to queue") }
+        showUndo(if (songIds.size == 1) "Added to queue" else "Added ${songIds.size} songs to queue") { c.player.removeQueued(songIds) }
     }
 
     override fun setStarred(songId: String, starred: Boolean) {
+        haptic(if (starred) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
         scope.launch {
             runCatching { c.library.setStarred(songId, starred) }
+                .onSuccess { if (!starred) showUndo("Removed from Liked Songs") { c.library.setStarred(songId, true) } }
                 .onFailure { snackbar.showSnackbar("Couldn't update Liked Songs (offline?)") }
         }
     }
 
+    var haptics: HapticFeedback? = null
+    private fun haptic(type: HapticFeedbackType) { haptics?.performHapticFeedback(type) }
+
     override fun download(songs: List<SongEntity>) {
+        c.usage.track(im.flume.hearth.data.Usage.DOWNLOAD)
         c.downloads.download(songs)
         scope.launch {
             val wifi = if (c.session.settings.value.wifiOnlyDownloads) " (waits for Wi-Fi)" else ""
@@ -129,24 +154,40 @@ private class AppActions(
         }
     }
 
-    override fun removeDownload(songIds: List<String>) { c.downloads.remove(songIds) }
+    override fun removeDownload(songIds: List<String>) {
+        c.downloads.remove(songIds)
+        showUndo(if (songIds.size == 1) "Download removed" else "${songIds.size} downloads removed") {
+            c.downloads.download(c.library.songsByIds(songIds))
+        }
+    }
     override fun openAlbum(id: String) = nav.navigate("album/${Uri.encode(id)}")
     override fun openArtist(id: String) = nav.navigate("artist/${Uri.encode(id)}")
     override fun openPlaylist(id: String) = nav.navigate("playlist/${Uri.encode(id)}")
     override fun openGenre(name: String) = nav.navigate("genre/${Uri.encode(name)}")
-    override fun open(route: String) = nav.navigate(route)
+    override fun open(route: String) {
+        when {
+            route.startsWith("mix/") -> c.usage.track(im.flume.hearth.data.Usage.MIX)
+            route.startsWith("stats/") -> c.usage.track(im.flume.hearth.data.Usage.STATS)
+            route == "queue" -> c.usage.track(im.flume.hearth.data.Usage.QUEUE)
+        }
+        nav.navigate(route)
+    }
     override fun coverUrl(coverArt: String?, size: Int) = c.api.coverArtUrl(coverArt, size)
 
     /** Songs waiting for the "Add to playlist" picker, or null when it's closed. */
     val playlistPicker = mutableStateOf<List<String>?>(null)
 
-    override fun addToPlaylist(songIds: List<String>) { playlistPicker.value = songIds }
+    override fun addToPlaylist(songIds: List<String>) {
+        c.usage.track(im.flume.hearth.data.Usage.PLAYLIST_ADD)
+        playlistPicker.value = songIds
+    }
 
     override fun startRadio(song: SongEntity) = radio("Radio · ${song.title}") { c.library.radio(song, null, it) }
 
     override fun startArtistRadio(artistId: String, name: String) = radio("Radio · $name") { c.library.radio(null, artistId, it) }
 
     private fun radio(label: String, ids: suspend (online: Boolean) -> List<String>) {
+        c.usage.track(im.flume.hearth.data.Usage.RADIO)
         scope.launch {
             val list = ids(c.network.isOnline.value)
             if (list.isEmpty()) {
@@ -197,6 +238,7 @@ fun AppRoot() {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val actions = remember { AppActions(c, nav, scope, snackbar) }
+    actions.haptics = LocalHapticFeedback.current
     val flags = remember { TransitionFlags() }
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -275,6 +317,7 @@ fun AppRoot() {
                         screen("queue") { QueueScreen() }
                         screen("mix/{index}") { MixScreen(it.arguments!!.getString("index")!!.toInt()) }
                         screen("stats/{key}") { StatsScreen(it.arguments!!.getString("key")!!) }
+                        screen("playlist-edit/{id}") { PlaylistEditScreen(it.arguments!!.getString("id")!!) }
                     }
                 }
             }
@@ -297,7 +340,7 @@ fun AppRoot() {
                 NowPlayingScreen(
                     state = playerState,
                     onClose = { nowPlayingOpen = false },
-                    onOpenQueue = { nowPlayingOpen = false; nav.navigate("queue") },
+                    onOpenQueue = { nowPlayingOpen = false; actions.open("queue") },
                 )
             }
         }

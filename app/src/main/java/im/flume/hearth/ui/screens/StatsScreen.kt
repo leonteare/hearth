@@ -177,7 +177,7 @@ private fun RankedSection(title: String, items: List<Ranked>, round: Boolean = f
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("${i + 1}", style = MaterialTheme.typography.titleMedium, color = TextSecondary, modifier = Modifier.width(28.dp))
-            CoverArt(r.coverArt, 48.dp, corner = if (round) 24.dp else 4.dp, requestSize = 150)
+            CoverArt(r.coverArt, 48.dp, corner = if (round) 24.dp else 4.dp, requestSize = 150, fallback = r.name)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(r.name, maxLines = 1, overflow = TextOverflow.Ellipsis)

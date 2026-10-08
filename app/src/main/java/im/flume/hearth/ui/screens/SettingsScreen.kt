@@ -154,6 +154,18 @@ fun GeneralSettings() {
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
 
+        Section("Feature use on this phone")
+        Text(
+            "How often each feature has been used. Never sent anywhere; it helps decide what to keep.",
+            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        remember { c.usage.all() }.sortedByDescending { it.second }.forEach { (name, count) ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text(name, modifier = Modifier.weight(1f))
+                Text("$count", color = TextSecondary)
+            }
+        }
+
         Section("")
         Clickable("Sign out", "Removes downloads and the library index from this phone", color = MaterialTheme.colorScheme.error) {
             confirmLogout = true

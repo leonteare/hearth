@@ -38,6 +38,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -88,6 +91,8 @@ fun SearchScreen() {
     var songs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
     var albums by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
     var artists by remember { mutableStateOf<List<ArtistEntity>>(emptyList()) }
+    var closeMatches by remember { mutableStateOf(false) }
+    val c = LocalContext.current.container
     val genres by remember { dao.genres() }.collectAsStateWithLifecycle(emptyList())
 
     val context = LocalContext.current
@@ -95,6 +100,7 @@ fun SearchScreen() {
     var recent by remember { mutableStateOf(recentPrefs.getString("recent", "").orEmpty().split('\n').filter { it.isNotBlank() }) }
     fun saveRecent(q: String) {
         val t = q.trim().takeIf { it.length >= 2 } ?: return
+        c.usage.track(im.flume.hearth.data.Usage.SEARCH)
         recent = (listOf(t) + recent.filterNot { it.equals(t, ignoreCase = true) }).take(10)
         recentPrefs.edit().putString("recent", recent.joinToString("\n")).apply()
     }
@@ -112,9 +118,11 @@ fun SearchScreen() {
             songs = emptyList(); albums = emptyList(); artists = emptyList(); return@LaunchedEffect
         }
         delay(120)
-        artists = dao.searchArtists(q, 5)
-        albums = dao.searchAlbums(q, 10)
-        songs = dao.searchSongs(q, 50)
+        val r = c.library.searchIndex(c.session.lastSyncAt).search(q)
+        artists = r.artists
+        albums = r.albums
+        songs = r.songs
+        closeMatches = r.fuzzy
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -190,6 +198,15 @@ fun SearchScreen() {
                     }
                 }
             } else {
+                if (closeMatches && (artists.isNotEmpty() || albums.isNotEmpty() || songs.isNotEmpty())) {
+                    item {
+                        Text(
+                            "No exact matches. Showing close matches.",
+                            color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
                 if (artists.isNotEmpty()) {
                     item { SectionHeader("Artists") }
                     items(artists, key = { "ar:${it.id}" }) { a -> ArtistRow(a) }
@@ -226,7 +243,7 @@ fun ArtistRow(a: ArtistEntity) {
         Modifier.fillMaxWidth().clickable { actions.openArtist(a.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CoverArt(a.coverArt, 52.dp, Modifier.clip(CircleShape), requestSize = 150)
+        CoverArt(a.coverArt, 52.dp, Modifier.clip(CircleShape), requestSize = 150, fallback = a.name)
         Spacer(Modifier.width(12.dp))
         Column {
             Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -242,7 +259,7 @@ fun AlbumListRow(a: AlbumEntity) {
         Modifier.fillMaxWidth().clickable { actions.openAlbum(a.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CoverArt(a.coverArt, 52.dp, requestSize = 150)
+        CoverArt(a.coverArt, 52.dp, requestSize = 150, fallback = a.name)
         Spacer(Modifier.width(12.dp))
         Column {
             Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -265,6 +282,28 @@ fun LibraryScreen() {
     val albums by remember { dao.albums() }.collectAsStateWithLifecycle(emptyList())
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(0)
     val sync by c.sync.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val sortPrefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
+    var sort by remember(tab) { mutableStateOf(sortPrefs.getInt("sort-${tab.name}", 0)) }
+    var sortOpen by remember { mutableStateOf(false) }
+    val sortOptions = when (tab) {
+        LibraryTab.PLAYLISTS -> listOf("A–Z", "Recently updated", "Most songs")
+        LibraryTab.ARTISTS -> listOf("A–Z", "Most albums")
+        LibraryTab.ALBUMS -> listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
+    }
+    val sortedPlaylists = when (sort) {
+        1 -> playlists.sortedByDescending { it.changed }
+        2 -> playlists.sortedByDescending { it.songCount }
+        else -> playlists
+    }
+    val sortedArtists = if (sort == 1 && tab == LibraryTab.ARTISTS) artists.sortedByDescending { it.albumCount } else artists
+    val sortedAlbums = when (sort) {
+        1 -> albums.sortedByDescending { it.created }
+        2 -> albums.sortedWith(compareBy({ it.artist.lowercase().removePrefix("the ") }, { it.year ?: 0 }))
+        3 -> albums.sortedByDescending { it.playCount }
+        4 -> albums.sortedByDescending { it.year ?: 0 }
+        else -> albums
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -272,14 +311,32 @@ fun LibraryScreen() {
             IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) { Icon(Icons.Default.Shuffle, "Shuffle all", tint = Accent) }
             IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
         }
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(LibraryTab.entries) { t ->
-                FilterChip(
-                    selected = tab == t,
-                    onClick = { tab = t },
-                    label = { Text(t.label) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = Color.Black),
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(LibraryTab.entries) { t ->
+                    FilterChip(
+                        selected = tab == t,
+                        onClick = { tab = t },
+                        label = { Text(t.label) },
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = Color.Black),
+                    )
+                }
+            }
+            Box {
+                TextButton(onClick = { sortOpen = true }) {
+                    Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(sortOptions.getOrElse(sort) { sortOptions[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                }
+                DropdownMenu(sortOpen, onDismissRequest = { sortOpen = false }) {
+                    sortOptions.forEachIndexed { i, label ->
+                        DropdownMenuItem(text = { Text(label, color = if (i == sort) Accent else Color.Unspecified) }, onClick = {
+                            sort = i
+                            sortPrefs.edit().putInt("sort-${tab.name}", i).apply()
+                            sortOpen = false
+                        })
+                    }
+                }
             }
         }
         PullToRefreshBox(
@@ -292,12 +349,12 @@ fun LibraryScreen() {
                     LibraryTab.PLAYLISTS -> {
                         item { LibraryShortcut("Liked Songs", Icons.Default.Favorite, Color(0xFF5038A0)) { actions.open("liked") } }
                         item { LibraryShortcut("Downloads", Icons.Default.DownloadDone, Color(0xFF1E6B52)) { actions.open("downloads") } }
-                        items(playlists, key = { it.id }) { p ->
+                        items(sortedPlaylists, key = { it.id }) { p ->
                             Row(
                                 Modifier.fillMaxWidth().clickable { actions.openPlaylist(p.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                CoverArt(p.coverArt, 56.dp, requestSize = 150)
+                                CoverArt(p.coverArt, 56.dp, requestSize = 150, fallback = p.name)
                                 Spacer(Modifier.width(12.dp))
                                 Column {
                                     Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -306,8 +363,8 @@ fun LibraryScreen() {
                             }
                         }
                     }
-                    LibraryTab.ARTISTS -> items(artists, key = { it.id }) { ArtistRow(it) }
-                    LibraryTab.ALBUMS -> items(albums, key = { it.id }) { AlbumListRow(it) }
+                    LibraryTab.ARTISTS -> items(sortedArtists, key = { it.id }) { ArtistRow(it) }
+                    LibraryTab.ALBUMS -> items(sortedAlbums, key = { it.id }) { AlbumListRow(it) }
                 }
                 item {
                     Text(

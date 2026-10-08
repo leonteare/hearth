@@ -174,6 +174,22 @@ class SubsonicClient(
         }
     }
 
+    suspend fun renamePlaylist(playlistId: String, name: String) {
+        call("updatePlaylist") { addQueryParameter("playlistId", playlistId); addQueryParameter("name", name) }
+    }
+
+    /** Replaces a playlist's songs with [songIds], in that order. */
+    suspend fun setPlaylistSongs(playlistId: String, songIds: List<String>) {
+        call("createPlaylist") {
+            addQueryParameter("playlistId", playlistId)
+            songIds.forEach { addQueryParameter("songId", it) }
+        }
+    }
+
+    suspend fun deletePlaylist(playlistId: String) {
+        call("deletePlaylist") { addQueryParameter("id", playlistId) }
+    }
+
     suspend fun removeFromPlaylist(playlistId: String, index: Int) {
         call("updatePlaylist") {
             addQueryParameter("playlistId", playlistId)

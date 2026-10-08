@@ -37,6 +37,9 @@ interface LibraryDao {
     @Query("SELECT * FROM songs")
     suspend fun allSongsOnce(): List<SongEntity>
 
+    @Query("SELECT * FROM albums") suspend fun allAlbumsOnce(): List<AlbumEntity>
+    @Query("SELECT * FROM artists") suspend fun allArtistsOnce(): List<ArtistEntity>
+
     @Query(
         """SELECT h.songId AS songId, h.playedAt AS playedAt, s.title AS title, s.artist AS artist, s.artistId AS artistId,
                   s.album AS album, s.albumId AS albumId, s.durationSec AS durationSec, s.coverArt AS coverArt
@@ -170,6 +173,7 @@ interface LibraryDao {
     @Query("DELETE FROM playlists") suspend fun clearPlaylists()
     @Query("DELETE FROM playlist_songs") suspend fun clearPlaylistSongs()
     @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId") suspend fun clearPlaylistSongs(playlistId: String)
+    @Query("DELETE FROM playlists WHERE id = :id") suspend fun deletePlaylistRow(id: String)
 
     @Transaction
     suspend fun replacePlaylist(playlist: PlaylistEntity, songs: List<PlaylistSongEntity>) {
