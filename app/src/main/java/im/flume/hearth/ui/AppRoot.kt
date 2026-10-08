@@ -84,6 +84,7 @@ import im.flume.hearth.ui.components.RowContext
 import im.flume.hearth.ui.screens.AlbumScreen
 import im.flume.hearth.ui.screens.ArtistScreen
 import im.flume.hearth.ui.screens.BrowseAlbumsScreen
+import im.flume.hearth.ui.screens.BrowseSongsScreen
 import im.flume.hearth.ui.screens.BrowseArtistsScreen
 import im.flume.hearth.ui.screens.DownloadsScreen
 import im.flume.hearth.ui.screens.GenreScreen
@@ -368,6 +369,7 @@ fun AppRoot() {
                         screen("library") { LibraryScreen() }
                         screen("browse/artists") { BrowseArtistsScreen() }
                         screen("browse/albums") { BrowseAlbumsScreen() }
+                        screen("browse/songs") { BrowseSongsScreen() }
                         screen("liked") { LikedScreen() }
                         screen("downloads") { DownloadsScreen() }
                         screen("settings") { SettingsScreen() }

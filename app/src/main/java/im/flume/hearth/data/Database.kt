@@ -37,6 +37,9 @@ interface LibraryDao {
     @Query("SELECT * FROM songs")
     suspend fun allSongsOnce(): List<SongEntity>
 
+    @Query("SELECT * FROM songs ORDER BY title COLLATE NOCASE")
+    fun allSongs(): Flow<List<SongEntity>>
+
     @Query("SELECT * FROM albums") suspend fun allAlbumsOnce(): List<AlbumEntity>
     @Query("SELECT * FROM artists") suspend fun allArtistsOnce(): List<ArtistEntity>
 

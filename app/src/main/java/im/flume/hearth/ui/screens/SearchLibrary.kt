@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Album
@@ -221,8 +222,9 @@ fun SearchScreen() {
                 item { SectionHeader("Browse everything") }
                 item {
                     Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BrowseTile("All artists", Icons.Default.Person, Modifier.weight(1f)) { actions.open("browse/artists") }
-                        BrowseTile("All albums", Icons.Default.Album, Modifier.weight(1f)) { actions.open("browse/albums") }
+                        BrowseTile("Artists", Icons.Default.Person, Modifier.weight(1f)) { actions.open("browse/artists") }
+                        BrowseTile("Albums", Icons.Default.Album, Modifier.weight(1f)) { actions.open("browse/albums") }
+                        BrowseTile("Songs", Icons.Default.MusicNote, Modifier.weight(1f)) { actions.open("browse/songs") }
                     }
                 }
                 if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
@@ -507,6 +509,30 @@ fun BrowseAlbumsScreen() {
         items(sortAlbums(albums, sort), key = { it.id }) { AlbumListRow(it) }
     }
 }
+
+@Composable
+fun BrowseSongsScreen() {
+    val dao = LocalContext.current.container.db.library()
+    val actions = LocalActions.current
+    val songs by remember { dao.allSongs() }.collectAsStateWithLifecycle(emptyList())
+    BrowseList("All songs", "browse-SONGS", SONG_SORTS) { sort ->
+        val sorted = when (sort) {
+            1 -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track })
+            2 -> songs.sortedByDescending { it.created.orEmpty() }
+            3 -> songs.sortedByDescending { it.playCount }
+            else -> songs
+        }
+        // Tapping a song plays everything, in this order, starting from that song.
+        val ids = sorted.map { it.id }
+        items(sorted, key = { it.id }) { song ->
+            SongRow(song, onClick = {
+                actions.play(PlaySource(PlaySource.Kind.SONGS, label = "All songs", songIds = ids), startSongId = song.id)
+            })
+        }
+    }
+}
+
+private val SONG_SORTS = listOf("A–Z", "Artist", "Recently added", "Most played")
 
 @Composable
 private fun BrowseList(title: String, prefKey: String, sortOptions: List<String>, content: LazyListScope.(sort: Int) -> Unit) {
