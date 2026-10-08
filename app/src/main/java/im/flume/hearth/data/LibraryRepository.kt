@@ -2,6 +2,7 @@ package im.flume.hearth.data
 
 import android.os.Bundle
 import im.flume.hearth.api.NavidromeNativeApi
+import im.flume.hearth.api.PlaylistDto
 import im.flume.hearth.api.SubsonicClient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -144,11 +145,28 @@ class LibraryRepository(
         }
     }
 
-    suspend fun refreshPlaylist(id: String) {
-        val pl = api.playlist(id) ?: return
+    /** Re-reads the playlist from the server into the local copy and returns it (null if it's gone). */
+    suspend fun refreshPlaylist(id: String): PlaylistDto? {
+        val pl = api.playlist(id) ?: return null
+        // Songs the other phone added that this one hasn't synced yet: the entries carry full song details.
+        val missing = pl.entry.map { it.id }.distinct().let { ids -> ids - songsByIds(ids).mapTo(HashSet()) { it.id } }
+        if (missing.isNotEmpty()) dao.insertMissingSongs(pl.entry.filter { it.id in missing }.distinctBy { it.id }.map { it.toEntity() })
         dao.replacePlaylist(pl.toEntity(), pl.entry.mapIndexed { i, s -> PlaylistSongEntity(id, i, s.id) })
         downloads.refreshPinned()
+        return pl
     }
+
+    /** The playlist's song ids as the server has them right now, in order. */
+    private suspend fun serverSongIds(playlistId: String): List<String> =
+        (api.playlist(playlistId) ?: throw java.io.IOException("Playlist not found")).entry.map { it.id }
+
+    /**
+     * The song ids to start an edit from: fresh from the server when possible (also updating the local
+     * copy), otherwise the local copy, including songs this phone hasn't synced.
+     */
+    suspend fun playlistSongIdsForEdit(playlistId: String): List<String> =
+        runCatching { refreshPlaylist(playlistId)?.entry?.map { it.id } }.getOrNull()
+            ?: dao.playlistEntriesOnce(playlistId).map { it.songId }
 
     suspend fun addToPlaylist(playlistId: String, songIds: List<String>) {
         api.addToPlaylist(playlistId, songIds)
@@ -157,7 +175,16 @@ class LibraryRepository(
 
     /** Returns the new playlist's id, or null if the server didn't say. */
     suspend fun createPlaylist(name: String, songIds: List<String>): String? {
-        val id = api.createPlaylist(name, songIds) ?: api.playlists().firstOrNull { it.name == name }?.id ?: return null
+        val id = api.createPlaylist(name, songIds) ?: run {
+            // Admins see everyone's playlists, so only look at our own with that name, newest first,
+            // preferring one this phone didn't know before.
+            val me = session.credentials.value?.username ?: return null
+            val known = dao.playlistsOnce().mapTo(HashSet()) { it.id }
+            api.playlists()
+                .filter { it.name == name && it.owner.equals(me, ignoreCase = true) }
+                .sortedWith(compareBy<PlaylistDto> { it.id in known }.thenByDescending { it.changed.orEmpty() })
+                .firstOrNull()?.id
+        } ?: return null
         refreshPlaylist(id)
         return id
     }
@@ -167,8 +194,16 @@ class LibraryRepository(
         refreshPlaylist(playlistId)
     }
 
-    suspend fun setPlaylistSongs(playlistId: String, songIds: List<String>) {
-        api.setPlaylistSongs(playlistId, songIds)
+    /**
+     * Saves an edit made from [original] (the server list when editing began) to [edited], merged with
+     * whatever the other phone changed meanwhile (see [PlaylistEdits.mergePlaylistEdit]). Uses
+     * updatePlaylist, which Navidrome allows for admins who don't own the playlist.
+     */
+    suspend fun savePlaylistEdit(playlistId: String, original: List<String>, edited: List<String>) {
+        val latest = serverSongIds(playlistId)
+        val merged = PlaylistEdits.mergePlaylistEdit(original, edited, latest)
+        val (remove, add) = PlaylistEdits.replaceOps(latest, merged)
+        if (remove.isNotEmpty() || add.isNotEmpty()) api.editPlaylistSongs(playlistId, remove, add)
         refreshPlaylist(playlistId)
     }
 
@@ -178,22 +213,50 @@ class LibraryRepository(
         dao.deletePlaylistRow(playlistId)
     }
 
-    suspend fun removeFromPlaylist(playlistId: String, index: Int) {
+    /** What a removal changed, so it can be undone with [savePlaylistEdit]. */
+    data class Removal(val before: List<String>, val after: List<String>)
+
+    /**
+     * Removes the [occurrence]th [songId] (counted on this phone's copy). The position is looked up
+     * again on the server first, so a song the other phone added or removed meanwhile doesn't shift it.
+     * Returns null when the song was already gone.
+     */
+    suspend fun removeFromPlaylist(playlistId: String, songId: String, occurrence: Int): Removal? {
+        val before = serverSongIds(playlistId)
+        val index = PlaylistEdits.indexOf(before, songId, occurrence)
+        if (index == null) { refreshPlaylist(playlistId); return null }
         api.removeFromPlaylist(playlistId, index)
-        refreshPlaylist(playlistId)
+        val after = refreshPlaylist(playlistId)?.entry?.map { it.id }
+            ?: before.toMutableList().apply { removeAt(index) }
+        return Removal(before, after)
+    }
+
+    /** Puts a removed song back where it was, keeping whatever the other phone changed since. */
+    suspend fun undoRemoval(playlistId: String, removal: Removal) =
+        savePlaylistEdit(playlistId, original = removal.after, edited = removal.before)
+
+    /** Message for a failed playlist edit; only mentions admin rights when the account isn't one. */
+    suspend fun editError(e: Throwable, owner: String?, fallback: String): String {
+        val notAuthorized = e is im.flume.hearth.api.SubsonicException && e.notAuthorized
+        val isAdmin = if (!notAuthorized) null else session.credentials.value?.username?.let { me ->
+            runCatching { api.user(me)?.adminRole }.getOrNull()
+        }
+        return PlaylistRules.editError(e, owner, isAdmin, fallback)
     }
 
     /**
      * Changes who a playlist is shared with. Re-reads the comment first so a change made on the other
      * phone a moment ago isn't overwritten, then writes it back with public on while anyone's invited.
+     * Returns the sharing the server has afterwards (read back, not assumed).
      */
-    suspend fun updateSharing(playlistId: String, change: (Sharing) -> Sharing) {
+    suspend fun updateSharing(playlistId: String, change: (Sharing) -> Sharing): Sharing? {
         val pl = api.playlist(playlistId) ?: throw java.io.IOException("Playlist not found")
         val parsed = PlaylistSharing.parse(pl.comment)
         val current = parsed.sharing ?: Sharing()
         val next = change(current.copy(owner = current.owner ?: pl.owner?.lowercase()))
         api.setPlaylistComment(playlistId, PlaylistSharing.serialize(parsed.text, next), public = !next.isEmpty)
-        refreshPlaylist(playlistId)
+        val fresh = refreshPlaylist(playlistId) ?: throw java.io.IOException("Playlist not found")
+        return PlaylistSharing.parse(fresh.comment).sharing
     }
 
     /**
@@ -204,8 +267,10 @@ class LibraryRepository(
     suspend fun answerInvite(playlistId: String, accept: Boolean): Boolean {
         val me = session.credentials.value?.username ?: return false
         session.setPlaylistDecision(playlistId, accept)
-        val saved = runCatching { updateSharing(playlistId) { if (accept) it.accept(me) else it.remove(me) } }.isSuccess
-        // Once the server has the answer the local copy isn't needed, so a later re-invite still shows up.
+        val after = runCatching { updateSharing(playlistId) { if (accept) it.accept(me) else it.remove(me) } }
+        // Only once the server's comment really shows the answer is the local copy dropped, so a later
+        // re-invite still shows up but a write the server ignored doesn't bring the invite back.
+        val saved = after.isSuccess && PlaylistRules.answerSaved(after.getOrNull(), me, accept)
         if (saved) session.setPlaylistDecision(playlistId, null)
         return saved
     }

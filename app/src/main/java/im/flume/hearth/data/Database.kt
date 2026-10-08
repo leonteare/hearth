@@ -84,6 +84,16 @@ interface LibraryDao {
     @Query("SELECT s.* FROM playlist_songs p JOIN songs s ON s.id = p.songId WHERE p.playlistId = :playlistId ORDER BY p.position")
     suspend fun playlistSongsOnce(playlistId: String): List<SongEntity>
 
+    /** Every entry with its server position, including songs this phone hasn't synced yet (song is null). */
+    @Query("SELECT p.position, p.songId, s.* FROM playlist_songs p LEFT JOIN songs s ON s.id = p.songId WHERE p.playlistId = :playlistId ORDER BY p.position")
+    fun playlistEntries(playlistId: String): Flow<List<PlaylistEntry>>
+
+    @Query("SELECT p.position, p.songId, s.* FROM playlist_songs p LEFT JOIN songs s ON s.id = p.songId WHERE p.playlistId = :playlistId ORDER BY p.position")
+    suspend fun playlistEntriesOnce(playlistId: String): List<PlaylistEntry>
+
+    /** Adds songs this phone doesn't know yet without touching ones it does (keeps local stars and counts). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertMissingSongs(items: List<SongEntity>)
+
     @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
     suspend fun downloadedSongsOnce(): List<SongEntity>
 

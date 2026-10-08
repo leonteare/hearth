@@ -181,13 +181,20 @@ class SubsonicClient(
         call("updatePlaylist") { addQueryParameter("playlistId", playlistId); addQueryParameter("name", name) }
     }
 
-    /** Replaces a playlist's songs with [songIds], in that order. */
-    suspend fun setPlaylistSongs(playlistId: String, songIds: List<String>) {
-        call("createPlaylist") {
+    /**
+     * Removes the entries at [indexesToRemove] and appends [songIdsToAdd] in one updatePlaylist call.
+     * Unlike createPlaylist?playlistId=, Navidrome lets admins do this on playlists they don't own.
+     */
+    suspend fun editPlaylistSongs(playlistId: String, indexesToRemove: List<Int>, songIdsToAdd: List<String>) {
+        call("updatePlaylist") {
             addQueryParameter("playlistId", playlistId)
-            songIds.forEach { addQueryParameter("songId", it) }
+            indexesToRemove.forEach { addQueryParameter("songIndexToRemove", it.toString()) }
+            songIdsToAdd.forEach { addQueryParameter("songIdToAdd", it) }
         }
     }
+
+    /** The account's details; [UserDto.adminRole] says whether it's an admin. */
+    suspend fun user(username: String): UserDto? = call("getUser") { addQueryParameter("username", username) }.user
 
     /** Sets the playlist's comment (where Hearth keeps sharing details) and whether others can see it. */
     suspend fun setPlaylistComment(playlistId: String, comment: String, public: Boolean) {

@@ -63,9 +63,32 @@ class PlaylistSharingTest {
     }
 
     @Test
-    fun `nobody shared means no sharing line`() {
-        assertEquals("Note", PlaylistSharing.serialize("Note\n", Sharing(owner = "leon")))
-        assertEquals("", PlaylistSharing.serialize("", null))
+    fun `nobody shared keeps an owner-only line and the comment is never empty`() {
+        // Navidrome ignores comment= so an empty comment would leave the old invites in place.
+        val stopped = PlaylistSharing.serialize("", Sharing(owner = "leon"))
+        assertEquals("""hearth:{"v":1,"owner":"leon","members":{},"invites":{}}""", stopped)
+        val parsed = PlaylistSharing.parse(stopped)
+        assertEquals("leon", parsed.sharing?.owner)
+        assertTrue(parsed.sharing!!.isEmpty)
+        assertEquals("", parsed.text)
+        assertEquals("Note\n" + stopped, PlaylistSharing.serialize("Note\n", Sharing(owner = "leon")))
+        assertEquals(" ", PlaylistSharing.serialize("", null))
+        assertEquals(" ", PlaylistSharing.serialize("", Sharing()))
+        assertEquals("Note", PlaylistSharing.serialize("Note", Sharing()))
+        // A leave that empties the playlist's sharing still writes something.
+        val left = Sharing(owner = "wife", members = mapOf("leon" to ShareRole.ADD)).remove("leon")
+        assertTrue(PlaylistSharing.serialize("", left).isNotEmpty())
+    }
+
+    @Test
+    fun `an invite answer only counts once the server shows it`() {
+        val invited = Sharing(owner = "wife", invites = mapOf("leon" to ShareRole.ADD))
+        assertFalse(PlaylistRules.answerSaved(invited, "Leon", accept = false))
+        assertFalse(PlaylistRules.answerSaved(invited, "leon", accept = true))
+        assertTrue(PlaylistRules.answerSaved(invited.accept("leon"), "leon", accept = true))
+        assertTrue(PlaylistRules.answerSaved(invited.remove("leon"), "leon", accept = false))
+        assertTrue(PlaylistRules.answerSaved(null, "leon", accept = false))
+        assertFalse(PlaylistRules.answerSaved(null, "leon", accept = true))
     }
 
     @Test
@@ -146,9 +169,12 @@ class PlaylistRulesTest {
 
     @Test
     fun `admin error names the owner`() {
-        val msg = PlaylistRules.editError(SubsonicException(50, "nope"), "leon", "fallback")
+        val msg = PlaylistRules.editError(SubsonicException(50, "nope"), "leon", isAdmin = false, "fallback")
         assertTrue(msg.contains("ask Leon"))
-        assertEquals("fallback", PlaylistRules.editError(java.io.IOException(), "leon", "fallback"))
-        assertEquals("fallback", PlaylistRules.editError(SubsonicException(70, "missing"), "leon", "fallback"))
+        // Admins (or unknown) being refused don't get told to become admins.
+        assertEquals("Couldn't save the playlist", PlaylistRules.editError(SubsonicException(50, "nope"), "leon", isAdmin = true, "fallback"))
+        assertEquals("Couldn't save the playlist", PlaylistRules.editError(SubsonicException(50, "nope"), "leon", isAdmin = null, "fallback"))
+        assertEquals("fallback", PlaylistRules.editError(java.io.IOException(), "leon", isAdmin = false, "fallback"))
+        assertEquals("fallback", PlaylistRules.editError(SubsonicException(70, "missing"), "leon", isAdmin = false, "fallback"))
     }
 }

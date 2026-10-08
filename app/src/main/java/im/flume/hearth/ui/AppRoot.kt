@@ -265,7 +265,7 @@ private class AppActions(
                     else -> {
                         val owner = playlistId?.let { c.library.dao.playlistOnce(it) }
                             ?.let { PlaylistRules.access(it, c.session.credentials.value?.username).owner }
-                        PlaylistRules.editError(error, owner, "Couldn't update the playlist (offline?)")
+                        c.library.editError(error, owner, "Couldn't update the playlist (offline?)")
                     }
                 }
             )

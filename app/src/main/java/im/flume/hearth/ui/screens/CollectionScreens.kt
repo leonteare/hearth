@@ -457,22 +457,38 @@ fun PlaylistScreen(id: String) {
     val access = item?.access
     val actions = LocalActions.current
     val online by c.network.isOnline.collectAsStateWithLifecycle()
-    val loadedSongs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(null)
-    val songs = loadedSongs.orEmpty()
+    // Entries keep their server positions, including songs this phone hasn't synced yet.
+    val entries by remember(id) { dao.playlistEntries(id) }.collectAsStateWithLifecycle(null)
+    val shown = remember(entries) { entries.orEmpty().withIndex().filter { it.value.song != null } }
+    val songs = remember(shown) { shown.map { it.value.song!! } }
+    val loadedSongs = entries?.let { songs }
     val screenScope = androidx.compose.runtime.rememberCoroutineScope()
     // Shared playlists change from the other phone; re-read on open so those edits show up right away.
+    // Also re-read when an entry's song isn't known here yet, which brings its details in.
     val shared = access != null && (access.isShared || !access.isOwner)
-    LaunchedEffect(id, shared, online) { if (shared && online) runCatching { c.library.refreshPlaylist(id) } }
+    val unknownSongs = entries?.any { it.song == null } == true
+    LaunchedEffect(id, shared, online, unknownSongs) {
+        if ((shared || unknownSongs) && online) runCatching { c.library.refreshPlaylist(id) }
+    }
     CollectionScreen(
         title = playlist?.name.orEmpty(),
         // Only name the owner when it's someone else's playlist.
         subtitle = if (access == null || access.isOwner) "" else "by ${PlaylistRules.displayName(access.owner)}",
         onRemoveSong = if (access?.canEdit == true) { index ->
-            val before = songs.map { it.id }
-            c.appScope.launch {
-                runCatching { c.library.removeFromPlaylist(id, index) }
-                    .onSuccess { actions.showUndo("Removed from playlist") { c.library.setPlaylistSongs(id, before) } }
-                    .onFailure { actions.showMessage(PlaylistRules.editError(it, access.owner, "Couldn't remove the song (offline?)")) }
+            // Identify the song by id and occurrence, not list position: the server re-finds it.
+            val all = entries.orEmpty().map { it.songId }
+            shown.getOrNull(index)?.let { (at, entry) ->
+                val occurrence = im.flume.hearth.data.PlaylistEdits.occurrenceAt(all, at)
+                c.appScope.launch {
+                    runCatching { c.library.removeFromPlaylist(id, entry.songId, occurrence) }
+                        .onSuccess { removal ->
+                            if (removal != null) actions.showUndo("Removed from playlist") {
+                                runCatching { c.library.undoRemoval(id, removal) }
+                                    .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't put the song back (offline?)")) }
+                            }
+                        }
+                        .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't remove the song (offline?)")) }
+                }
             }
         } else null,
         cover = playlist?.coverArt,
@@ -521,7 +537,7 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                 .onSuccess { actions.showMessage(done) }
                 .onFailure { e ->
                     actions.showMessage(
-                        if (e is im.flume.hearth.api.SubsonicException) PlaylistRules.editError(e, access.owner, "Couldn't change the photo (offline?)")
+                        if (e is im.flume.hearth.api.SubsonicException) c.library.editError(e, access.owner, "Couldn't change the photo (offline?)")
                         else photoError(e) { c.session.vault.clear(); c.nativeApi.forgetSession() }
                     )
                 }
@@ -574,7 +590,7 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                     renaming = false
                     c.appScope.launch {
                         runCatching { c.library.renamePlaylist(id, newName.trim()) }
-                            .onFailure { actions.showMessage(PlaylistRules.editError(it, access.owner, "Couldn't rename the playlist (offline?)")) }
+                            .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't rename the playlist (offline?)")) }
                     }
                 }) { Text("Save") }
             },
@@ -628,13 +644,20 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
 fun PlaylistEditScreen(id: String) {
     val c = LocalContext.current.container
     val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    val original by remember(id) { c.db.library().playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
     val owner = remember(id) { c.library.playlistItem(id) }.collectAsStateWithLifecycle(null).value?.access?.owner
     val actions = LocalActions.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
-    var order by remember { mutableStateOf<List<Pair<Int, SongEntity>>>(emptyList()) }
-    LaunchedEffect(original) { if (order.isEmpty()) order = original.mapIndexed { i, s -> i to s } }
+    // The server's list when editing began; null until loaded. Save merges against it.
+    var original by remember(id) { mutableStateOf<List<String>?>(null) }
+    // (stable key, song id, song details or null when this phone doesn't know the song)
+    var order by remember(id) { mutableStateOf<List<Triple<Int, String, SongEntity?>>>(emptyList()) }
+    LaunchedEffect(id) {
+        val ids = c.library.playlistSongIdsForEdit(id)
+        val known = c.library.songsByIds(ids.distinct()).associateBy { it.id }
+        order = ids.mapIndexed { i, s -> Triple(i, s, known[s]) }
+        original = ids
+    }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val reorder = rememberReorderableLazyListState(listState) { from, to ->
         order = order.toMutableList().apply { add(to.index, removeAt(from.index)) }
@@ -642,24 +665,25 @@ fun PlaylistEditScreen(id: String) {
     Column(Modifier.fillMaxSize()) {
         TopBar("Edit order") {
             // Stay on the screen until Navidrome has the new order, so a failed save doesn't lose the edit.
-            TextButton(enabled = !saving, onClick = {
+            TextButton(enabled = !saving && original != null, onClick = {
+                val start = original ?: return@TextButton
                 saving = true
-                val ids = order.map { it.second.id }
+                val ids = order.map { it.second }
                 scope.launch {
-                    val error = c.appScope.async { runCatching { c.library.setPlaylistSongs(id, ids) }.exceptionOrNull() }.await()
+                    val error = c.appScope.async { runCatching { c.library.savePlaylistEdit(id, start, ids) }.exceptionOrNull() }.await()
                     saving = false
                     if (error == null) back?.onBackPressed()
-                    else actions.showMessage(PlaylistRules.editError(error, owner, "Couldn't save the new order (offline?)"))
+                    else actions.showMessage(c.library.editError(error, owner, "Couldn't save the new order (offline?)"))
                 }
             }) { Text(if (saving) "Saving…" else "Save") }
         }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            items(order, key = { it.first }) { (key, song) ->
+            items(order, key = { it.first }) { (key, _, song) ->
                 ReorderableItem(reorder, key = key) { dragging ->
                     MediaRow(
-                        song.title, song.artist, onClick = null,
+                        song?.title ?: "Song not synced yet", song?.artist.orEmpty(), onClick = null,
                         modifier = Modifier.background(if (dragging) SurfaceHigh else Background),
-                        coverArt = song.coverArt, fallback = song.album,
+                        coverArt = song?.coverArt, fallback = song?.album.orEmpty(),
                     ) {
                         Box(Modifier.draggableHandle().size(48.dp), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)

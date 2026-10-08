@@ -86,10 +86,14 @@ object PlaylistSharing {
         raw.mapNotNull { (user, role) -> ShareRole.fromWire(role)?.let { user.lowercase() to it } }
             .filter { it.first.isNotBlank() }.toMap()
 
-    /** The comment to write back: the human [text], plus the sharing line unless nobody is shared with. */
+    /**
+     * The comment to write back: the human [text] plus the sharing line. Never empty: Navidrome treats
+     * `comment=` as "not given" and would keep the old line (and its invites), so when nobody is shared
+     * with an owner-only line stays, or a single space when there's nothing else to write.
+     */
     fun serialize(text: String, sharing: Sharing?): String {
         val human = text.trimEnd()
-        if (sharing == null || sharing.isEmpty) return human
+        if (sharing == null || (sharing.isEmpty && sharing.owner == null)) return human.ifEmpty { " " }
         val wire = Wire(
             owner = sharing.owner,
             members = sharing.members.mapValues { it.value.wire },
@@ -155,12 +159,24 @@ object PlaylistRules {
     /** The "Add to playlist" picker. */
     fun editable(all: List<PlaylistItem>) = all.filter { it.access.canEdit }
 
+    /** Whether the server's [sharing] (read back after writing) shows [me]'s answer to an invite. */
+    fun answerSaved(sharing: Sharing?, me: String, accept: Boolean): Boolean {
+        val u = me.lowercase()
+        return if (accept) sharing?.members?.containsKey(u) == true
+        else sharing == null || (u !in sharing.members && u !in sharing.invites)
+    }
+
     /** Capitalised for display: "leon" becomes "Leon". */
     fun displayName(user: String?): String = user?.replaceFirstChar { it.titlecase() } ?: "the owner"
 
-    /** Message for a failed playlist edit; explains the admin rule when the server says no. */
-    fun editError(e: Throwable, owner: String?, fallback: String): String =
-        if (e is SubsonicException && e.notAuthorized)
+    /**
+     * Message for a failed playlist edit. The admin hint only shows when the server said no and the
+     * account is known not to be an admin ([isAdmin] false); an admin being refused gets a plain message.
+     */
+    fun editError(e: Throwable, owner: String?, isAdmin: Boolean?, fallback: String): String = when {
+        e !is SubsonicException || !e.notAuthorized -> fallback
+        isAdmin == false ->
             "Only admins can edit playlists they don't own — ask ${displayName(owner)} to make your Navidrome account an admin"
-        else fallback
+        else -> "Couldn't save the playlist"
+    }
 }
