@@ -54,6 +54,18 @@ class LyricsTest {
     }
 
     @Test
+    fun `positive offset makes lyrics appear sooner`() {
+        val lines = listOf(LyricLine(1_000, "a"), LyricLine(5_000, "b"), LyricLine(null, "c")).withOffset(2_000)
+        assertEquals(listOf(0L, 3_000L, null), lines.map { it.start })
+    }
+
+    @Test
+    fun `negative offset makes lyrics appear later`() {
+        val lines = listOf(LyricLine(1_000, "a")).withOffset(-500)
+        assertEquals(1_500L, lines[0].start)
+    }
+
+    @Test
     fun `blank lyrics count as empty`() {
         assertTrue(Lyrics(false, listOf(LyricLine(null, " "))).isEmpty)
     }

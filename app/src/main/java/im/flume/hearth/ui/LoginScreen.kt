@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -44,7 +45,8 @@ fun LoginScreen() {
     val scope = rememberCoroutineScope()
     var url by rememberSaveable { mutableStateOf("http://") }
     var user by rememberSaveable { mutableStateOf("") }
-    var pass by rememberSaveable { mutableStateOf("") }
+    // Plain remember: a saveable password would sit unencrypted in the saved-state Bundle.
+    var pass by remember { mutableStateOf("") }
     var busy by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -85,6 +87,8 @@ fun LoginScreen() {
                     busy = false
                     result.onSuccess {
                         c.session.saveCredentials(creds)
+                        // Kept encrypted (Keystore) so playlist photos don't ask for it again.
+                        runCatching { c.session.vault.save(pass) }
                         c.network.reportServerSuccess()
                         c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
                     }.onFailure { e ->
@@ -93,7 +97,7 @@ fun LoginScreen() {
                                 "If it's your own certificate (e.g. Caddy's local one), install its root certificate on the phone, " +
                                 "or use a plain http:// address over Tailscale."
                         } else {
-                            "Couldn't sign in: ${e.message ?: e.javaClass.simpleName}.\n" +
+                            "Couldn't sign in: ${im.flume.hearth.util.userMessage(e)}.\n" +
                                 "Check the address and that Tailscale is connected."
                         }
                     }

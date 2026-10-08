@@ -34,22 +34,41 @@ import java.util.concurrent.TimeUnit
 
 fun crashFile(context: Context) = java.io.File(context.filesDir, "last-crash.txt")
 
-/** Saves [e] so it can be copied from Home next time the app opens. Never throws. */
+/** Errors that were caught and handled; kept for debugging, never shown as a crash. */
+fun errorLogFile(context: Context) = java.io.File(context.filesDir, "errors.log")
+
+/** Report text with URLs and login parameters scrubbed out (stream URLs carry the token). */
+private fun report(where: String, e: Throwable): String = im.flume.hearth.util.scrubSecrets(
+    "Hearth ${BuildConfig.VERSION_NAME} on Android ${android.os.Build.VERSION.RELEASE}, " +
+        "${java.util.Date()}, $where\n\n${e.stackTraceToString()}"
+)
+
+/** Saves a real (uncaught) crash so it can be copied from Home next time the app opens. Never throws. */
 fun writeCrash(context: Context, where: String, e: Throwable) {
+    runCatching { crashFile(context).writeText(report(where, e)) }
+}
+
+private val errorLogLock = Any()
+private const val ERROR_LOG_MAX = 64 * 1024
+
+/** Appends a handled error to [errorLogFile], keeping only the newest ~64 KB. Never throws. */
+fun logHandledError(context: Context, where: String, e: Throwable) {
     runCatching {
-        crashFile(context).writeText(
-            "Hearth ${BuildConfig.VERSION_NAME} on Android ${android.os.Build.VERSION.RELEASE}, " +
-                "${java.util.Date()}, $where\n\n${e.stackTraceToString()}"
-        )
+        synchronized(errorLogLock) {
+            val file = errorLogFile(context)
+            val old = if (file.exists()) file.readText() else ""
+            val combined = old + report(where, e) + "\n\n----\n\n"
+            file.writeText(if (combined.length > ERROR_LOG_MAX) combined.takeLast(ERROR_LOG_MAX) else combined)
+        }
     }
 }
 
 /**
- * For long-lived scopes: a failed background job (e.g. a database error) is recorded instead of
- * crashing the app. Cancellation never reaches a handler, so it still propagates normally.
+ * For long-lived scopes: a failed background job (e.g. a database error) is logged instead of
+ * crashing the app, and isn't reported as a crash. Cancellation never reaches a handler.
  */
 fun crashLoggingHandler(context: Context, name: String) = CoroutineExceptionHandler { _, e ->
-    writeCrash(context, "caught in $name", e)
+    logHandledError(context, "caught in $name", e)
 }
 
 class HearthApp : Application(), SingletonImageLoader.Factory {
@@ -69,7 +88,10 @@ class HearthApp : Application(), SingletonImageLoader.Factory {
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { container.http })) }
+            .components {
+                add(im.flume.hearth.playback.CoverCacheKeys)
+                add(OkHttpNetworkFetcherFactory(callFactory = { container.http }))
+            }
             .diskCache {
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("covers"))

@@ -7,6 +7,9 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import im.flume.hearth.api.SubsonicClient
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,11 +31,19 @@ class NetworkMonitor(
     private val cm = context.getSystemService(ConnectivityManager::class.java)
 
     private val hasNetwork = MutableStateFlow(cm.activeNetwork != null)
-    private val serverReachable = MutableStateFlow(true)
+    /** Null until the first ping answers: unknown counts as unreachable, so nothing streams on a guess. */
+    private val serverReachable = MutableStateFlow<Boolean?>(null)
+    private var checking: Job? = null
 
     val isOnline: StateFlow<Boolean> =
-        combine(hasNetwork, serverReachable, session.settings) { net, server, s -> net && server && !s.offlineMode }
-            .stateIn(scope, SharingStarted.Eagerly, true)
+        combine(hasNetwork, serverReachable, session.settings) { net, server, s -> net && server == true && !s.offlineMode }
+            .stateIn(scope, SharingStarted.Eagerly, false)
+
+    /** The user switched on offline mode: nothing may stream, and there's no point pinging. */
+    val offlineMode: Boolean get() = session.settings.value.offlineMode
+
+    /** Offline mode, or no network at all: streaming can't work, so fail fast instead of waiting on timeouts. */
+    val cannotStream: Boolean get() = offlineMode || !hasNetwork.value
 
     private val _wifi = MutableStateFlow(onWifi())
 
@@ -62,7 +73,7 @@ class NetworkMonitor(
         // Notice quickly when Tailscale / the server comes back.
         scope.launch {
             while (true) {
-                delay(if (serverReachable.value) 5 * 60_000L else 20_000L)
+                delay(if (serverReachable.value == true) 5 * 60_000L else 20_000L)
                 if (hasNetwork.value) checkServer()
             }
         }
@@ -83,9 +94,22 @@ class NetworkMonitor(
 
     fun checkServer() {
         val creds = session.credentials.value ?: return
-        scope.launch {
+        if (checking?.isActive == true) return
+        checking = scope.launch {
             serverReachable.value = runCatching { api.ping(creds) }.isSuccess
         }
+    }
+
+    /**
+     * Waits (up to [timeoutMs]) for an answer when it isn't known yet whether the server is reachable,
+     * e.g. right after start, so a shuffle isn't built from a guess. Returns [isOnline].
+     */
+    suspend fun awaitServerKnown(timeoutMs: Long = 5_000): Boolean {
+        if (serverReachable.value == null && hasNetwork.value && !offlineMode) {
+            checkServer()
+            withTimeoutOrNull(timeoutMs) { serverReachable.first { it != null } }
+        }
+        return isOnline.value
     }
 
     fun reportServerFailure() { serverReachable.value = false }

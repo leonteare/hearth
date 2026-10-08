@@ -43,7 +43,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // No silent fallback to the debug key: a release without keystore.properties fails (see below).
+            signingConfig = signingConfigs.findByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -63,6 +64,18 @@ android {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// A release APK/bundle must carry the real signing key: without keystore.properties, fail rather than
+// quietly sign with the debug key (which can't update the installed app). Debug builds are unaffected.
+val hasReleaseKey = keystoreProps.containsKey("storeFile")
+val requireReleaseKey = tasks.register("requireReleaseKey") {
+    doLast {
+        if (!hasReleaseKey) throw GradleException("Release signing needs keystore.properties (storeFile, storePassword, keyAlias, keyPassword)")
+    }
+}
+tasks.configureEach {
+    if (name == "packageRelease" || name == "signReleaseBundle") dependsOn(requireReleaseKey)
 }
 
 dependencies {
