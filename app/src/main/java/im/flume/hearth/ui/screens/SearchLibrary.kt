@@ -5,6 +5,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.ui.text.style.TextAlign
+import im.flume.hearth.data.YourLibrary
+import kotlinx.coroutines.flow.combine
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.Dispatchers
@@ -187,6 +193,14 @@ fun SearchScreen() {
                         }
                     }
                 }
+                // The Library tab only shows what you saved; the whole server is one tap away here.
+                item { SectionHeader("Browse everything") }
+                item {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BrowseTile("All artists", Icons.Default.Person, Modifier.weight(1f)) { actions.open("browse/artists") }
+                        BrowseTile("All albums", Icons.Default.Album, Modifier.weight(1f)) { actions.open("browse/albums") }
+                    }
+                }
                 if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
                 items(genres.chunked(2)) { pair ->
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -235,6 +249,18 @@ fun SearchScreen() {
     }
 }
 
+@Composable
+private fun BrowseTile(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.height(56.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = Accent)
+        Spacer(Modifier.width(12.dp))
+        Text(title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 private fun genreColor(name: String): Color {
     val palette = listOf(0xFF8C1932, 0xFF1E3264, 0xFF477D95, 0xFF8D67AB, 0xFFE8115B, 0xFF148A08, 0xFFBA5D07, 0xFF503750, 0xFF0D73EC, 0xFF777777)
     return Color(palette[(name.hashCode() and 0x7fffffff) % palette.size])
@@ -274,6 +300,40 @@ fun AlbumListRow(a: AlbumEntity) {
 
 private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums") }
 
+private val ARTIST_SORTS = listOf("A–Z", "Most albums")
+private val ALBUM_SORTS = listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
+
+private fun sortArtists(artists: List<ArtistEntity>, sort: Int) =
+    if (sort == 1) artists.sortedByDescending { it.albumCount } else artists
+
+private fun sortAlbums(albums: List<AlbumEntity>, sort: Int) = when (sort) {
+    1 -> albums.sortedByDescending { it.created }
+    2 -> albums.sortedWith(compareBy({ it.artist.lowercase().removePrefix("the ") }, { it.year ?: 0 }))
+    3 -> albums.sortedByDescending { it.playCount }
+    4 -> albums.sortedByDescending { it.year ?: 0 }
+    else -> albums
+}
+
+@Composable
+private fun SortMenu(options: List<String>, sort: Int, onSort: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) {
+            Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(options.getOrElse(sort) { options[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+        }
+        DropdownMenu(open, onDismissRequest = { open = false }) {
+            options.forEachIndexed { i, label ->
+                DropdownMenuItem(text = { Text(label, color = if (i == sort) Accent else Color.Unspecified) }, onClick = {
+                    onSort(i)
+                    open = false
+                })
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen() {
@@ -282,37 +342,32 @@ fun LibraryScreen() {
     val actions = LocalActions.current
     var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
     val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
-    val artists by remember { dao.artists() }.collectAsStateWithLifecycle(emptyList())
-    val albums by remember { dao.albums() }.collectAsStateWithLifecycle(emptyList())
+    // Personal: saved albums, and artists you follow or saved an album by. The whole server is under Search.
+    val albums by remember { dao.savedAlbums() }.collectAsStateWithLifecycle(emptyList())
+    val artists by remember { combine(dao.artists(), dao.savedAlbums(), YourLibrary::artists) }.collectAsStateWithLifecycle(emptyList())
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(0)
     val sync by c.sync.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val sortPrefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
     var sort by remember(tab) { mutableStateOf(sortPrefs.getInt("sort-${tab.name}", 0)) }
-    var sortOpen by remember { mutableStateOf(false) }
     val sortOptions = when (tab) {
         LibraryTab.PLAYLISTS -> listOf("A–Z", "Recently updated", "Most songs")
-        LibraryTab.ARTISTS -> listOf("A–Z", "Most albums")
-        LibraryTab.ALBUMS -> listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
+        LibraryTab.ARTISTS -> ARTIST_SORTS
+        LibraryTab.ALBUMS -> ALBUM_SORTS
     }
     val sortedPlaylists = when (sort) {
         1 -> playlists.sortedByDescending { it.changed }
         2 -> playlists.sortedByDescending { it.songCount }
         else -> playlists
     }
-    val sortedArtists = if (sort == 1 && tab == LibraryTab.ARTISTS) artists.sortedByDescending { it.albumCount } else artists
-    val sortedAlbums = when (sort) {
-        1 -> albums.sortedByDescending { it.created }
-        2 -> albums.sortedWith(compareBy({ it.artist.lowercase().removePrefix("the ") }, { it.year ?: 0 }))
-        3 -> albums.sortedByDescending { it.playCount }
-        4 -> albums.sortedByDescending { it.year ?: 0 }
-        else -> albums
-    }
+    val sortedArtists = remember(artists, sort, tab) { if (tab == LibraryTab.ARTISTS) sortArtists(artists, sort) else artists }
+    val sortedAlbums = remember(albums, sort, tab) { if (tab == LibraryTab.ALBUMS) sortAlbums(albums, sort) else albums }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Your Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) { Icon(Icons.Default.Shuffle, "Shuffle all", tint = Accent) }
+            // Home's tile shuffles just your library; this one is for the whole server.
+            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) { Icon(Icons.Default.Shuffle, "Shuffle everything", tint = Accent) }
             IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -326,21 +381,9 @@ fun LibraryScreen() {
                     )
                 }
             }
-            Box {
-                TextButton(onClick = { sortOpen = true }) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(sortOptions.getOrElse(sort) { sortOptions[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
-                }
-                DropdownMenu(sortOpen, onDismissRequest = { sortOpen = false }) {
-                    sortOptions.forEachIndexed { i, label ->
-                        DropdownMenuItem(text = { Text(label, color = if (i == sort) Accent else Color.Unspecified) }, onClick = {
-                            sort = i
-                            sortPrefs.edit().putInt("sort-${tab.name}", i).apply()
-                            sortOpen = false
-                        })
-                    }
-                }
+            SortMenu(sortOptions, sort) {
+                sort = it
+                sortPrefs.edit().putInt("sort-${tab.name}", it).apply()
             }
         }
         PullToRefreshBox(
@@ -367,12 +410,30 @@ fun LibraryScreen() {
                             }
                         }
                     }
-                    LibraryTab.ARTISTS -> items(sortedArtists, key = { it.id }) { ArtistRow(it) }
-                    LibraryTab.ALBUMS -> items(sortedAlbums, key = { it.id }) { AlbumListRow(it) }
+                    LibraryTab.ARTISTS -> {
+                        if (sortedArtists.isEmpty()) item {
+                            LibraryEmpty(
+                                "No artists yet",
+                                "Tap Follow on an artist's page, or save one of their albums, and they'll show up here.",
+                                "Browse all artists",
+                            ) { actions.open("browse/artists") }
+                        }
+                        items(sortedArtists, key = { it.id }) { ArtistRow(it) }
+                    }
+                    LibraryTab.ALBUMS -> {
+                        if (sortedAlbums.isEmpty()) item {
+                            LibraryEmpty(
+                                "No saved albums yet",
+                                "Tap the heart on an album to save it here. Albums you download are saved too.",
+                                "Browse all albums",
+                            ) { actions.open("browse/albums") }
+                        }
+                        items(sortedAlbums, key = { it.id }) { AlbumListRow(it) }
+                    }
                 }
                 item {
                     Text(
-                        "$songCount songs • pull down to refresh",
+                        "$songCount songs on the server • pull down to refresh",
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(16.dp),
@@ -380,6 +441,55 @@ fun LibraryScreen() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryEmpty(title: String, body: String, button: String, onBrowse: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(body, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onBrowse) { Text(button, color = Accent) }
+    }
+}
+
+/** Every artist on the server, for when you want more than Your Library. */
+@Composable
+fun BrowseArtistsScreen() {
+    val dao = LocalContext.current.container.db.library()
+    val artists by remember { dao.artists() }.collectAsStateWithLifecycle(emptyList())
+    BrowseList("All artists", "browse-ARTISTS", ARTIST_SORTS) { sort ->
+        items(sortArtists(artists, sort), key = { it.id }) { ArtistRow(it) }
+    }
+}
+
+/** Every album on the server, saved or not. */
+@Composable
+fun BrowseAlbumsScreen() {
+    val dao = LocalContext.current.container.db.library()
+    val albums by remember { dao.albums() }.collectAsStateWithLifecycle(emptyList())
+    BrowseList("All albums", "browse-ALBUMS", ALBUM_SORTS) { sort ->
+        items(sortAlbums(albums, sort), key = { it.id }) { AlbumListRow(it) }
+    }
+}
+
+@Composable
+private fun BrowseList(title: String, prefKey: String, sortOptions: List<String>, content: LazyListScope.(sort: Int) -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
+    var sort by remember { mutableStateOf(prefs.getInt(prefKey, 0)) }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            BackButton()
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            SortMenu(sortOptions, sort) {
+                sort = it
+                prefs.edit().putInt(prefKey, it).apply()
+            }
+        }
+        LazyColumn(Modifier.fillMaxSize()) { content(sort) }
     }
 }
 

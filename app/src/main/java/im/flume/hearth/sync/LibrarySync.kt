@@ -42,6 +42,20 @@ class LibrarySync(
         val rescanned = scan?.lastScan != null && scan.lastScan != session.lastScan
         if (force || session.lastSyncAt == 0L || stale || rescanned || session.syncedSchema < SCHEMA) {
             fullSync(scan?.lastScan)
+        } else {
+            refreshStars()
+        }
+    }
+
+    /**
+     * Saved albums and followed artists can change from another device between full syncs, and
+     * getStarred2 is a single cheap request, so it runs on every check. Only flags change; no rows go.
+     */
+    suspend fun refreshStars() {
+        if (mutex.isLocked) return
+        mutex.withLock {
+            val starred = runCatching { api.starred() }.getOrNull() ?: return
+            db.library().applyStars(starred.album.map { it.id }, starred.artist.map { it.id })
         }
     }
 
@@ -58,14 +72,19 @@ class LibrarySync(
             }
             val albums = pageAll { offset -> api.albumList("alphabeticalByName", PAGE, offset) }
             val artists = api.artists()
+            // The list endpoints don't always carry the user's stars, so getStarred2 is the source of truth.
+            // If it fails, fall back to whatever the lists said rather than failing the whole sync.
+            val starred = runCatching { api.starred() }.getOrNull()
+            val starredAlbums = starred?.album?.mapTo(HashSet()) { it.id }
+            val starredArtists = starred?.artist?.mapTo(HashSet()) { it.id }
             val playlists = api.playlists()
             val playlistSongs = playlists.flatMap { pl ->
                 api.playlist(pl.id)?.entry.orEmpty().mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
             }
             db.library().replaceLibrary(
                 songs = songs.map { it.toEntity() },
-                albums = albums.map { it.toEntity() },
-                artists = artists.map { it.toEntity() },
+                albums = albums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
+                artists = artists.map { a -> a.toEntity().let { e -> if (starredArtists == null) e else e.copy(starred = a.id in starredArtists) } },
                 playlists = playlists.map { it.toEntity() },
                 playlistSongs = playlistSongs,
             )

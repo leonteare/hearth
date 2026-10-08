@@ -94,6 +94,40 @@ class SubsonicClientTest {
     }
 
     @Test
+    fun `albums and artists are starred with their own parameter`() = runTest {
+        repeat(4) { server.enqueue(MockResponse().setBody("""{"subsonic-response":{"status":"ok","version":"1.16.1"}}""")) }
+        client.starAlbum("al1")
+        client.unstarAlbum("al1")
+        client.starArtist("ar1")
+        client.unstarArtist("ar1")
+        val urls = List(4) { server.takeRequest().requestUrl!! }
+        assertEquals(listOf("/rest/star", "/rest/unstar", "/rest/star", "/rest/unstar"), urls.map { it.encodedPath })
+        assertEquals("al1", urls[0].queryParameter("albumId"))
+        assertEquals("al1", urls[1].queryParameter("albumId"))
+        assertEquals("ar1", urls[2].queryParameter("artistId"))
+        assertEquals("ar1", urls[3].queryParameter("artistId"))
+        urls.forEach { assertEquals(null, it.queryParameter("id")) }
+    }
+
+    @Test
+    fun `getStarred2 parses albums and artists, and copes with nothing starred`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"subsonic-response":{"status":"ok","version":"1.16.1","starred2":{
+                   "artist":[{"id":"ar1","name":"Art","albumCount":2,"starred":"2024-01-01T00:00:00Z"}],
+                   "album":[{"id":"al1","name":"Alb","starred":"2024-01-01T00:00:00Z"}]}}}"""
+            )
+        )
+        server.enqueue(MockResponse().setBody("""{"subsonic-response":{"status":"ok","version":"1.16.1","starred2":{}}}"""))
+        val s = client.starred()
+        assertEquals(listOf("ar1"), s.artist.map { it.id })
+        assertEquals(listOf("al1"), s.album.map { it.id })
+        assertEquals("/rest/getStarred2", server.takeRequest().requestUrl!!.encodedPath)
+        val empty = client.starred()
+        assertTrue(empty.album.isEmpty() && empty.artist.isEmpty())
+    }
+
+    @Test
     fun `stream url picks raw or transcoded`() {
         val raw = client.streamUrl("x", 0)!!
         assertTrue(raw.contains("format=raw"))

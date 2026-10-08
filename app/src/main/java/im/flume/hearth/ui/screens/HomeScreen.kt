@@ -116,7 +116,7 @@ fun HomeScreen() {
         item {
             QuickGrid(
                 tiles = buildList {
-                    add(QuickTile("Shuffle all", Icons.Default.Shuffle, Accent) { actions.play(PlaySource.All, shuffle = true) })
+                    add(QuickTile("Shuffle my library", Icons.Default.Shuffle, Accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
                     add(QuickTile("Liked Songs", Icons.Default.Favorite, Color(0xFF5038A0)) { actions.open("liked") })
                     add(QuickTile("Downloads", Icons.Default.DownloadDone, Color(0xFF1E6B52)) { actions.open("downloads") })
                     recent.take(3).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }

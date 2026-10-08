@@ -107,6 +107,10 @@ interface Actions {
     fun showUndo(message: String, undo: suspend () -> Unit)
     /** Shows a short [message], e.g. when something couldn't be saved. */
     fun showMessage(message: String) {}
+    /** Saves an album to Your Library or removes it. */
+    fun setAlbumSaved(albumId: String, saved: Boolean) {}
+    /** Follows or unfollows an artist, which puts them in Your Library. */
+    fun setArtistFollowed(artistId: String, followed: Boolean) {}
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }

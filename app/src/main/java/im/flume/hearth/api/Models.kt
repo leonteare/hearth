@@ -28,6 +28,14 @@ data class SubsonicResponse(
     val albumInfo: AlbumInfo? = null,
     val similarSongs: SongList? = null,
     val similarSongs2: SongList? = null,
+    val starred2: Starred2? = null,
+)
+
+@Serializable
+data class Starred2(
+    val artist: List<ArtistDto> = emptyList(),
+    val album: List<AlbumDto> = emptyList(),
+    val song: List<SongDto> = emptyList(),
 )
 
 @Serializable

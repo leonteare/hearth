@@ -50,6 +50,11 @@ class SessionStore(context: Context) {
         get() = prefs.getInt("syncedSchema", 0)
         set(v) = prefs.edit { putInt("syncedSchema", v) }
 
+    /** Set once downloaded albums have been saved to the (now personal) Your Library. */
+    var savedDownloadedAlbums: Boolean
+        get() = prefs.getBoolean("savedDownloadedAlbums", false)
+        set(v) = prefs.edit { putBoolean("savedDownloadedAlbums", v) }
+
     var lastScan: String?
         get() = prefs.getString("lastScan", null)
         set(v) = prefs.edit { putString("lastScan", v) }

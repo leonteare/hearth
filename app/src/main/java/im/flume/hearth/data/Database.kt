@@ -124,6 +124,23 @@ interface LibraryDao {
     @Query("SELECT * FROM albums ORDER BY name COLLATE NOCASE")
     fun albums(): Flow<List<AlbumEntity>>
 
+    /** Albums this user saved (starred) to Your Library. */
+    @Query("SELECT * FROM albums WHERE starred = 1 ORDER BY name COLLATE NOCASE")
+    fun savedAlbums(): Flow<List<AlbumEntity>>
+
+    @Query("SELECT id FROM albums WHERE starred = 1")
+    suspend fun savedAlbumIds(): List<String>
+
+    @Query("UPDATE albums SET starred = :starred WHERE id = :id")
+    suspend fun setAlbumStarred(id: String, starred: Boolean)
+
+    @Query("UPDATE albums SET starred = 0") suspend fun clearAlbumStars()
+    @Query("UPDATE albums SET starred = 1 WHERE id IN (:ids)") suspend fun starAlbums(ids: List<String>)
+
+    /** Liked songs plus every song on a saved album: "my library" for shuffling. */
+    @Query("SELECT * FROM songs WHERE starred = 1 OR albumId IN (SELECT id FROM albums WHERE starred = 1) ORDER BY artist, album, disc, track")
+    suspend fun myLibrarySongsOnce(): List<SongEntity>
+
     @Query("SELECT * FROM albums WHERE artistId = :artistId ORDER BY year DESC, name")
     fun artistAlbums(artistId: String): Flow<List<AlbumEntity>>
 
@@ -155,6 +172,19 @@ interface LibraryDao {
 
     @Query("SELECT * FROM artists WHERE id = :id")
     fun artist(id: String): Flow<ArtistEntity?>
+
+    @Query("UPDATE artists SET starred = :starred WHERE id = :id")
+    suspend fun setArtistStarred(id: String, starred: Boolean)
+
+    @Query("UPDATE artists SET starred = 0") suspend fun clearArtistStars()
+    @Query("UPDATE artists SET starred = 1 WHERE id IN (:ids)") suspend fun starArtists(ids: List<String>)
+
+    /** Replaces album and artist stars with the server's list in one go, so the Library never flickers empty. */
+    @Transaction
+    suspend fun applyStars(albumIds: List<String>, artistIds: List<String>) {
+        clearAlbumStars(); albumIds.chunked(900).forEach { starAlbums(it) }
+        clearArtistStars(); artistIds.chunked(900).forEach { starArtists(it) }
+    }
 
     @Query("SELECT * FROM artists WHERE name LIKE '%' || :q || '%' ORDER BY albumCount DESC LIMIT :limit")
     suspend fun searchArtists(q: String, limit: Int): List<ArtistEntity>

@@ -6,7 +6,7 @@ import im.flume.hearth.download.DownloadRepository
 
 /** Something the user can press play on. Converted to a Bundle to travel to the playback service. */
 data class PlaySource(val kind: Kind, val id: String? = null, val label: String = "", val songIds: List<String> = emptyList()) {
-    enum class Kind { ALL, ALBUM, ARTIST, PLAYLIST, GENRE, LIKED, DOWNLOADS, SONGS }
+    enum class Kind { ALL, MY_LIBRARY, ALBUM, ARTIST, PLAYLIST, GENRE, LIKED, DOWNLOADS, SONGS }
 
     fun toBundle() = Bundle().apply {
         putString("kind", kind.name)
@@ -17,13 +17,15 @@ data class PlaySource(val kind: Kind, val id: String? = null, val label: String 
 
     companion object {
         fun fromBundle(b: Bundle) = PlaySource(
-            kind = Kind.valueOf(b.getString("kind") ?: Kind.ALL.name),
+            kind = Kind.entries.firstOrNull { it.name == b.getString("kind") } ?: Kind.ALL,
             id = b.getString("id"),
             label = b.getString("label").orEmpty(),
             songIds = b.getStringArrayList("songIds").orEmpty(),
         )
 
-        val All = PlaySource(Kind.ALL, label = "Your library")
+        val All = PlaySource(Kind.ALL, label = "Everything")
+        /** Liked songs and saved albums; falls back to everything when nothing's been saved yet. */
+        val MyLibrary = PlaySource(Kind.MY_LIBRARY, label = "Your library")
         val Liked = PlaySource(Kind.LIKED, label = "Liked Songs")
         val Downloads = PlaySource(Kind.DOWNLOADS, label = "Downloads")
     }
@@ -40,6 +42,10 @@ class LibraryRepository(
     suspend fun resolve(source: PlaySource, offlineOnly: Boolean): List<SongEntity> {
         val songs = when (source.kind) {
             PlaySource.Kind.ALL -> if (offlineOnly) dao.downloadedSongsOnce() else songsByIds(dao.allSongIds())
+            PlaySource.Kind.MY_LIBRARY -> {
+                val mine = dao.myLibrarySongsOnce().let { if (offlineOnly) it.filter { s -> downloads.isDownloaded(s.id) } else it }
+                return mine.ifEmpty { resolve(PlaySource.All, offlineOnly) }
+            }
             PlaySource.Kind.ALBUM -> dao.albumSongsOnce(source.id!!)
             PlaySource.Kind.ARTIST -> dao.artistSongsOnce(source.id!!)
             PlaySource.Kind.PLAYLIST -> dao.playlistSongsOnce(source.id!!)
@@ -73,6 +79,35 @@ class LibraryRepository(
         runCatching { if (starred) api.star(songId) else api.unstar(songId) }
             .onFailure { dao.setStarred(songId, !starred); throw it }
         if (starred) downloads.refreshPinned()
+    }
+
+    /** Saves an album to (or removes it from) Your Library. Updates the row first; reverts and throws on failure. */
+    suspend fun setAlbumSaved(albumId: String, saved: Boolean) {
+        dao.setAlbumStarred(albumId, saved)
+        runCatching { if (saved) api.starAlbum(albumId) else api.unstarAlbum(albumId) }
+            .onFailure { dao.setAlbumStarred(albumId, !saved); throw it }
+    }
+
+    /** Follows or unfollows an artist. Same optimistic update and revert as [setAlbumSaved]. */
+    suspend fun setArtistFollowed(artistId: String, followed: Boolean) {
+        dao.setArtistStarred(artistId, followed)
+        runCatching { if (followed) api.starArtist(artistId) else api.unstarArtist(artistId) }
+            .onFailure { dao.setArtistStarred(artistId, !followed); throw it }
+    }
+
+    /**
+     * One-off when this version first runs: albums kept for offline become saved albums, so the new
+     * personal Albums tab doesn't open empty. Returns false (try again next launch) if any star failed.
+     */
+    suspend fun saveDownloadedAlbums(): Boolean {
+        val saved = dao.savedAlbumIds().toHashSet()
+        val pinned = db.downloads().pinned().filter { it.kind == DownloadRepository.KIND_ALBUM }.map { it.id }
+        var ok = true
+        for (id in pinned) {
+            if (id in saved) continue
+            runCatching { setAlbumSaved(id, true) }.onFailure { ok = false }
+        }
+        return ok
     }
 
     /**
@@ -135,5 +170,17 @@ class LibraryRepository(
         val remote = api.albumList("recent", limit)
         val local = dao.albumsByIds(remote.map { it.id }).associateBy { it.id }
         return remote.map { local[it.id] ?: it.toEntity() }
+    }
+}
+
+/** The personal side of the library. Kept free of Android so it can be unit tested. */
+object YourLibrary {
+    /**
+     * Artists on the Library tab: ones you follow plus the artists of albums you saved, A–Z.
+     * Artists of liked songs are left out on purpose; that would be nearly everyone.
+     */
+    fun artists(all: List<ArtistEntity>, savedAlbums: List<AlbumEntity>): List<ArtistEntity> {
+        val fromAlbums = savedAlbums.mapNotNullTo(HashSet()) { it.artistId }
+        return all.filter { it.starred || it.id in fromAlbums }
     }
 }

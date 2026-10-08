@@ -106,6 +106,18 @@ class AppContainer(context: Context) {
         appScope.launch(Dispatchers.Main) {
             session.settings.collect { accentState.value = androidx.compose.ui.graphics.Color(it.accent) }
         }
+        saveDownloadedAlbumsOnce()
+    }
+
+    /**
+     * Your Library became personal (saved albums only). Albums people already kept offline are
+     * clearly theirs, so save them on the first run; retried next launch if the server can't be reached.
+     */
+    private fun saveDownloadedAlbumsOnce() {
+        if (session.savedDownloadedAlbums || session.credentials.value == null) return
+        appScope.launch {
+            if (library.saveDownloadedAlbums()) session.savedDownloadedAlbums = true
+        }
     }
 
     /** Recently streamed audio, so replays are instant and work with no signal. One instance per process. */

@@ -201,6 +201,18 @@ class SubsonicClient(
 
     suspend fun unstar(songId: String) { call("unstar") { addQueryParameter("id", songId) } }
 
+    // Albums and artists are starred with their own parameter; "id" only means songs.
+    suspend fun starAlbum(albumId: String) { call("star") { addQueryParameter("albumId", albumId) } }
+
+    suspend fun unstarAlbum(albumId: String) { call("unstar") { addQueryParameter("albumId", albumId) } }
+
+    suspend fun starArtist(artistId: String) { call("star") { addQueryParameter("artistId", artistId) } }
+
+    suspend fun unstarArtist(artistId: String) { call("unstar") { addQueryParameter("artistId", artistId) } }
+
+    /** Everything this user has starred. Stars are per user in Navidrome, so this is "my" library. */
+    suspend fun starred(): Starred2 = call("getStarred2").starred2 ?: Starred2()
+
     /** [submission] false = "now playing", true = counts as a play. [timeMs] is when playback started. */
     suspend fun scrobble(songId: String, submission: Boolean, timeMs: Long? = null) {
         call("scrobble") {

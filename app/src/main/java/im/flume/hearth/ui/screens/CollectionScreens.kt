@@ -24,6 +24,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.foundation.layout.width
 import kotlinx.coroutines.async
@@ -119,6 +122,9 @@ fun CollectionScreen(
     topContent: LazyListScope.() -> Unit = {},
     onRemoveSong: ((index: Int) -> Unit)? = null,
     headerActions: @Composable () -> Unit = {},
+    /** Albums only: whether it's in Your Library. Null hides the heart. */
+    saved: Boolean? = null,
+    onSavedChange: (Boolean) -> Unit = {},
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -206,9 +212,23 @@ fun CollectionScreen(
                         when {
                             anyDownloading -> confirmCancel = true
                             pin != null && (isPinned || allDownloaded) -> c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
-                            pin != null -> c.downloads.pinAndDownload(pin.kind, pin.id, songs)
+                            pin != null -> {
+                                c.downloads.pinAndDownload(pin.kind, pin.id, songs)
+                                // Keeping an album offline means you want it; removing the download doesn't unsave it.
+                                if (saved == false) onSavedChange(true)
+                            }
                             allDownloaded -> actions.removeDownload(songs.map { it.id })
                             else -> actions.download(songs)
+                        }
+                    }
+                    if (saved != null) {
+                        IconButton(onClick = { onSavedChange(!saved) }) {
+                            Icon(
+                                if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                if (saved) "Remove from Your Library" else "Save to Your Library",
+                                tint = if (saved) Accent else TextSecondary,
+                                modifier = Modifier.size(28.dp),
+                            )
                         }
                     }
                 },
@@ -322,6 +342,8 @@ fun AlbumScreen(id: String) {
         source = PlaySource(PlaySource.Kind.ALBUM, id, a?.name.orEmpty()),
         pin = PinTarget(DownloadRepository.KIND_ALBUM, id),
         showTrackNumbers = true,
+        saved = a?.starred,
+        onSavedChange = { actions.setAlbumSaved(id, it) },
         extraContent = {
             item { AlbumDetails(a, id, songs.size, songs.sumOf { it.durationSec.toLong() }) }
             a?.artistId?.let { artistId ->
@@ -529,6 +551,8 @@ fun ArtistScreen(id: String) {
                 onPlay = { actions.play(source) },
                 onShuffle = { actions.play(source, shuffle = true) },
                 extra = {
+                    artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
+                    Spacer(Modifier.width(4.dp))
                     TextButton(onClick = { actions.startArtistRadio(id, name) }) {
                         Icon(Icons.Default.Radio, null, tint = Accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(6.dp))
@@ -558,6 +582,20 @@ fun ArtistScreen(id: String) {
             }
         }
         item { ArtistAbout(id) }
+    }
+}
+
+/** Outlined pill: "Follow" adds the artist to Your Library, "Following" when they're already there. */
+@Composable
+private fun FollowButton(following: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = CircleShape,
+        border = BorderStroke(1.dp, if (following) Accent else TextSecondary),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.height(32.dp),
+    ) {
+        Text(if (following) "Following" else "Follow", color = if (following) Accent else Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }
 
