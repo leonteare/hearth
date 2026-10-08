@@ -83,7 +83,18 @@ import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.components.AlbumCard
+import im.flume.hearth.ui.components.ActionSheet
+import im.flume.hearth.ui.components.BackButton
+import im.flume.hearth.ui.components.MediaCard
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.MenuItem
+import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.components.plural
+import im.flume.hearth.ui.theme.Destructive
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.DownloadsColor
+import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.LikedColor
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.DownloadToggle
 import im.flume.hearth.ui.components.rememberCoverColor
@@ -94,19 +105,10 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.components.formatLongDuration
-import im.flume.hearth.ui.theme.Accent
 import im.flume.hearth.ui.theme.TextSecondary
 
 /** Pin target for the download toggle: albums and playlists stay in sync; other lists are one-off downloads. */
 data class PinTarget(val kind: String, val id: String)
-
-@Composable
-fun BackButton() {
-    val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    IconButton(onClick = { dispatcher?.onBackPressed() }, modifier = Modifier.statusBarsPadding()) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-    }
-}
 
 @Composable
 fun CollectionScreen(
@@ -128,6 +130,7 @@ fun CollectionScreen(
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
+    val accent = MaterialTheme.colorScheme.primary
     val downloads = LocalRowContext.current.downloads
     val pinned by remember { c.downloads.pinned }.collectAsStateWithLifecycle(emptySet())
     val isPinned = pin != null && "${pin.kind}:${pin.id}" in pinned
@@ -191,7 +194,7 @@ fun CollectionScreen(
                     Spacer(Modifier.height(16.dp))
                     Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
                     Text(
-                        listOfNotNull(subtitle.takeIf { it.isNotBlank() }, "${songs.size} songs", formatLongDuration(totalSec).takeIf { totalSec > 0 })
+                        listOfNotNull(subtitle.takeIf { it.isNotBlank() }, plural(songs.size, "song"), formatLongDuration(totalSec).takeIf { totalSec > 0 })
                             .joinToString(" • "),
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodyMedium,
@@ -213,6 +216,7 @@ fun CollectionScreen(
                             anyDownloading -> confirmCancel = true
                             pin != null && (isPinned || allDownloaded) -> c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
                             pin != null -> {
+                                usage.track(im.flume.hearth.data.Usage.DOWNLOAD)
                                 c.downloads.pinAndDownload(pin.kind, pin.id, songs)
                                 // Keeping an album offline means you want it; removing the download doesn't unsave it.
                                 if (saved == false) onSavedChange(true)
@@ -226,7 +230,7 @@ fun CollectionScreen(
                             Icon(
                                 if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 if (saved) "Remove from Your Library" else "Save to Your Library",
-                                tint = if (saved) Accent else TextSecondary,
+                                tint = if (saved) accent else TextSecondary,
                                 modifier = Modifier.size(28.dp),
                             )
                         }
@@ -295,7 +299,7 @@ fun CollectionScreen(
                     onClick = { actions.play(source) },
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = Color.Black),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
                 ) { Icon(Icons.Default.PlayArrow, "Play") }
             }
         }
@@ -320,8 +324,8 @@ private fun SelectionBar(
         IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Stop selecting") }
         Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Select all") }
-        IconButton(onClick = onPlayNext) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Play next") }
-        IconButton(onClick = onQueue) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Add to queue") }
+        IconButton(onClick = onPlayNext) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Play next") }
+        IconButton(onClick = onQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Add to queue") }
         IconButton(onClick = onPlaylist) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist") }
         IconButton(onClick = onDownload) { Icon(Icons.Outlined.ArrowCircleDown, "Download") }
     }
@@ -349,7 +353,7 @@ fun AlbumScreen(id: String) {
             a?.artistId?.let { artistId ->
                 item {
                     TextButton(onClick = { actions.openArtist(artistId) }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text("More by ${a.artist}", color = Accent)
+                        Text("More by ${a.artist}")
                     }
                 }
             }
@@ -405,14 +409,14 @@ fun PlaylistScreen(id: String) {
         pin = PinTarget(DownloadRepository.KIND_PLAYLIST, id),
         headerActions = {
             if (playlist != null && (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true))) {
-                PlaylistMenu(id, playlist!!.name, screenScope)
+                PlaylistMenu(id, playlist!!.name, playlist?.coverArt, screenScope)
             }
         },
     )
 }
 
 @Composable
-private fun PlaylistMenu(id: String, name: String, screenScope: kotlinx.coroutines.CoroutineScope) {
+private fun PlaylistMenu(id: String, name: String, coverArt: String?, screenScope: kotlinx.coroutines.CoroutineScope) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -420,13 +424,11 @@ private fun PlaylistMenu(id: String, name: String, screenScope: kotlinx.coroutin
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var newName by remember(name) { mutableStateOf(name) }
-    Box {
-        IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { open = false; renaming = true })
-            DropdownMenuItem(text = { Text("Edit order") }, leadingIcon = { Icon(Icons.Default.SwapVert, null) }, onClick = { open = false; actions.open("playlist-edit/$id") })
-            DropdownMenuItem(text = { Text("Delete playlist") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { open = false; deleting = true })
-        }
+    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
+    ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = coverArt, fallback = name) {
+        MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
+        MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
+        MenuItem("Delete playlist", Icons.Default.Delete, tint = Destructive, tintText = true) { open = false; deleting = true }
     }
     if (renaming) {
         AlertDialog(
@@ -440,7 +442,7 @@ private fun PlaylistMenu(id: String, name: String, screenScope: kotlinx.coroutin
                         runCatching { c.library.renamePlaylist(id, newName.trim()) }
                             .onFailure { actions.showMessage("Couldn't rename the playlist (offline?)") }
                     }
-                }) { Text("Save", color = Accent) }
+                }) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
         )
@@ -463,7 +465,7 @@ private fun PlaylistMenu(id: String, name: String, screenScope: kotlinx.coroutin
                         }.await()
                         if (ok) back?.onBackPressed() else actions.showMessage("Couldn't delete the playlist (offline?)")
                     }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text("Delete", color = Destructive) }
             },
             dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
         )
@@ -486,9 +488,7 @@ fun PlaylistEditScreen(id: String) {
         order = order.toMutableList().apply { add(to.index, removeAt(from.index)) }
     }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            BackButton()
-            Text("Edit order", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        TopBar("Edit order") {
             // Stay on the screen until Navidrome has the new order, so a failed save doesn't lose the edit.
             TextButton(enabled = !saving, onClick = {
                 saving = true
@@ -498,21 +498,16 @@ fun PlaylistEditScreen(id: String) {
                     saving = false
                     if (ok) back?.onBackPressed() else actions.showMessage("Couldn't save the new order (offline?)")
                 }
-            }) { Text(if (saving) "Saving…" else "Save", color = Accent) }
+            }) { Text(if (saving) "Saving…" else "Save") }
         }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             items(order, key = { it.first }) { (key, song) ->
                 ReorderableItem(reorder, key = key) { dragging ->
-                    Row(
-                        Modifier.fillMaxWidth().background(if (dragging) SurfaceHigh else Background).padding(start = 16.dp, top = 6.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    MediaRow(
+                        song.title, song.artist, onClick = null,
+                        modifier = Modifier.background(if (dragging) SurfaceHigh else Background),
+                        coverArt = song.coverArt, fallback = song.album,
                     ) {
-                        CoverArt(song.coverArt, 44.dp, requestSize = 150, fallback = song.album)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(song.title, maxLines = 1)
-                            Text(song.artist, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                        }
                         Box(Modifier.draggableHandle().size(48.dp), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
                         }
@@ -542,7 +537,7 @@ fun ArtistScreen(id: String) {
                     CoverArt(artist?.coverArt ?: albums.firstOrNull()?.coverArt, 180.dp, Modifier.clip(CircleShape), requestSize = 600)
                     Spacer(Modifier.height(16.dp))
                     Text(name, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-                    Text("${albums.size} albums • ${songs.size} songs", color = TextSecondary, modifier = Modifier.padding(4.dp))
+                    Text("${plural(albums.size, "album")} • ${plural(songs.size, "song")}", color = TextSecondary, modifier = Modifier.padding(4.dp))
                 }
             }
         }
@@ -554,9 +549,9 @@ fun ArtistScreen(id: String) {
                     artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
                     Spacer(Modifier.width(4.dp))
                     TextButton(onClick = { actions.startArtistRadio(id, name) }) {
-                        Icon(Icons.Default.Radio, null, tint = Accent, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Radio", color = Accent)
+                        Text("Radio")
                     }
                 },
             )
@@ -570,8 +565,10 @@ fun ArtistScreen(id: String) {
         if (albums.isNotEmpty()) {
             item {
                 SectionHeader("Albums")
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(albums, key = { it.id }) { AlbumCard(it, subtitle = it.year?.toString().orEmpty()) }
+                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                    items(albums, key = { it.id }) { al ->
+                        MediaCard(al.name, al.year?.toString().orEmpty(), onClick = { actions.openAlbum(al.id) }, coverArt = al.coverArt)
+                    }
                 }
             }
         }
@@ -588,14 +585,15 @@ fun ArtistScreen(id: String) {
 /** Outlined pill: "Follow" adds the artist to Your Library, "Following" when they're already there. */
 @Composable
 private fun FollowButton(following: Boolean, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
     OutlinedButton(
         onClick = onClick,
         shape = CircleShape,
-        border = BorderStroke(1.dp, if (following) Accent else TextSecondary),
+        border = BorderStroke(1.dp, if (following) accent else TextSecondary),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
         modifier = Modifier.height(32.dp),
     ) {
-        Text(if (following) "Following" else "Follow", color = if (following) Accent else Color.White, style = MaterialTheme.typography.labelLarge)
+        Text(if (following) "Following" else "Follow", color = if (following) accent else Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -623,7 +621,7 @@ fun LikedScreen() {
         songs = songs,
         source = PlaySource.Liked,
         pin = PinTarget(DownloadRepository.KIND_LIKED, "liked"),
-        headerIcon = { BigIcon(Icons.Default.Favorite, Color(0xFF5038A0)) },
+        headerIcon = { BigIcon(Icons.Default.Favorite, LikedColor) },
     )
 }
 
@@ -653,7 +651,7 @@ fun DownloadsScreen() {
             text = { Text("Everything downloaded to this phone will be deleted. You can download it again later.") },
             confirmButton = {
                 TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text("Remove", color = Destructive)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },
@@ -666,7 +664,7 @@ fun DownloadsScreen() {
         cover = null,
         songs = songs,
         source = PlaySource.Downloads,
-        headerIcon = { BigIcon(Icons.Default.DownloadDone, Color(0xFF1E6B52)) },
+        headerIcon = { BigIcon(Icons.Default.DownloadDone, DownloadsColor) },
         topContent = {
             if (queued.isNotEmpty()) {
                 item(key = "q-head") {
@@ -680,9 +678,9 @@ fun DownloadsScreen() {
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f),
                         )
                         if (userPaused) {
-                            TextButton(onClick = { c.downloads.resume() }) { Text("Resume", color = Accent) }
+                            TextButton(onClick = { c.downloads.resume() }) { Text("Resume") }
                         } else if (!storageFull) {
-                            TextButton(onClick = { c.downloads.pause() }) { Text("Pause", color = Accent) }
+                            TextButton(onClick = { c.downloads.pause() }) { Text("Pause") }
                         }
                         TextButton(onClick = { c.downloads.cancelPending() }) { Text("Cancel all", color = TextSecondary) }
                     }
@@ -693,7 +691,7 @@ fun DownloadsScreen() {
                                 "Phone storage is full. Free up some space, then try again.",
                                 color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again", color = Accent) }
+                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
                         }
                         waitingForWifi -> Text(
                             "Waiting for Wi-Fi. Turn off \"Download on Wi-Fi only\" in Settings → Storage to use mobile data.",
@@ -705,7 +703,7 @@ fun DownloadsScreen() {
                                 lastError ?: "Server busy, trying again shortly",
                                 color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now", color = Accent) }
+                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now") }
                         }
                     }
                 }
@@ -724,7 +722,7 @@ fun DownloadsScreen() {
                                 lastError?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }
                             }
                         }
-                        if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry", color = Accent) }
+                        if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry") }
                     }
                 }
             }
@@ -736,7 +734,7 @@ fun DownloadsScreen() {
             if (songs.isNotEmpty()) {
                 item {
                     TextButton(onClick = { confirmRemoveAll = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text("Remove all downloads", color = MaterialTheme.colorScheme.error)
+                        Text("Remove all downloads", color = Destructive)
                     }
                 }
             } else if (pending.isEmpty()) {
@@ -765,8 +763,7 @@ private fun QueuedSongRow(song: SongEntity) {
         if (progress != null) {
             LinearProgressIndicator(
                 progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = 76.dp, end = 16.dp).height(3.dp),
-                color = Accent,
+                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
                 trackColor = TextSecondary.copy(alpha = 0.25f),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
@@ -777,7 +774,7 @@ private fun QueuedSongRow(song: SongEntity) {
 
 @Composable
 private fun BigIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
-    Box(Modifier.size(180.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(color), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(180.dp).clip(HearthShapes.Cover).background(color), contentAlignment = Alignment.Center) {
         Icon(icon, null, Modifier.size(72.dp), tint = Color.White)
     }
 }

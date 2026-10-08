@@ -118,7 +118,14 @@ import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatDuration
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.BannerCard
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.SectionHeader
+import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.theme.DestructiveFill
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.TimerOff
 import im.flume.hearth.ui.theme.AccentDeep
 import androidx.compose.ui.graphics.lerp
 import im.flume.hearth.ui.theme.Background
@@ -220,7 +227,7 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     val songId = current.mediaId
     val song by remember(songId) { c.db.library().songFlow(songId) }.collectAsStateWithLifecycle(null)
     var showLyrics by rememberSaveable { mutableStateOf(false) }
-    val topColor = rememberCoverColor(state.coverArt, lerp(Accent, Color.Black, 0.6f))
+    val topColor = rememberCoverColor(state.coverArt, lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.6f))
 
     val player = c.player
     val haptics = LocalHapticFeedback.current
@@ -326,6 +333,7 @@ private fun PlayerControls(
     onOpenQueue: () -> Unit,
 ) {
     val actions = LocalActions.current
+    val accent = MaterialTheme.colorScheme.primary
     val player = LocalContext.current.container.player
     val meta = state.current?.mediaMetadata ?: return
     val songId = state.current.mediaId
@@ -348,7 +356,7 @@ private fun PlayerControls(
         }
         val starred = song?.starred == true
         IconButton(onClick = { actions.setStarred(songId, !starred) }) {
-            Icon(if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Like", tint = if (starred) Accent else Color.White)
+            Icon(if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Like", tint = if (starred) accent else Color.White)
         }
     }
 
@@ -369,7 +377,7 @@ private fun PlayerControls(
 
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         IconButton(onClick = { player.toggleShuffle() }) {
-            Icon(Icons.Default.Shuffle, "Shuffle", tint = if (state.shuffle) Accent else Color.White)
+            Icon(Icons.Default.Shuffle, "Shuffle", tint = if (state.shuffle) accent else Color.White)
         }
         IconButton(onClick = { player.previous() }, Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(40.dp)) }
         FilledIconButton(
@@ -385,14 +393,14 @@ private fun PlayerControls(
             Icon(
                 if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
                 "Repeat",
-                tint = if (state.repeatMode == Player.REPEAT_MODE_OFF) Color.White else Accent,
+                tint = if (state.repeatMode == Player.REPEAT_MODE_OFF) Color.White else accent,
             )
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         val usage = LocalContext.current.container.usage
         IconButton(onClick = { if (!showLyrics) usage.track(im.flume.hearth.data.Usage.LYRICS); onToggleLyrics() }) {
-            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, "Lyrics", tint = if (showLyrics) Accent else Color.White)
+            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, "Lyrics", tint = if (showLyrics) accent else Color.White)
         }
         IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
     }
@@ -412,7 +420,7 @@ private fun LyricsView(song: SongEntity?, state: PlayerUiState, modifier: Modifi
 
     val l = lyrics
     when {
-        loading -> Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Accent) }
+        loading -> Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         l == null -> LyricsMessage("Lyrics aren't available offline for this song", modifier)
         l.isEmpty -> LyricsMessage("No lyrics for this song", modifier)
         else -> SyncedOrPlainLyrics(l, state, modifier)
@@ -433,7 +441,7 @@ private fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit
     var sleepPicker by remember { mutableStateOf(false) }
     val usage = LocalContext.current.container.usage
     if (sleepPicker) {
-        SleepTimerDialog(active = sleepAt != 0L, onPick = { if (it != 0L) usage.track(im.flume.hearth.data.Usage.SLEEP); player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
+        SleepTimerSheet(active = sleepAt != 0L, onPick = { if (it != 0L) usage.track(im.flume.hearth.data.Usage.SLEEP); player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
     }
     IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
     ActionSheet(open, { open = false }, title = song?.title, subtitle = song?.artist, coverArt = song?.coverArt, fallback = song?.album) {
@@ -441,7 +449,7 @@ private fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit
             MenuItem("Start radio", Icons.Default.Radio) { open = false; actions.startRadio(song) }
             MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(listOf(song.id)) }
         }
-        MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", Icons.Outlined.Bedtime, tint = if (sleepAt != 0L) Accent else Color.White) {
+        MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", Icons.Outlined.Bedtime, tint = if (sleepAt != 0L) MaterialTheme.colorScheme.primary else Color.White) {
             open = false; sleepPicker = true
         }
         song?.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { open = false; onClose(); actions.openAlbum(id) } }
@@ -515,31 +523,21 @@ private fun SleepStatus(sleepAt: Long) {
     LaunchedEffect(sleepAt) { while (true) { now = System.currentTimeMillis(); delay(15_000) } }
     val text = if (sleepAt == PlaybackService.SLEEP_END_OF_SONG) "Stops after this song"
     else "Stops in ${((sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min"
+    val accent = MaterialTheme.colorScheme.primary
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.Bedtime, null, tint = Accent, modifier = Modifier.size(12.dp))
+        Icon(Icons.Outlined.Bedtime, null, tint = accent, modifier = Modifier.size(12.dp))
         Spacer(Modifier.width(4.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = Accent)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = accent)
     }
 }
 
 @Composable
-private fun SleepTimerDialog(active: Boolean, onPick: (Long) -> Unit, onDismiss: () -> Unit) {
+private fun SleepTimerSheet(active: Boolean, onPick: (Long) -> Unit, onDismiss: () -> Unit) {
     val options = listOf(15, 30, 45, 60).map { "$it minutes" to it * 60_000L } + ("End of this song" to PlaybackService.SLEEP_END_OF_SONG)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Sleep timer") },
-        text = {
-            Column {
-                options.forEach { (label, ms) ->
-                    Text(label, modifier = Modifier.fillMaxWidth().clickable { onPick(ms) }.padding(vertical = 12.dp))
-                }
-                if (active) {
-                    Text("Turn off timer", color = Accent, modifier = Modifier.fillMaxWidth().clickable { onPick(0) }.padding(vertical = 12.dp))
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+    ActionSheet(true, onDismiss, title = "Sleep timer", showCover = false) {
+        options.forEach { (label, ms) -> MenuItem(label, Icons.Outlined.Timer) { onPick(ms) } }
+        if (active) MenuItem("Turn off timer", Icons.Outlined.TimerOff, tint = MaterialTheme.colorScheme.primary, tintText = true) { onPick(0) }
+    }
 }
 
 /** Lyric text sizes (sp) and line gaps (dp) for the Appearance settings. */
@@ -631,10 +629,7 @@ fun QueueScreen() {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
-            BackButton()
-            Text("Queue", style = MaterialTheme.typography.titleLarge)
-        }
+        TopBar("Queue")
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (history.isNotEmpty()) {
                 item(key = "h-prev") { QueueHeader("Previously played", 0.6f) }
@@ -642,17 +637,9 @@ fun QueueScreen() {
             }
             state.current?.let { cur ->
                 item(key = "h-now") {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        QueueHeader("Now playing")
-                        if (total > 1) {
-                            Text(
-                                "$position of $total",
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(start = 8.dp, bottom = 10.dp),
-                            )
-                        }
-                    }
+                    SectionHeader("Now playing", trailing = if (total > 1) {
+                        { Text("$position of $total", color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(end = 12.dp)) }
+                    } else null)
                 }
                 item(key = "now") { QueueRow(QueueEntry(state.currentIndex, cur), isCurrent = true) }
             }
@@ -698,15 +685,7 @@ fun QueueScreen() {
 
 @Composable
 private fun RepeatNote(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(8.dp))
-            .background(Accent.copy(alpha = 0.15f)).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = Accent)
-        Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
+    BannerCard(title = null, body = text, icon = icon, tinted = true)
 }
 
 /**
@@ -730,18 +709,20 @@ private fun SwipeableQueueRow(
 
     Box(Modifier.fillMaxWidth()) {
         val o = offset.value
+        val accent = MaterialTheme.colorScheme.primary
         if (o > 0f) {
             val armed = o >= triggerPx
             Row(
-                Modifier.matchParentSize().background(if (armed) Accent else Accent.copy(alpha = 0.45f)).padding(start = 20.dp),
+                Modifier.matchParentSize().background(if (armed) accent else accent.copy(alpha = 0.45f)).padding(start = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = Color.Black)
+                val onAccent = MaterialTheme.colorScheme.onPrimary
+                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = onAccent)
                 Spacer(Modifier.width(8.dp))
-                Text("Play next", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Play next", color = onAccent, fontWeight = FontWeight.Bold)
             }
         } else if (o < 0f) {
-            Box(Modifier.matchParentSize().background(Color(0xFFB3261E))) {
+            Box(Modifier.matchParentSize().background(DestructiveFill)) {
                 Column(
                     Modifier.align(Alignment.CenterEnd).width(104.dp).fillMaxHeight().clickable(enabled = revealed, onClick = onRemove),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -781,24 +762,17 @@ private fun SwipeableQueueRow(
 /** A song further down the queue than the player has loaded yet; it moves into the list above as you listen. */
 @Composable
 private fun LaterRow(song: SongEntity, alpha: Float) {
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        CoverArt(song.coverArt, 44.dp, requestSize = 150, fallback = song.album)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = alpha * 0.85f))
-            Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary.copy(alpha = alpha), style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    MediaRow(
+        song.title, song.artist, onClick = null,
+        coverArt = song.coverArt, fallback = song.album,
+        titleColor = Color.White.copy(alpha = alpha * 0.85f),
+        subtitleColor = TextSecondary.copy(alpha = alpha),
+    )
 }
 
 @Composable
 private fun QueueHeader(text: String, alpha: Float = 1f) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleMedium,
-        color = Color.White.copy(alpha = alpha),
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-    )
+    SectionHeader(text, color = Color.White.copy(alpha = alpha))
 }
 
 @Composable
@@ -811,32 +785,21 @@ private fun QueueRow(
     handle: (@Composable () -> Modifier)? = null,
 ) {
     val meta = entry.item.mediaMetadata
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(if (dragging) SurfaceHigh else if (isCurrent) Surface else Background)
-            .clickable(enabled = !isCurrent, onClick = onClick)
-            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverArt(meta.extras?.getString(EXTRA_COVER_ART), 44.dp, requestSize = 150, fallback = meta.albumTitle?.toString())
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                meta.title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (isCurrent) Accent else Color.White.copy(alpha = alpha),
-            )
-            Text(
-                meta.artist?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = TextSecondary.copy(alpha = alpha), style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        if (handle != null) {
-            Box(handle().size(48.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
+    MediaRow(
+        meta.title?.toString().orEmpty(),
+        meta.artist?.toString().orEmpty(),
+        onClick = if (isCurrent) null else onClick,
+        modifier = Modifier.background(if (dragging) SurfaceHigh else if (isCurrent) Surface else Background),
+        coverArt = meta.extras?.getString(EXTRA_COVER_ART),
+        fallback = meta.albumTitle?.toString(),
+        titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = alpha),
+        subtitleColor = TextSecondary.copy(alpha = alpha),
+        trailing = handle?.let { h ->
+            {
+                Box(h().size(48.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
+                }
             }
-        } else {
-            Spacer(Modifier.width(16.dp))
-        }
-    }
+        },
+    )
 }

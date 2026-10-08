@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.CheckCircle
@@ -81,7 +83,8 @@ import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.SongEntity
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.DividerColor
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 
@@ -125,7 +128,7 @@ fun CoverArt(
     coverArt: String?,
     size: Dp?,
     modifier: Modifier = Modifier,
-    corner: Dp = 4.dp,
+    corner: Dp = Dimens.CoverCorner,
     requestSize: Int = 300,
     /** Album / playlist / artist name, shown as initials on a coloured tile when there's no artwork. */
     fallback: String? = null,
@@ -177,6 +180,8 @@ fun ActionSheet(
     subtitle: String? = null,
     coverArt: String? = null,
     fallback: String? = subtitle,
+    /** False for plain text headers, e.g. "Sort by". */
+    showCover: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (!open) return
@@ -187,14 +192,16 @@ fun ActionSheet(
     ) {
         if (title != null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback)
-                Spacer(Modifier.width(14.dp))
+                if (showCover) {
+                    CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback)
+                    Spacer(Modifier.width(14.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     subtitle?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = DividerColor)
         }
         Column(Modifier.padding(bottom = 16.dp), content = content)
     }
@@ -218,10 +225,11 @@ fun SongRow(
     val dl = ctx.downloads[song.id]
     val playable = ctx.online || dl == DownloadState.DONE
     val isPlaying = ctx.playingId == song.id
+    val accent = MaterialTheme.colorScheme.primary
     Row(
         Modifier
             .fillMaxWidth()
-            .background(if (selected == true) Accent.copy(alpha = 0.12f) else Color.Transparent)
+            .background(if (selected == true) accent.copy(alpha = 0.12f) else Color.Transparent)
             .combinedClickable(
                 enabled = playable || selected != null,
                 onClick = onClick,
@@ -230,23 +238,23 @@ fun SongRow(
                     if (onLongPress != null) onLongPress() else menu = true
                 },
             )
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = Dimens.Gutter, vertical = Dimens.RowPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selected != null) {
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
                 if (selected) "Selected" else "Not selected",
-                tint = if (selected) Accent else TextSecondary,
-                modifier = Modifier.padding(end = 12.dp).size(24.dp),
+                tint = if (selected) accent else TextSecondary,
+                modifier = Modifier.padding(end = Dimens.CoverGap).size(24.dp),
             )
         }
         if (leading != null) {
             Text(leading, Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
         }
         if (showCover) {
-            CoverArt(song.coverArt, 48.dp, requestSize = 150, fallback = song.album)
-            Spacer(Modifier.width(12.dp))
+            CoverArt(song.coverArt, Dimens.RowCover, requestSize = 150, fallback = song.album)
+            Spacer(Modifier.width(Dimens.CoverGap))
         }
         Column(Modifier.weight(1f)) {
             Text(
@@ -254,7 +262,7 @@ fun SongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = when {
-                    isPlaying -> Accent
+                    isPlaying -> accent
                     !playable -> TextSecondary.copy(alpha = 0.5f)
                     else -> Color.White
                 },
@@ -262,7 +270,7 @@ fun SongRow(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (dl) {
-                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = Accent)
+                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = accent)
                     DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, null, Modifier.size(14.dp), tint = TextSecondary)
                     else -> {}
                 }
@@ -276,7 +284,7 @@ fun SongRow(
                 )
             }
         }
-        if (song.starred) Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = Accent)
+        if (song.starred) Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = accent)
         if (selected == null) {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
             SongMenu(song, menu, onDismiss = { menu = false }, onRemoveFromPlaylist = onRemoveFromPlaylist)
@@ -290,13 +298,13 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemov
     val dl = LocalRowContext.current.downloads[song.id]
     var info by remember { mutableStateOf(false) }
     ActionSheet(expanded, onDismiss, title = song.title, subtitle = song.artist, coverArt = song.coverArt, fallback = song.album) {
-        MenuItem("Play next", Icons.AutoMirrored.Filled.QueueMusic) { actions.playNext(listOf(song.id)); onDismiss() }
+        MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { actions.playNext(listOf(song.id)); onDismiss() }
         MenuItem("Start radio", Icons.Default.Radio) { actions.startRadio(song); onDismiss() }
         MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
         onRemoveFromPlaylist?.let { remove ->
             MenuItem("Remove from this playlist", Icons.Default.RemoveCircleOutline) { remove(); onDismiss() }
         }
-        MenuItem("Add to queue", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToQueue(listOf(song.id)); onDismiss() }
+        MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { actions.addToQueue(listOf(song.id)); onDismiss() }
         MenuItem(
             if (song.starred) "Remove from Liked Songs" else "Add to Liked Songs",
             if (song.starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -345,76 +353,82 @@ fun SongInfoDialog(song: SongEntity, onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * One row of an [ActionSheet]. [icon] may be null for plain choice lists; [checked] shows a tick on
+ * the current choice. [tint] colours the icon (and the text, for destructive items).
+ */
 @Composable
-fun MenuItem(text: String, icon: ImageVector, tint: Color = Color.White, onClick: () -> Unit) {
+fun MenuItem(
+    text: String,
+    icon: ImageVector?,
+    tint: Color = Color.White,
+    checked: Boolean = false,
+    tintText: Boolean = false,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = tint)
-        Spacer(Modifier.width(20.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge)
+        if (icon != null) {
+            Icon(icon, null, tint = tint)
+            Spacer(Modifier.width(20.dp))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = when {
+                tintText -> tint
+                checked -> MaterialTheme.colorScheme.primary
+                else -> Color.Unspecified
+            },
+            modifier = Modifier.weight(1f),
+        )
+        if (checked) Icon(Icons.Default.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
     }
 }
 
+/** A sheet of mutually exclusive choices, with a tick on the current one. */
 @Composable
-fun AlbumCard(album: AlbumEntity, width: Dp = 140.dp, subtitle: String = album.artist) {
-    val actions = LocalActions.current
-    Column(
-        Modifier
-            .width(width)
-            .clip(RoundedCornerShape(6.dp))
-            .combinedClickableCompat { actions.openAlbum(album.id) }
-    ) {
-        CoverArt(album.coverArt, width, fallback = album.name)
-        Spacer(Modifier.height(8.dp))
-        Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+fun <T> ChoiceSheet(open: Boolean, title: String, options: List<Pair<T, String>>, selected: T, onDismiss: () -> Unit, onPick: (T) -> Unit) {
+    ActionSheet(open, onDismiss, title = title, showCover = false) {
+        options.forEach { (value, label) ->
+            MenuItem(label, null, checked = value == selected) { onPick(value); onDismiss() }
+        }
     }
 }
 
 @Composable
 fun AlbumRow(title: String, albums: List<AlbumEntity>) {
     if (albums.isEmpty()) return
+    val actions = LocalActions.current
     SectionHeader(title)
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        items(albums, key = { it.id }) { AlbumCard(it) }
+    LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+        items(albums, key = { it.id }) { a -> MediaCard(a.name, a.artist, onClick = { actions.openAlbum(a.id) }, coverArt = a.coverArt) }
     }
-}
-
-@Composable
-fun SectionHeader(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 12.dp),
-    )
 }
 
 /** Big round play button + shuffle button used on album / playlist / artist headers. */
 @Composable
 fun PlayShuffleButtons(onPlay: () -> Unit, onShuffle: () -> Unit, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
-    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
         extra()
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onShuffle, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.Shuffle, "Shuffle", tint = Accent, modifier = Modifier.size(28.dp))
+            Icon(Icons.Default.Shuffle, "Shuffle", tint = accent, modifier = Modifier.size(28.dp))
         }
         Spacer(Modifier.width(8.dp))
         FilledIconButton(
             onClick = onPlay,
             modifier = Modifier.size(56.dp),
             shape = CircleShape,
-            colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent, contentColor = Color.Black),
+            colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
         ) {
             Icon(Icons.Default.PlayArrow, "Play", modifier = Modifier.size(32.dp))
         }
     }
 }
-
-@OptIn(ExperimentalFoundationApi::class)
-fun Modifier.combinedClickableCompat(onLongClick: (() -> Unit)? = null, onClick: () -> Unit): Modifier =
-    this.combinedClickable(onClick = onClick, onLongClick = onLongClick)
 
 fun formatDuration(totalSec: Long): String {
     val h = totalSec / 3600
@@ -434,3 +448,6 @@ fun formatBytes(bytes: Long): String = when {
     bytes >= 1L shl 20 -> "%.0f MB".format(bytes / (1L shl 20).toDouble())
     else -> "%.0f KB".format(bytes / 1024.0)
 }
+
+/** "1 song", "3 songs". */
+fun plural(count: Int, one: String, many: String = one + "s"): String = "$count ${if (count == 1) one else many}"

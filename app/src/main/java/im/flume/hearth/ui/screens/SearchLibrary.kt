@@ -85,7 +85,19 @@ import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.SongRow
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.ChoiceSheet
+import im.flume.hearth.ui.components.IconTile
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.PageHeader
+import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.components.plural
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.DownloadsColor
+import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.LikedColor
+import im.flume.hearth.ui.theme.OnSearchField
+import im.flume.hearth.ui.theme.SearchFieldColor
+import im.flume.hearth.ui.theme.SearchFieldHint
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
@@ -136,35 +148,36 @@ fun SearchScreen() {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Text("Search", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.statusBarsPadding().padding(16.dp))
+        PageHeader("Search")
+        Spacer(Modifier.height(8.dp))
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Dimens.Gutter)
                 .height(44.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.White)
+                .clip(HearthShapes.Card)
+                .background(SearchFieldColor)
                 .padding(start = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Search, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Search, null, tint = OnSearchField, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             BasicTextField(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Black),
-                cursorBrush = SolidColor(Color.Black),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = OnSearchField),
+                cursorBrush = SolidColor(OnSearchField),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { saveRecent(query) }),
                 modifier = Modifier.weight(1f).focusRequester(focus),
                 decorationBox = { inner ->
-                    if (query.isEmpty()) Text("Songs, artists or albums", color = Color.DarkGray, style = MaterialTheme.typography.bodyLarge)
+                    if (query.isEmpty()) Text("Songs, artists or albums", color = SearchFieldHint, style = MaterialTheme.typography.bodyLarge)
                     inner()
                 },
             )
             if (query.isNotEmpty()) {
-                IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear", tint = Color.Black) }
+                IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear", tint = OnSearchField) }
             } else {
                 Spacer(Modifier.width(12.dp))
             }
@@ -174,8 +187,7 @@ fun SearchScreen() {
             if (query.isBlank()) {
                 if (recent.isNotEmpty()) {
                     item {
-                        Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f)) { SectionHeader("Recent searches") }
+                        SectionHeader("Recent searches") {
                             TextButton(onClick = {
                                 recent = emptyList()
                                 recentPrefs.edit().remove("recent").apply()
@@ -184,7 +196,7 @@ fun SearchScreen() {
                     }
                     items(recent, key = { "r:$it" }) { r ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { query = r }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            Modifier.fillMaxWidth().clickable { query = r }.padding(horizontal = Dimens.Gutter, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(Icons.Default.History, null, tint = TextSecondary)
@@ -196,17 +208,17 @@ fun SearchScreen() {
                 // The Library tab only shows what you saved; the whole server is one tap away here.
                 item { SectionHeader("Browse everything") }
                 item {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         BrowseTile("All artists", Icons.Default.Person, Modifier.weight(1f)) { actions.open("browse/artists") }
                         BrowseTile("All albums", Icons.Default.Album, Modifier.weight(1f)) { actions.open("browse/albums") }
                     }
                 }
                 if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
                 items(genres.chunked(2)) { pair ->
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         pair.forEach { g ->
                             Box(
-                                Modifier.weight(1f).height(72.dp).clip(RoundedCornerShape(8.dp))
+                                Modifier.weight(1f).height(72.dp).clip(HearthShapes.Card)
                                     .background(genreColor(g.genre)).clickable { actions.openGenre(g.genre) }.padding(12.dp)
                             ) {
                                 Text(g.genre, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -252,10 +264,10 @@ fun SearchScreen() {
 @Composable
 private fun BrowseTile(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     Row(
-        modifier.height(56.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        modifier.height(56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = Accent)
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
         Text(title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -269,33 +281,18 @@ private fun genreColor(name: String): Color {
 @Composable
 fun ArtistRow(a: ArtistEntity) {
     val actions = LocalActions.current
-    Row(
-        Modifier.fillMaxWidth().clickable { actions.openArtist(a.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverArt(a.coverArt, 52.dp, Modifier.clip(CircleShape), requestSize = 150, fallback = a.name)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Artist • ${a.albumCount} albums", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    MediaRow(a.name, "Artist • ${plural(a.albumCount, "album")}", onClick = { actions.openArtist(a.id) }, coverArt = a.coverArt, round = true)
 }
 
 @Composable
 fun AlbumListRow(a: AlbumEntity) {
     val actions = LocalActions.current
-    Row(
-        Modifier.fillMaxWidth().clickable { actions.openAlbum(a.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CoverArt(a.coverArt, 52.dp, requestSize = 150, fallback = a.name)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(a.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOfNotNull("Album", a.artist, a.year?.toString()).joinToString(" • "), color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
+    MediaRow(
+        a.name,
+        listOfNotNull("Album", a.artist, a.year?.toString()).joinToString(" • "),
+        onClick = { actions.openAlbum(a.id) },
+        coverArt = a.coverArt,
+    )
 }
 
 private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums") }
@@ -317,21 +314,12 @@ private fun sortAlbums(albums: List<AlbumEntity>, sort: Int) = when (sort) {
 @Composable
 private fun SortMenu(options: List<String>, sort: Int, onSort: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { open = true }) {
-            Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(options.getOrElse(sort) { options[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
-        }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            options.forEachIndexed { i, label ->
-                DropdownMenuItem(text = { Text(label, color = if (i == sort) Accent else Color.Unspecified) }, onClick = {
-                    onSort(i)
-                    open = false
-                })
-            }
-        }
+    TextButton(onClick = { open = true }) {
+        Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(options.getOrElse(sort) { options[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
     }
+    ChoiceSheet(open, "Sort by", options.mapIndexed { i, label -> i to label }, sort, onDismiss = { open = false }, onPick = onSort)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -364,20 +352,24 @@ fun LibraryScreen() {
     val sortedAlbums = remember(albums, sort, tab) { if (tab == LibraryTab.ALBUMS) sortAlbums(albums, sort) else albums }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Your Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        PageHeader("Your Library") {
             // Home's tile shuffles just your library; this one is for the whole server.
-            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) { Icon(Icons.Default.Shuffle, "Shuffle everything", tint = Accent) }
-            IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
+            IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) {
+                Icon(Icons.Default.Shuffle, "Shuffle everything", tint = MaterialTheme.colorScheme.primary)
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = Dimens.Gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(LibraryTab.entries) { t ->
                     FilterChip(
                         selected = tab == t,
                         onClick = { tab = t },
                         label = { Text(t.label) },
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = Color.Black),
+                        shape = HearthShapes.Chip,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                     )
                 }
             }
@@ -394,20 +386,14 @@ fun LibraryScreen() {
             LazyColumn(Modifier.fillMaxSize()) {
                 when (tab) {
                     LibraryTab.PLAYLISTS -> {
-                        item { LibraryShortcut("Liked Songs", Icons.Default.Favorite, Color(0xFF5038A0)) { actions.open("liked") } }
-                        item { LibraryShortcut("Downloads", Icons.Default.DownloadDone, Color(0xFF1E6B52)) { actions.open("downloads") } }
+                        item {
+                            MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(Icons.Default.Favorite, LikedColor) })
+                        }
+                        item {
+                            MediaRow("Downloads", null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
+                        }
                         items(sortedPlaylists, key = { it.id }) { p ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable { actions.openPlaylist(p.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                CoverArt(p.coverArt, 56.dp, requestSize = 150, fallback = p.name)
-                                Spacer(Modifier.width(12.dp))
-                                Column {
-                                    Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("Playlist • ${p.songCount} songs", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
+                            MediaRow(p.name, "Playlist • ${plural(p.songCount, "song")}", onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt)
                         }
                     }
                     LibraryTab.ARTISTS -> {
@@ -433,7 +419,7 @@ fun LibraryScreen() {
                 }
                 item {
                     Text(
-                        "$songCount songs on the server • pull down to refresh",
+                        "${plural(songCount, "song")} on the server • pull down to refresh",
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(16.dp),
@@ -451,7 +437,7 @@ private fun LibraryEmpty(title: String, body: String, button: String, onBrowse: 
         Spacer(Modifier.height(8.dp))
         Text(body, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onBrowse) { Text(button, color = Accent) }
+        TextButton(onClick = onBrowse) { Text(button) }
     }
 }
 
@@ -481,28 +467,12 @@ private fun BrowseList(title: String, prefKey: String, sortOptions: List<String>
     val prefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
     var sort by remember { mutableStateOf(prefs.getInt(prefKey, 0)) }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            BackButton()
-            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        TopBar(title) {
             SortMenu(sortOptions, sort) {
                 sort = it
                 prefs.edit().putInt(prefKey, it).apply()
             }
         }
         LazyColumn(Modifier.fillMaxSize()) { content(sort) }
-    }
-}
-
-@Composable
-private fun LibraryShortcut(title: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(56.dp).clip(RoundedCornerShape(4.dp)).background(color), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Color.White)
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(title, fontWeight = FontWeight.SemiBold)
     }
 }

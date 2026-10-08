@@ -1,7 +1,11 @@
 package im.flume.hearth.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * Counts how often each feature gets used, so unused ones can be spotted and removed. Stays on the
@@ -13,6 +17,14 @@ class Usage(context: Context) {
     fun track(feature: String) = prefs.edit { putInt(feature, prefs.getInt(feature, 0) + 1) }
 
     fun all(): List<Pair<String, Int>> = FEATURES.map { it to prefs.getInt(it, 0) }
+
+    /** [all], re-emitted whenever a count changes. */
+    fun changes(): Flow<List<Pair<String, Int>>> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> trySend(all()) }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(all())
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     companion object {
         const val RADIO = "Radio"

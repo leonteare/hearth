@@ -51,9 +51,6 @@ interface LibraryDao {
     @Query("SELECT songId FROM play_history WHERE playedAt >= :since")
     suspend fun recentHistorySongIds(since: Long): List<String>
 
-    @Query("SELECT id FROM songs WHERE id IN (SELECT songId FROM downloads WHERE state = 'DONE')")
-    suspend fun downloadedSongIds(): List<String>
-
     @Query("SELECT * FROM songs WHERE albumId = :albumId ORDER BY disc, track, title")
     fun albumSongs(albumId: String): Flow<List<SongEntity>>
 
@@ -84,9 +81,6 @@ interface LibraryDao {
     @Query("SELECT s.* FROM playlist_songs p JOIN songs s ON s.id = p.songId WHERE p.playlistId = :playlistId ORDER BY p.position")
     suspend fun playlistSongsOnce(playlistId: String): List<SongEntity>
 
-    @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId ORDER BY s.artist, s.album, s.disc, s.track")
-    fun downloadedOrQueuedSongs(): Flow<List<SongEntity>>
-
     @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
     suspend fun downloadedSongsOnce(): List<SongEntity>
 
@@ -99,14 +93,6 @@ interface LibraryDao {
            ORDER BY CASE d.state WHEN 'DOWNLOADING' THEN 0 WHEN 'QUEUED' THEN 1 ELSE 2 END, d.addedAt"""
     )
     fun pendingDownloadSongs(): Flow<List<SongEntity>>
-
-    @Query(
-        """SELECT * FROM songs
-           WHERE title LIKE '%' || :q || '%' OR artist LIKE '%' || :q || '%' OR album LIKE '%' || :q || '%'
-           ORDER BY CASE WHEN title LIKE :q || '%' THEN 0 WHEN title LIKE '%' || :q || '%' THEN 1 ELSE 2 END, playCount DESC
-           LIMIT :limit"""
-    )
-    suspend fun searchSongs(q: String, limit: Int): List<SongEntity>
 
     @Query("UPDATE songs SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: String, starred: Boolean)
@@ -147,17 +133,9 @@ interface LibraryDao {
     @Query("SELECT * FROM albums ORDER BY created DESC LIMIT :limit")
     fun recentlyAdded(limit: Int): Flow<List<AlbumEntity>>
 
-    @Query("SELECT * FROM albums WHERE playCount > 0 ORDER BY playCount DESC LIMIT :limit")
-    fun mostPlayed(limit: Int): Flow<List<AlbumEntity>>
-
-    @Query("SELECT * FROM albums ORDER BY RANDOM() LIMIT :limit")
-    suspend fun randomAlbums(limit: Int): List<AlbumEntity>
-
     @Query("SELECT * FROM albums WHERE id IN (:ids)")
     suspend fun albumsByIds(ids: List<String>): List<AlbumEntity>
 
-    @Query("SELECT * FROM albums WHERE name LIKE '%' || :q || '%' ORDER BY playCount DESC LIMIT :limit")
-    suspend fun searchAlbums(q: String, limit: Int): List<AlbumEntity>
 
     /** Albums from local play history, most recent first. */
     @Query(
@@ -185,9 +163,6 @@ interface LibraryDao {
         clearAlbumStars(); albumIds.chunked(900).forEach { starAlbums(it) }
         clearArtistStars(); artistIds.chunked(900).forEach { starArtists(it) }
     }
-
-    @Query("SELECT * FROM artists WHERE name LIKE '%' || :q || '%' ORDER BY albumCount DESC LIMIT :limit")
-    suspend fun searchArtists(q: String, limit: Int): List<ArtistEntity>
 
     // --- playlists ---
     @Query("SELECT * FROM playlists ORDER BY name COLLATE NOCASE")
@@ -241,8 +216,6 @@ interface LibraryDao {
     @Insert suspend fun insertPendingScrobble(item: PendingScrobbleEntity)
     @Query("SELECT * FROM pending_scrobbles ORDER BY time") suspend fun pendingScrobbles(): List<PendingScrobbleEntity>
     @Query("DELETE FROM pending_scrobbles WHERE rowId = :rowId") suspend fun deletePendingScrobble(rowId: Long)
-
-    @Query("DELETE FROM play_history") suspend fun clearHistory()
 }
 
 @Dao

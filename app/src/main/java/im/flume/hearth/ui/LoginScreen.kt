@@ -35,7 +35,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.api.Credentials
 import im.flume.hearth.container
-import im.flume.hearth.ui.theme.Accent
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
@@ -55,7 +54,7 @@ fun LoginScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(48.dp))
-        Icon(Icons.Default.LocalFireDepartment, null, tint = Accent, modifier = Modifier.size(64.dp))
+        Icon(Icons.Default.LocalFireDepartment, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
         Text("Hearth", style = MaterialTheme.typography.headlineLarge)
         Text("Sign in to your Navidrome server", color = TextSecondary)
         Spacer(Modifier.height(16.dp))

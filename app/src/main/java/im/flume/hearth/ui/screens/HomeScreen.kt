@@ -58,7 +58,13 @@ import im.flume.hearth.ui.components.AlbumRow
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.MediaCard
+import im.flume.hearth.ui.components.PageHeader
+import im.flume.hearth.ui.components.plural
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.DownloadsColor
+import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.LikedColor
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 import java.util.Calendar
@@ -84,13 +90,10 @@ fun HomeScreen() {
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
     LaunchedEffect(songCount > 0) { if (songCount > 0) mixes = runCatching { c.mixes.today(online) }.getOrDefault(emptyList()) }
 
+    val accent = MaterialTheme.colorScheme.primary
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(greeting(), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            PageHeader(greeting()) {
                 if (!online) Icon(Icons.Default.CloudOff, "Offline", tint = TextSecondary)
                 IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
             }
@@ -102,7 +105,7 @@ fun HomeScreen() {
         val running = sync as? SyncState.Running
         if (running != null && songCount <= 0) {
             item {
-                Column(Modifier.padding(16.dp)) {
+                Column(Modifier.padding(Dimens.Gutter)) {
                     Text("Loading your library… ${running.songsSoFar} songs", color = TextSecondary)
                     Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -116,9 +119,9 @@ fun HomeScreen() {
         item {
             QuickGrid(
                 tiles = buildList {
-                    add(QuickTile("Shuffle my library", Icons.Default.Shuffle, Accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
-                    add(QuickTile("Liked Songs", Icons.Default.Favorite, Color(0xFF5038A0)) { actions.open("liked") })
-                    add(QuickTile("Downloads", Icons.Default.DownloadDone, Color(0xFF1E6B52)) { actions.open("downloads") })
+                    add(QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
+                    add(QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") })
+                    add(QuickTile("Downloads", Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
                     recent.take(3).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
                 }
             )
@@ -129,8 +132,11 @@ fun HomeScreen() {
         if (mixes.isNotEmpty()) {
             item {
                 SectionHeader("Your mixes")
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(mixes.size) { i -> MixCard(mixes[i]) { actions.open("mix/$i") } }
+                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                    items(mixes.size) { i ->
+                        val mix = mixes[i]
+                        MediaCard(mix.title, mix.subtitle, onClick = { actions.open("mix/$i") }, subtitleLines = 2, cover = { MixCover(mix, Dimens.CardWidth) })
+                    }
                 }
             }
         }
@@ -139,14 +145,9 @@ fun HomeScreen() {
         if (playlists.isNotEmpty()) {
             item {
                 SectionHeader("Your playlists")
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
                     items(playlists, key = { it.id }) { p ->
-                        Column(Modifier.width(140.dp).clickable { actions.openPlaylist(p.id) }) {
-                            CoverArt(p.coverArt, 140.dp, fallback = p.name)
-                            Spacer(Modifier.height(8.dp))
-                            Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                            Text("${p.songCount} songs", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                        }
+                        MediaCard(p.name, plural(p.songCount, "song"), onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt)
                     }
                 }
             }
@@ -157,20 +158,10 @@ fun HomeScreen() {
 @Composable
 fun MixCover(mix: Mix, size: androidx.compose.ui.unit.Dp) {
     val covers = (mix.covers + List(4) { null }).take(4)
-    Column(Modifier.size(size).clip(RoundedCornerShape(6.dp))) {
+    Column(Modifier.size(size).clip(HearthShapes.Cover)) {
         for (row in 0..1) Row(Modifier.weight(1f)) {
             for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = 200)
         }
-    }
-}
-
-@Composable
-private fun MixCard(mix: Mix, onClick: () -> Unit) {
-    Column(Modifier.width(140.dp).clickable(onClick = onClick)) {
-        MixCover(mix, 140.dp)
-        Spacer(Modifier.height(8.dp))
-        Text(mix.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-        Text(mix.subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
     }
 }
 
@@ -184,7 +175,7 @@ private data class QuickTile(
 
 @Composable
 private fun QuickGrid(tiles: List<QuickTile>) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { t -> QuickTileView(t, Modifier.weight(1f)) }
@@ -197,12 +188,12 @@ private fun QuickGrid(tiles: List<QuickTile>) {
 @Composable
 private fun QuickTileView(t: QuickTile, modifier: Modifier) {
     Row(
-        modifier.height(56.dp).clip(RoundedCornerShape(6.dp)).background(SurfaceHigh).clickable(onClick = t.onClick),
+        modifier.height(56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = t.onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (t.icon != null) {
             Box(Modifier.size(56.dp).background(t.color), contentAlignment = Alignment.Center) {
-                Icon(t.icon, null, tint = if (t.color == Accent) Color.Black else Color.White)
+                Icon(t.icon, null, tint = if (t.color == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.onPrimary else Color.White)
             }
         } else {
             CoverArt(t.cover, 56.dp, corner = 0.dp, requestSize = 150, fallback = t.title)

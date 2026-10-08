@@ -93,7 +93,8 @@ import im.flume.hearth.ui.screens.AppearanceSettings
 import im.flume.hearth.ui.screens.GeneralSettings
 import im.flume.hearth.ui.screens.SettingsScreen
 import im.flume.hearth.ui.screens.StorageSettings
-import im.flume.hearth.ui.theme.Accent
+import androidx.compose.material3.MaterialTheme
+import im.flume.hearth.ui.theme.NavBarColor
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.CoroutineScope
@@ -386,7 +387,7 @@ private fun NavGraphBuilder.screen(route: String, content: @Composable (NavBackS
 
 @Composable
 private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
-    NavigationBar(containerColor = Color(0xF0101010)) {
+    NavigationBar(containerColor = NavBarColor) {
         TABS.forEach { (dest, label, icon) ->
             NavigationBarItem(
                 selected = currentTab == dest,
@@ -398,7 +399,7 @@ private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
                     selectedTextColor = Color.White,
                     unselectedIconColor = TextSecondary,
                     unselectedTextColor = TextSecondary,
-                    indicatorColor = Accent.copy(alpha = 0.25f),
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 ),
             )
         }
@@ -407,7 +408,7 @@ private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
 
 @Composable
 private fun SideRail(currentTab: String, onTabClick: (String) -> Unit) {
-    NavigationRail(containerColor = Color(0xFF0C0C0C)) {
+    NavigationRail(containerColor = NavBarColor) {
         Spacer(Modifier.weight(1f))
         TABS.forEach { (dest, label, icon) ->
             NavigationRailItem(
@@ -420,7 +421,7 @@ private fun SideRail(currentTab: String, onTabClick: (String) -> Unit) {
                     selectedTextColor = Color.White,
                     unselectedIconColor = TextSecondary,
                     unselectedTextColor = TextSecondary,
-                    indicatorColor = Accent.copy(alpha = 0.25f),
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 ),
                 modifier = Modifier.padding(vertical = 4.dp),
             )

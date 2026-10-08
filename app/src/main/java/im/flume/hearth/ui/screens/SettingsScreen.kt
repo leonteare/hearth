@@ -61,7 +61,10 @@ import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.playback.QueueStore
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.ChoiceSheet
+import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.theme.Destructive
+import im.flume.hearth.ui.theme.DividerColor
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,10 +77,7 @@ private val CACHE_SIZES = listOf(512 to "512 MB", 1024 to "1 GB", 2048 to "2 GB"
 @Composable
 private fun SettingsPage(title: String, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Row(Modifier.statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
-            BackButton()
-            Text(title, style = MaterialTheme.typography.titleLarge)
-        }
+        TopBar(title)
         content()
         Spacer(Modifier.height(24.dp))
     }
@@ -89,8 +89,8 @@ fun SettingsScreen() {
     val actions = LocalActions.current
     SettingsPage("Settings") {
         listOf(
-            Triple("General", "Account, library, streaming, updates", Icons.Outlined.Settings) to "settings/general",
-            Triple("Storage", "Downloads, cache, offline mode", Icons.Outlined.Storage) to "settings/storage",
+            Triple("General", "Account, library, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
+            Triple("Storage", "Downloads, cache", Icons.Outlined.Storage) to "settings/storage",
             Triple("Appearance", "Accent colour, lyrics", Icons.Outlined.Palette) to "settings/appearance",
         ).forEach { (row, route) ->
             val (title, subtitle, icon) = row
@@ -98,7 +98,7 @@ fun SettingsScreen() {
                 Modifier.fillMaxWidth().clickable { actions.open(route) }.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, null, tint = Accent)
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(title)
@@ -119,6 +119,7 @@ fun GeneralSettings() {
     val songCount by remember { c.db.library().songCount() }.collectAsStateWithLifecycle(0)
     val sync by c.sync.state.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
+    val usageCounts by remember { c.usage.changes() }.collectAsStateWithLifecycle(c.usage.all())
 
     SettingsPage("General") {
         Section("App")
@@ -127,9 +128,12 @@ fun GeneralSettings() {
         Section("Account")
         Info("Signed in as", creds?.username.orEmpty())
         Info("Server", creds?.serverUrl.orEmpty())
+        Clickable("Sign out", "Removes downloads and the library index from this phone", color = Destructive) {
+            confirmLogout = true
+        }
 
         Section("Library")
-        Info("Songs on this phone's index", songCount.toString())
+        Info("Songs in your library", songCount.toString())
         Clickable(
             title = if (sync is SyncState.Running) "Syncing…" else "Resync library now",
             subtitle = (sync as? SyncState.Failed)?.message ?: "Fetches any changes from Navidrome",
@@ -146,6 +150,9 @@ fun GeneralSettings() {
         Toggle("Smart shuffle", settings.smartShuffle, "Avoid playing the same artist twice in a row") { v ->
             c.session.updateSettings { it.copy(smartShuffle = v) }
         }
+        Toggle("Offline mode", settings.offlineMode, "Only play downloaded songs, even with a connection") { v ->
+            c.session.updateSettings { it.copy(offlineMode = v) }
+        }
 
         Section("Streaming")
         Choice("Quality on Wi-Fi", settings.wifiBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(wifiBitrate = v) } }
@@ -160,16 +167,11 @@ fun GeneralSettings() {
             "How often each feature has been used. Never sent anywhere; it helps decide what to keep.",
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
-        remember { c.usage.all() }.sortedByDescending { it.second }.forEach { (name, count) ->
+        usageCounts.sortedByDescending { it.second }.forEach { (name, count) ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
                 Text(name, modifier = Modifier.weight(1f))
                 Text("$count", color = TextSecondary)
             }
-        }
-
-        Section("")
-        Clickable("Sign out", "Removes downloads and the library index from this phone", color = MaterialTheme.colorScheme.error) {
-            confirmLogout = true
         }
     }
 
@@ -189,7 +191,7 @@ fun GeneralSettings() {
                         QueueStore(context.filesDir).clear()
                         c.session.logout()
                     }
-                }) { Text("Sign out", color = MaterialTheme.colorScheme.error) }
+                }) { Text("Sign out", color = Destructive) }
             },
             dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } },
         )
@@ -216,11 +218,8 @@ fun StorageSettings() {
             c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
             c.downloads.schedule()
         }
-        Toggle("Offline mode", settings.offlineMode, "Only play downloaded songs, even with a connection") { v ->
-            c.session.updateSettings { it.copy(offlineMode = v) }
-        }
         if (downloadedBytes > 0) {
-            Clickable("Remove all downloads", color = MaterialTheme.colorScheme.error) { confirmRemoveAll = true }
+            Clickable("Remove all downloads", color = Destructive) { confirmRemoveAll = true }
         }
 
         Section("Streaming cache")
@@ -247,7 +246,7 @@ fun StorageSettings() {
             text = { Text("Everything downloaded to this phone will be deleted. You can download it again later.") },
             confirmButton = {
                 TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text("Remove", color = Destructive)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },
@@ -309,9 +308,9 @@ fun AppearanceSettings() {
 
 @Composable
 private fun Section(title: String) {
-    HorizontalDivider(Modifier.padding(top = 16.dp), color = Color(0xFF2A2A2A))
+    HorizontalDivider(Modifier.padding(top = 16.dp), color = DividerColor)
     if (title.isNotEmpty()) {
-        Text(title, color = Accent, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp))
+        Text(title, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp))
     }
 }
 
@@ -341,22 +340,16 @@ private fun Toggle(title: String, value: Boolean, subtitle: String? = null, onCh
             Text(title)
             subtitle?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }
         }
-        Switch(value, onCheckedChange = onChange, colors = SwitchDefaults.colors(checkedTrackColor = Accent))
+        Switch(value, onCheckedChange = onChange, colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary))
     }
 }
 
 @Composable
 private fun Choice(title: String, value: Int, options: List<Pair<Int, String>>, onChange: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        Column(Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(title)
-            Text(options.firstOrNull { it.first == value }?.second ?: "$value", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-        }
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            options.forEach { (v, label) ->
-                DropdownMenuItem(text = { Text(label) }, onClick = { onChange(v); open = false })
-            }
-        }
+    Column(Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(title)
+        Text(options.firstOrNull { it.first == value }?.second ?: "$value", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
+    ChoiceSheet(open, title, options, value, onDismiss = { open = false }, onPick = onChange)
 }

@@ -44,7 +44,6 @@ class PlayerConnection(private val context: Context) {
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     val positionMs: Long get() = controller?.currentPosition ?: 0
-    val bufferedMs: Long get() = controller?.bufferedPosition ?: 0
 
     fun connect() {
         if (future != null) return

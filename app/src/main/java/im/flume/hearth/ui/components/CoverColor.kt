@@ -31,14 +31,14 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
-import im.flume.hearth.ui.theme.Accent
+import androidx.compose.material3.MaterialTheme
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** A rich but dark-enough colour taken from the cover art, for header gradients. Fades in once known. */
 @Composable
-fun rememberCoverColor(coverArt: String?, fallback: Color = lerp(Accent, Color.Black, 0.6f)): Color {
+fun rememberCoverColor(coverArt: String?, fallback: Color = lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.6f)): Color {
     val context = LocalContext.current
     val actions = LocalActions.current
     var found by remember(coverArt) { mutableStateOf<Color?>(null) }
@@ -65,13 +65,12 @@ fun DownloadToggle(downloaded: Boolean, progress: Float?, onClick: () -> Unit) {
                 CircularProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.size(26.dp),
-                    color = Accent,
                     trackColor = TextSecondary.copy(alpha = 0.3f),
                     strokeWidth = 2.dp,
                 )
             } else if (downloaded) {
-                Box(Modifier.size(26.dp).clip(CircleShape).background(Accent), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.ArrowDownward, "Remove download", tint = Color.Black, modifier = Modifier.size(18.dp))
+                Box(Modifier.size(26.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.ArrowDownward, "Remove download", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                 }
             } else {
                 Icon(Icons.Outlined.ArrowCircleDown, "Download", tint = TextSecondary, modifier = Modifier.size(28.dp))

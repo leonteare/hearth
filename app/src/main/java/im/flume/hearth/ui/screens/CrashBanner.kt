@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.crashFile
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.BannerCard
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 
@@ -34,18 +34,15 @@ fun CrashBanner() {
     val file = remember { crashFile(context) }
     var report by remember { mutableStateOf(runCatching { file.takeIf { it.exists() }?.readText() }.getOrNull()) }
     val text = report ?: return
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(8.dp)).background(SurfaceHigh).padding(14.dp)
-    ) {
-        Text("Hearth crashed last time", fontWeight = FontWeight.Bold)
-        Text("Copy the details and send them on so it can be fixed.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-        Row {
+    BannerCard(
+        title = "Hearth crashed last time",
+        body = "Copy the details and send them on so it can be fixed.",
+        actions = {
             TextButton(onClick = {
                 context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Hearth crash", text))
                 Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-            }) { Text("Copy details", color = Accent) }
+            }) { Text("Copy details") }
             TextButton(onClick = { file.delete(); report = null }) { Text("Dismiss", color = TextSecondary) }
-        }
-    }
+        },
+    )
 }

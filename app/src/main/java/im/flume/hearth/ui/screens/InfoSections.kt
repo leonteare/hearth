@@ -39,7 +39,8 @@ import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.formatLongDuration
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.MediaCard
+import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.TextSecondary
 import java.time.LocalDate
 import java.time.Month
@@ -81,7 +82,7 @@ fun AboutText(title: String, text: String, link: String?) {
             Spacer(Modifier.height(8.dp))
             Text(
                 "Read more on Last.fm",
-                color = Accent,
+                color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.clickable {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -138,18 +139,11 @@ fun ArtistAbout(artistId: String) {
     val fans = info?.similarArtist.orEmpty().filter { it.id.isNotBlank() && it.albumCount > 0 }
     if (fans.isNotEmpty()) {
         SectionHeader("Fans also like")
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(fans, key = { it.id }) { a -> ArtistCard(a.id, a.name, a.coverArt) }
+        val actions = LocalActions.current
+        LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+            items(fans, key = { it.id }) { a ->
+                MediaCard(a.name, null, onClick = { actions.openArtist(a.id) }, coverArt = a.coverArt, width = 110.dp, round = true)
+            }
         }
-    }
-}
-
-@Composable
-private fun ArtistCard(id: String, name: String, coverArt: String?) {
-    val actions = LocalActions.current
-    Column(Modifier.width(110.dp).clickable { actions.openArtist(id) }, horizontalAlignment = Alignment.CenterHorizontally) {
-        CoverArt(coverArt, 110.dp, corner = 55.dp, requestSize = 300)
-        Spacer(Modifier.height(8.dp))
-        Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }

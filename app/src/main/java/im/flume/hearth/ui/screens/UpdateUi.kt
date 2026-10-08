@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.update.UpdateState
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.BannerCard
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 
@@ -48,31 +48,18 @@ fun UpdateBanner() {
         is UpdateState.Failed -> (s.release ?: return) to s.message
         else -> return
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(SurfaceHigh)
-            .padding(14.dp)
+    BannerCard(
+        title = "Update available",
+        body = line,
+        icon = Icons.Default.SystemUpdate,
+        bodyMaxLines = 2,
+        trailing = if (state is UpdateState.Available || state is UpdateState.Failed || state is UpdateState.NeedsPermission) {
+            { Button(onClick = { updater.install(release) }) { Text("Install") } }
+        } else null,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.SystemUpdate, null, tint = Accent)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Update available", fontWeight = FontWeight.Bold)
-                Text(line, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            if (state is UpdateState.Available || state is UpdateState.Failed || state is UpdateState.NeedsPermission) {
-                Button(
-                    onClick = { updater.install(release) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black),
-                ) { Text("Install") }
-            }
-        }
         (state as? UpdateState.Downloading)?.let { d ->
             Spacer(Modifier.height(10.dp))
-            LinearProgressIndicator(progress = { d.progress }, modifier = Modifier.fillMaxWidth(), color = Accent)
+            LinearProgressIndicator(progress = { d.progress }, modifier = Modifier.fillMaxWidth())
         }
         if (release.notes.isNotBlank() && state is UpdateState.Available) {
             Spacer(Modifier.height(8.dp))

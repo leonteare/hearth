@@ -49,7 +49,10 @@ import im.flume.hearth.data.StatsPeriod
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.AccentDeep
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
@@ -82,11 +85,11 @@ fun StatsCard(period: StatsPeriod) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .padding(horizontal = Dimens.Gutter, vertical = 6.dp)
+            .clip(HearthShapes.Card)
             .background(Brush.horizontalGradient(listOf(AccentDeep, SurfaceHigh)))
             .clickable { actions.open("stats/${period.key}") }
-            .padding(14.dp),
+            .padding(Dimens.CardPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -113,7 +116,7 @@ fun StatsScreen(key: String) {
         item {
             Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(AccentDeep, Color.Transparent)))) {
                 Column {
-                    BackButton()
+                    TopBar(null)
                     Text(period.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(horizontal = 16.dp))
                     Text("in music", color = TextSecondary, modifier = Modifier.padding(horizontal = 16.dp))
                     Spacer(Modifier.height(20.dp))
@@ -136,7 +139,6 @@ fun StatsScreen(key: String) {
         item {
             Button(
                 onClick = { actions.play(PlaySource(PlaySource.Kind.SONGS, label = "${period.title}: top songs", songIds = stats.topSongIds)) },
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black),
                 modifier = Modifier.padding(16.dp),
             ) {
                 Icon(Icons.Default.PlayArrow, null)
@@ -151,7 +153,7 @@ fun StatsScreen(key: String) {
         stats.busiestDay?.let { day ->
             item {
                 SectionHeader("Favourite day to listen")
-                Text(day.getDisplayName(TextStyle.FULL, Locale.getDefault()), style = MaterialTheme.typography.titleLarge, color = Accent, modifier = Modifier.padding(horizontal = 16.dp))
+                Text(day.getDisplayName(TextStyle.FULL, Locale.getDefault()), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
         item {
@@ -165,7 +167,7 @@ fun StatsScreen(key: String) {
 
 @Composable
 private fun StatTile(value: String, label: String, modifier: Modifier) {
-    Column(modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.3f)).padding(12.dp)) {
+    Column(modifier.clip(HearthShapes.Card).background(Color.Black.copy(alpha = 0.3f)).padding(12.dp)) {
         Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
         Text(label, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
     }
@@ -176,18 +178,14 @@ private fun RankedSection(title: String, items: List<Ranked>, round: Boolean = f
     if (items.isEmpty()) return
     SectionHeader(title)
     items.forEachIndexed { i, r ->
-        Row(
-            Modifier.fillMaxWidth().clickable { onClick(r.id) }.padding(horizontal = 16.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("${i + 1}", style = MaterialTheme.typography.titleMedium, color = TextSecondary, modifier = Modifier.width(28.dp))
-            CoverArt(r.coverArt, 48.dp, corner = if (round) 24.dp else 4.dp, requestSize = 150, fallback = r.name)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(r.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (r.detail.endsWith("plays")) r.detail else "${r.detail} · ${r.plays} plays", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        MediaRow(
+            r.name,
+            if (r.detail.endsWith("plays")) r.detail else "${r.detail} · ${r.plays} plays",
+            onClick = { onClick(r.id) },
+            coverArt = r.coverArt,
+            round = round,
+            leading = { Text("${i + 1}", style = MaterialTheme.typography.titleMedium, color = TextSecondary, modifier = Modifier.width(28.dp)) },
+        )
     }
 }
 
@@ -198,7 +196,7 @@ private fun MonthChart(minutes: List<Long>) {
     Row(Modifier.fillMaxWidth().height(140.dp).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
         minutes.forEachIndexed { i, m ->
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.fillMaxWidth().fillMaxHeight(0.85f * m / max + 0.01f).clip(RoundedCornerShape(3.dp)).background(Accent))
+                Box(Modifier.fillMaxWidth().fillMaxHeight(0.85f * m / max + 0.01f).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.primary))
                 Spacer(Modifier.height(4.dp))
                 Text(java.time.Month.of(i + 1).getDisplayName(TextStyle.NARROW, Locale.getDefault()), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             }
