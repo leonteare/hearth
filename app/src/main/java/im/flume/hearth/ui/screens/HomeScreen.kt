@@ -82,6 +82,7 @@ fun HomeScreen() {
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
+    val downloadCounts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
 
@@ -124,8 +125,11 @@ fun HomeScreen() {
                 tiles = buildList {
                     add(QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
                     add(QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") })
-                    add(QuickTile("Downloads", Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
-                    recent.take(3).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
+                    // Only while something is downloading or failed; finished downloads live in their albums and playlists.
+                    if (downloadCounts.active) {
+                        add(QuickTile(downloadCounts.summary, Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
+                    }
+                    recent.take(if (downloadCounts.active) 3 else 4).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
                 }
             )
         }

@@ -91,6 +91,19 @@ data class DownloadEntity(
     val path: String?,
     val bytes: Long,
     val addedAt: Long,
+    /** When the download finished (0 if it hasn't, or finished before this was recorded). */
+    @ColumnInfo(defaultValue = "0") val completedAt: Long = 0,
+)
+
+/**
+ * What the user said about downloading one song, which wins over any album, playlist or Liked Songs
+ * download: [wanted] true = they downloaded the song itself, false = they removed it.
+ */
+@Entity(tableName = "song_download_prefs")
+data class SongDownloadPrefEntity(
+    @PrimaryKey val songId: String,
+    val wanted: Boolean,
+    val updatedAt: Long,
 )
 
 /** An album or playlist the user chose to keep offline; new playlist songs get downloaded on sync. */

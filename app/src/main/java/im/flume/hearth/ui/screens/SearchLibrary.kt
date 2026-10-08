@@ -421,8 +421,12 @@ fun LibraryScreen() {
                         item {
                             MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(Icons.Default.Favorite, LikedColor) })
                         }
-                        item {
-                            MediaRow("Downloads", null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
+                        // Not a playlist: only shown while songs are downloading or failed (always reachable from Settings → Storage).
+                        item(key = "downloads") {
+                            val counts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+                            if (counts.active) {
+                                MediaRow(counts.summary, null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
+                            }
                         }
                         items(sortedPlaylists, key = { it.playlist.id }) { item -> PlaylistListRow(item) }
                     }

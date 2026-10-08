@@ -90,6 +90,13 @@ interface LibraryDao {
     @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
     fun downloadedSongs(): Flow<List<SongEntity>>
 
+    /** Songs that finished downloading since [since], newest first. */
+    @Query(
+        """SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId
+           WHERE d.state = 'DONE' AND d.completedAt >= :since ORDER BY d.completedAt DESC LIMIT :limit"""
+    )
+    fun recentlyDownloadedSongs(since: Long, limit: Int): Flow<List<SongEntity>>
+
     /** Not-yet-finished downloads: the one in progress first, then the queue in order, failures last. */
     @Query(
         """SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state != 'DONE'
@@ -249,12 +256,45 @@ interface DownloadDao {
     @Query("SELECT songId FROM downloads WHERE state != 'DONE'") suspend fun pendingIds(): List<String>
     @Query("DELETE FROM downloads WHERE state != 'DONE'") suspend fun deletePending()
     @Query("SELECT COALESCE(SUM(bytes), 0) FROM downloads WHERE state = 'DONE'") fun totalBytes(): Flow<Long>
+    @Query("SELECT COALESCE(SUM(bytes), 0) FROM downloads WHERE state = 'DONE' AND songId IN (:ids)") suspend fun bytesOf(ids: List<String>): Long
+
+    /** How many songs are waiting, downloading and failed: drives the Downloads entry points. */
+    @Query(
+        """SELECT COALESCE(SUM(CASE WHEN state = 'QUEUED' THEN 1 ELSE 0 END), 0) AS queued,
+                  COALESCE(SUM(CASE WHEN state = 'DOWNLOADING' THEN 1 ELSE 0 END), 0) AS downloading,
+                  COALESCE(SUM(CASE WHEN state = 'FAILED' THEN 1 ELSE 0 END), 0) AS failed
+           FROM downloads"""
+    )
+    fun counts(): Flow<DownloadCounts>
+
+    /** Downloads of songs the server no longer has (no row in songs). */
+    @Query("SELECT songId FROM downloads WHERE songId NOT IN (SELECT id FROM songs)") suspend fun orphanIds(): List<String>
+
+    // --- per-song preferences (see SongDownloadPrefEntity) ---
+    @Query("SELECT * FROM song_download_prefs") suspend fun prefs(): List<SongDownloadPrefEntity>
+    @Upsert suspend fun upsertPrefs(items: List<SongDownloadPrefEntity>)
+    @Query("DELETE FROM song_download_prefs WHERE songId IN (:ids)") suspend fun deletePrefs(ids: List<String>)
+    @Query("DELETE FROM song_download_prefs WHERE wanted = 0 AND songId IN (:ids)") suspend fun clearRemoved(ids: List<String>)
+    @Query("DELETE FROM song_download_prefs") suspend fun clearPrefs()
 
     @Query("SELECT * FROM pinned") suspend fun pinned(): List<PinnedEntity>
     @Query("SELECT * FROM pinned") fun pinnedFlow(): Flow<List<PinnedEntity>>
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun pin(item: PinnedEntity)
     @Query("DELETE FROM pinned WHERE kind = :kind AND id = :id") suspend fun unpin(kind: String, id: String)
     @Query("DELETE FROM pinned") suspend fun clearPinned()
+}
+
+data class DownloadCounts(val queued: Int = 0, val downloading: Int = 0, val failed: Int = 0) {
+    /** Songs still to come (waiting or on their way). */
+    val left: Int get() = queued + downloading
+    /** True while there's something to look at on the Downloads page. */
+    val active: Boolean get() = left > 0 || failed > 0
+    /** Short label for the Downloads shortcut, e.g. "Downloading · 34 left". */
+    val summary: String get() = when {
+        left > 0 -> "Downloading · $left left"
+        failed > 0 -> "Downloads · $failed couldn't download"
+        else -> "Downloads"
+    }
 }
 
 class Converters {
@@ -267,8 +307,9 @@ class Converters {
         SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class,
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
+        SongDownloadPrefEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -304,10 +345,22 @@ abstract class AppDatabase : RoomDatabase() {
             "ALTER TABLE playlists ADD COLUMN isPublic INTEGER NOT NULL DEFAULT 0",
         )
 
+        /** When each download finished, and per-song download choices. Must match the entities exactly. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_4_5_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_4_5_SQL = listOf(
+            "ALTER TABLE downloads ADD COLUMN completedAt INTEGER NOT NULL DEFAULT 0",
+            "CREATE TABLE IF NOT EXISTS `song_download_prefs` (`songId` TEXT NOT NULL, `wanted` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`songId`))",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }
