@@ -43,12 +43,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Songs kept on the phone for offline play. Files live in app-private storage; the playback data
@@ -202,10 +204,15 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val c = (applicationContext as HearthApp).container
         val dao = c.db.downloads()
         // The server may take a while to start sending a song it has to convert first.
-        val http = c.http.newBuilder().readTimeout(2, TimeUnit.MINUTES).build()
+        // One connection per song (HTTP/1.1): with HTTP/2 every download shares a single connection,
+        // and one hiccup on the server resets all of them at once.
+        val http = c.http.newBuilder().readTimeout(2, TimeUnit.MINUTES).protocols(listOf(Protocol.HTTP_1_1)).build()
         val claim = Mutex()
         val completed = AtomicInteger()
         val failuresInRow = AtomicInteger()
+        // While the server is struggling, every lane waits until this time, then only lane 0 runs until a song succeeds.
+        val backoffUntil = AtomicLong(0)
+        val struggling = AtomicBoolean(false)
         val waitingForWifi = AtomicBoolean(false)
         fun paused() = c.session.settings.value.downloadsPaused
         runCatching { setForeground(foregroundInfo(0)) }
@@ -216,6 +223,8 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 val settings = c.session.settings.value
                 if (paused() || index >= settings.parallelDownloads) return
                 if (settings.wifiOnlyDownloads && !c.network.onWifi()) { waitingForWifi.set(true); return }
+                val wait = backoffUntil.get() - System.currentTimeMillis()
+                if (wait > 0 || (index > 0 && struggling.get())) { delay(wait.coerceIn(5_000, RETRY_DELAY_MS)); continue }
                 val next = claim.withLock {
                     dao.nextQueued()?.copy(state = DownloadState.DOWNLOADING)?.also { dao.upsert(it) }
                 } ?: return
@@ -231,6 +240,17 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                         dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED)) }
                         return
                     }
+                    if (e is java.io.IOException && (c.downloads.attempts.merge(next.songId, 1, Int::plus) ?: 0) < MAX_CONNECTION_TRIES) {
+                        // The connection dropped (server busy or restarting): not this song's fault. Put it back,
+                        // slow down, and wait longer each time it keeps happening.
+                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED)) }
+                        struggling.set(true)
+                        val n = failuresInRow.incrementAndGet().coerceAtMost(6)
+                        val pause = RETRY_DELAY_MS shl (n - 1) // 30s, 1m, 2m, 4m, 8m, 16m
+                        backoffUntil.set(System.currentTimeMillis() + pause)
+                        c.downloads.reportError("${describe(e)}. Server busy, trying again in ${pause / 60_000.0} min".replace(".0 min", " min"))
+                        continue
+                    }
                     c.downloads.reportError(describe(e))
                     null
                 }
@@ -242,6 +262,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                         c.downloads.markDone(next.songId, file.absolutePath)
                         runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
                         failuresInRow.set(0)
+                        struggling.set(false)
                         c.downloads.reportError(null)
                         runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
                     }
@@ -277,6 +298,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     }
 
     private fun describe(e: Exception): String = when (e) {
+        is okhttp3.internal.http2.StreamResetException -> "The server cut the download off"
         is java.net.SocketTimeoutException -> "The server took too long to respond"
         is java.net.UnknownHostException -> "Couldn't find the server (is Tailscale connected?)"
         is java.net.ConnectException -> "Couldn't connect to the server"
@@ -353,6 +375,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         private const val NOTIFICATION_ID = 42
         private const val MAX_TRIES = 3
         const val MAX_PARALLEL = 4
+        private const val MAX_CONNECTION_TRIES = 6
         private const val RETRY_DELAY_MS = 30_000L
     }
 }

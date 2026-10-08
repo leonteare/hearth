@@ -31,12 +31,25 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 
+fun crashFile(context: Context) = java.io.File(context.filesDir, "last-crash.txt")
+
 class HearthApp : Application(), SingletonImageLoader.Factory {
     lateinit var container: AppContainer
         private set
 
     override fun onCreate() {
         super.onCreate()
+        // Keep the details of a crash so they can be copied from Home next time the app opens.
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            runCatching {
+                crashFile(this).writeText(
+                    "Hearth ${BuildConfig.VERSION_NAME} on Android ${android.os.Build.VERSION.RELEASE}, " +
+                        "${java.util.Date()}, thread ${thread.name}\n\n${e.stackTraceToString()}"
+                )
+            }
+            previous?.uncaughtException(thread, e)
+        }
         container = AppContainer(this)
     }
 
