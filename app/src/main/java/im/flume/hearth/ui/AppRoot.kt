@@ -119,18 +119,23 @@ private class AppActions(
         }
     }
 
-    private fun plural(n: Int) = if (n == 1) "" else "$n songs "
+    override fun showMessage(message: String) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(message, duration = SnackbarDuration.Short)
+        }
+    }
 
     override fun playNext(songIds: List<String>) {
         haptic(HapticFeedbackType.Confirm)
         c.player.playNext(songIds)
-        showUndo("${plural(songIds.size).ifEmpty { "" }}Playing next".replaceFirstChar { it.uppercase() }) { c.player.removeQueued(songIds) }
+        showUndo(if (songIds.size == 1) "Playing next" else "${songIds.size} songs will play next") { c.player.removeQueued(songIds) }
     }
 
     override fun addToQueue(songIds: List<String>) {
         haptic(HapticFeedbackType.Confirm)
         c.player.addToQueue(songIds)
-        showUndo(if (songIds.size == 1) "Added to queue" else "Added ${songIds.size} songs to queue") { c.player.removeQueued(songIds) }
+        showUndo(if (songIds.size == 1) "Added to the queue" else "Added ${songIds.size} songs to the queue") { c.player.removeQueued(songIds) }
     }
 
     override fun setStarred(songId: String, starred: Boolean) {
@@ -149,7 +154,7 @@ private class AppActions(
         c.usage.track(im.flume.hearth.data.Usage.DOWNLOAD)
         c.downloads.download(songs)
         scope.launch {
-            val wifi = if (c.session.settings.value.wifiOnlyDownloads) " (waits for Wi-Fi)" else ""
+            val wifi = if (c.session.settings.value.wifiOnlyDownloads && !c.network.wifi.value) " (waits for Wi-Fi)" else ""
             snackbar.showSnackbar("Downloading ${songs.size} song${if (songs.size == 1) "" else "s"}$wifi")
         }
     }

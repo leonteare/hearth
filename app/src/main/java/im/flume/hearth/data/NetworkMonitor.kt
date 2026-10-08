@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import im.flume.hearth.api.SubsonicClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,21 @@ class NetworkMonitor(
         combine(hasNetwork, serverReachable, session.settings) { net, server, s -> net && server && !s.offlineMode }
             .stateIn(scope, SharingStarted.Eagerly, true)
 
+    private val _wifi = MutableStateFlow(onWifi())
+
+    /** Live version of [onWifi], for the UI. */
+    val wifi: StateFlow<Boolean> = _wifi
+
     init {
+        // Watches every network, not just the default one: with a VPN on top, Wi-Fi is never the default.
+        cm.registerNetworkCallback(
+            NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) { _wifi.value = onWifi() }
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { _wifi.value = onWifi() }
+                override fun onLost(network: Network) { _wifi.value = onWifi(except = network) }
+            },
+        )
         cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 hasNetwork.value = true
@@ -57,10 +72,10 @@ class NetworkMonitor(
      * True when connected through Wi-Fi (or Ethernet), including with a VPN such as Tailscale on top.
      * Android can report a VPN as "metered" even on Wi-Fi, so this looks at the actual transports.
      */
-    fun onWifi(): Boolean = cm.allNetworks.any { n ->
-        val caps = cm.getNetworkCapabilities(n) ?: return@any false
-        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+    fun onWifi(): Boolean = onWifi(except = null)
+
+    private fun onWifi(except: Network?): Boolean = cm.allNetworks.any { n ->
+        n != except && isWifi(cm.getNetworkCapabilities(n))
     }
 
     /** True when the current connection is metered (mobile data). */
@@ -75,4 +90,10 @@ class NetworkMonitor(
 
     fun reportServerFailure() { serverReachable.value = false }
     fun reportServerSuccess() { serverReachable.value = true }
+
+    companion object {
+        fun isWifi(caps: NetworkCapabilities?): Boolean = caps != null &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+    }
 }

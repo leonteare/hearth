@@ -105,6 +105,8 @@ interface Actions {
     fun addToPlaylist(songIds: List<String>)
     /** Shows [message] with an Undo button that runs [undo]. */
     fun showUndo(message: String, undo: suspend () -> Unit)
+    /** Shows a short [message], e.g. when something couldn't be saved. */
+    fun showMessage(message: String) {}
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }

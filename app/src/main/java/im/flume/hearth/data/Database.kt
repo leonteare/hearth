@@ -225,7 +225,12 @@ interface DownloadDao {
     @Upsert suspend fun upsert(item: DownloadEntity)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertIgnore(items: List<DownloadEntity>)
     @Query("DELETE FROM downloads WHERE songId IN (:ids)") suspend fun delete(ids: List<String>)
-    @Query("UPDATE downloads SET state = 'QUEUED' WHERE state IN ('DOWNLOADING', 'FAILED')") suspend fun requeueStale()
+    @Query("SELECT EXISTS(SELECT 1 FROM downloads WHERE state = 'QUEUED')") suspend fun hasQueued(): Boolean
+    @Query("UPDATE downloads SET state = 'QUEUED' WHERE state = 'FAILED'") suspend fun requeueFailed()
+    @Query("UPDATE downloads SET state = 'QUEUED' WHERE state = 'FAILED' AND songId IN (:ids)") suspend fun requeueFailed(ids: List<String>)
+    /** Only safe when no download lane is running: otherwise two lanes could fetch the same song. */
+    @Query("UPDATE downloads SET state = 'QUEUED' WHERE state = 'DOWNLOADING'") suspend fun requeueInterrupted()
+    @Query("SELECT songId FROM downloads WHERE state != 'DONE'") suspend fun pendingIds(): List<String>
     @Query("DELETE FROM downloads WHERE state != 'DONE'") suspend fun deletePending()
     @Query("SELECT COALESCE(SUM(bytes), 0) FROM downloads WHERE state = 'DONE'") fun totalBytes(): Flow<Long>
 

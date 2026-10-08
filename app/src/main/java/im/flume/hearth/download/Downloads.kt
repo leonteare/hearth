@@ -4,18 +4,23 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
+import android.os.StatFs
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Constraints
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.CancellationException
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -25,11 +30,17 @@ import im.flume.hearth.R
 import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.DownloadEntity
 import im.flume.hearth.data.DownloadState
+import im.flume.hearth.data.NetworkMonitor
 import im.flume.hearth.data.PinnedEntity
 import im.flume.hearth.data.SessionStore
 import im.flume.hearth.data.SongEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,20 +48,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import okhttp3.Call
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
+import okhttp3.Call
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Songs kept on the phone for offline play. Files live in app-private storage; the playback data
@@ -67,6 +78,12 @@ class DownloadRepository(
     /** In-flight HTTP calls by song id, so removing a download stops it immediately. */
     internal val active = ConcurrentHashMap<String, Call>()
 
+    /**
+     * Songs the user removed or cancelled. Cancelling a call makes it fail like a dropped connection,
+     * so the worker checks this to avoid queueing the song again or counting it as server trouble.
+     */
+    internal val cancelled: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     /** Why the most recent download failed, in plain words, or null. */
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
@@ -74,6 +91,18 @@ class DownloadRepository(
 
     /** Tries per song this session, so a song that keeps failing doesn't loop forever. */
     internal val attempts = ConcurrentHashMap<String, Int>()
+
+    /** While the server is struggling every lane waits until this time. Shared so "Retry now" can clear it. */
+    internal val backoffUntil = MutableStateFlow(0L)
+    private val _backingOff = MutableStateFlow(false)
+    /** True while downloads wait out a backoff after several connection drops in a row. */
+    val backingOff: StateFlow<Boolean> = _backingOff.asStateFlow()
+    internal fun setBackingOff(value: Boolean) { _backingOff.value = value }
+
+    private val _storageFull = MutableStateFlow(false)
+    /** True when downloads stopped because the phone ran out of space; they wait until the user acts. */
+    val storageFull: StateFlow<Boolean> = _storageFull.asStateFlow()
+    internal fun setStorageFull(value: Boolean) { _storageFull.value = value }
 
     /** Songs currently downloading and how far along each is (0..1, or null if the size isn't known). */
     private val _progress = MutableStateFlow<Map<String, Float?>>(emptyMap())
@@ -89,21 +118,27 @@ class DownloadRepository(
 
     fun resume() {
         session.updateSettings { it.copy(downloadsPaused = false) }
+        _storageFull.value = false
         schedule()
     }
 
-    /** Try failed downloads again. */
+    /** Try failed downloads again, and stop waiting out any backoff. */
     fun retryFailed() = scope.launch {
         attempts.clear()
         _lastError.value = null
-        dao.requeueStale()
+        _storageFull.value = false
+        backoffUntil.value = 0
+        _backingOff.value = false
+        requeueStale()
         schedule()
     }
 
     /** Drop everything that hasn't finished yet; finished downloads are kept. */
     fun cancelPending() = scope.launch {
-        active.values.forEach { it.cancel() }
+        val ids = dao.pendingIds()
+        cancelled.addAll(ids)
         dao.deletePending()
+        ids.forEach { active.remove(it)?.cancel() }
     }
     val dir: File = File(context.filesDir, "music").apply { mkdirs() }
 
@@ -114,9 +149,50 @@ class DownloadRepository(
     init {
         scope.launch {
             dao.allOnce().filter { it.state == DownloadState.DONE && it.path != null }.forEach { done[it.songId] = it.path!! }
-            dao.requeueStale()
+            requeueStale()
             schedule()
         }
+        // The worker gives up rather than waiting hours for Wi-Fi; start it again when Wi-Fi turns up.
+        runCatching {
+            context.getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
+                NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
+                object : ConnectivityManager.NetworkCallback() {
+                    // Capabilities change often (signal strength); only react the first time a network is Wi-Fi.
+                    private val wifiNetworks: MutableSet<Network> = ConcurrentHashMap.newKeySet()
+                    override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                        if (!NetworkMonitor.isWifi(caps)) wifiNetworks.remove(network)
+                        else if (wifiNetworks.add(network) && session.settings.value.wifiOnlyDownloads) resumeIfWaiting()
+                    }
+                    override fun onLost(network: Network) { wifiNetworks.remove(network) }
+                },
+            )
+        }
+        // Opening the app is a good moment to carry on with anything left over.
+        scope.launch(Dispatchers.Main) {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+                override fun onStart(owner: LifecycleOwner) { resumeIfWaiting() }
+            })
+        }
+    }
+
+    /** Starts the worker if songs are queued and nothing is holding them back on purpose. */
+    private fun resumeIfWaiting() {
+        if (session.settings.value.downloadsPaused || _storageFull.value) return
+        scope.launch { if (dao.hasQueued()) schedule() }
+    }
+
+    /**
+     * Failed songs always go back in the queue; ones marked as downloading only when the worker isn't
+     * running, otherwise a second lane could pick up a song that's still being fetched.
+     */
+    private suspend fun requeueStale() {
+        dao.requeueFailed()
+        if (!workerRunning()) dao.requeueInterrupted()
+    }
+
+    private suspend fun workerRunning(): Boolean = withContext(Dispatchers.IO) {
+        runCatching { WorkManager.getInstance(context).getWorkInfosForUniqueWork(WORK_NAME).get() }.getOrDefault(emptyList())
+            .any { it.state == WorkInfo.State.RUNNING }
     }
 
     fun localFile(songId: String): File? = done[songId]?.let(::File)?.takeIf { it.exists() }
@@ -127,13 +203,17 @@ class DownloadRepository(
 
     fun download(songs: List<SongEntity>) = scope.launch {
         val now = System.currentTimeMillis()
+        cancelled.removeAll(songs.map { it.id }.toSet())
+        _storageFull.value = false
         dao.insertIgnore(songs.mapIndexed { i, s -> DownloadEntity(s.id, DownloadState.QUEUED, null, 0, now + i) })
         schedule()
     }
 
+    /** Deletes the rows before cancelling, so a lane that sees its call fail knows the user removed it. */
     fun remove(songIds: List<String>) = scope.launch {
-        songIds.forEach { id -> active.remove(id)?.cancel(); done.remove(id); File(dir, id).delete() }
+        cancelled.addAll(songIds)
         songIds.chunked(500).forEach { dao.delete(it) }
+        songIds.forEach { id -> active.remove(id)?.cancel(); done.remove(id); File(dir, id).delete() }
     }
 
     fun pinAndDownload(kind: String, id: String, songs: List<SongEntity>) = scope.launch {
@@ -166,25 +246,19 @@ class DownloadRepository(
         remove(ids)
     }
 
-    /** True when the download job is waiting to start again (e.g. for Wi-Fi). */
-    val pausedAfterErrors: Flow<Boolean> = WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(WORK_NAME)
-        .map { infos -> infos.any { it.state == WorkInfo.State.ENQUEUED && it.runAttemptCount > 0 } }
-
     /**
      * Starts the download worker. A running worker keeps going (it picks up newly queued songs);
-     * one that's waiting to retry is replaced so it starts straight away. The Wi-Fi-only setting is
+     * one that's waiting to start is replaced so it starts straight away. The Wi-Fi-only setting is
      * checked by the worker itself rather than Android's "unmetered" constraint, which a VPN like
      * Tailscale can switch on and off mid-download.
      */
     fun schedule() {
         scope.launch(Dispatchers.IO) {
             val wm = WorkManager.getInstance(context)
-            val running = runCatching { wm.getWorkInfosForUniqueWork(WORK_NAME).get() }.getOrDefault(emptyList())
-                .any { it.state == WorkInfo.State.RUNNING }
+            val running = workerRunning()
             val request = OneTimeWorkRequestBuilder<DownloadWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)
                 .build()
             wm.enqueueUniqueWork(WORK_NAME, if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE, request)
         }
@@ -198,11 +272,78 @@ class DownloadRepository(
     }
 }
 
+/** The worker's decisions that don't need Android, kept apart so they can be unit tested. */
+internal object DownloadPolicy {
+    const val MAX_CONNECTION_TRIES = 6
+    const val BACKOFF_MS = 10_000L
+    const val MAX_BACKOFF_MS = 120_000L
+    /** Below this much free space, don't start another song. */
+    const val MIN_FREE_BYTES = 500L * 1024 * 1024
+
+    enum class Failure {
+        /** Dropped connection: back of the queue, try again soon. */
+        Transient,
+        /** Phone is out of space: stop everything until the user acts. */
+        StorageFull,
+        /** This song won't download: mark it failed. */
+        SongFailed,
+        /** The user removed it: forget it, not a failure. */
+        Cancelled,
+    }
+
+    /** [connectionTries] counts dropped connections for this song, including this one. */
+    fun classify(e: Throwable, removedByUser: Boolean, connectionTries: Int): Failure = when {
+        removedByUser -> Failure.Cancelled
+        isStorageFull(e) -> Failure.StorageFull
+        e is IOException && connectionTries < MAX_CONNECTION_TRIES -> Failure.Transient
+        else -> Failure.SongFailed
+    }
+
+    fun isStorageFull(e: Throwable): Boolean =
+        generateSequence(e) { it.cause }.take(8).any { t ->
+            val msg = t.message.orEmpty()
+            msg.contains("ENOSPC") || msg.contains("No space left", ignoreCase = true)
+        }
+
+    /** How long every lane waits after [failuresInRow] dropped connections: none for the first two, then 10s doubling to 2 min. */
+    fun backoffMs(failuresInRow: Int): Long =
+        if (failuresInRow < 3) 0 else (BACKOFF_MS shl (failuresInRow - 3).coerceAtMost(4)).coerceAtMost(MAX_BACKOFF_MS)
+
+    /** What an idle lane (no queued song) should do: keep waiting while other lanes are busy, since they may requeue songs. */
+    fun idleLaneShouldExit(busyLanes: Int): Boolean = busyLanes <= 0
+
+    /** Unique per attempt, so two fetches of the same song can never write into one file. */
+    fun partName(songId: String, attempt: Long): String = "$songId.$attempt.part"
+}
+
 class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+    private enum class Halt { WIFI, STORAGE }
 
     override suspend fun doWork(): Result {
         val c = (applicationContext as HearthApp).container
         val dao = c.db.downloads()
+        val repo = c.downloads
+        fun paused() = c.session.settings.value.downloadsPaused
+        fun parallel() = c.session.settings.value.parallelDownloads.coerceIn(1, MAX_PARALLEL)
+        fun waitingForWifi() = c.session.settings.value.wifiOnlyDownloads && !c.network.onWifi()
+        fun lowOnSpace() = runCatching { StatFs(repo.dir.path).availableBytes < DownloadPolicy.MIN_FREE_BYTES }.getOrDefault(false)
+
+        // Only one worker runs at a time and no lane has started, so anything marked as downloading
+        // (or a half-written file) was left behind by a worker that was stopped.
+        dao.requeueInterrupted()
+        repo.dir.listFiles { f -> f.name.endsWith(".part") }?.forEach { it.delete() }
+        repo.setStorageFull(false)
+
+        fun stopForStorage(): Result {
+            repo.setStorageFull(true)
+            repo.reportError("Phone storage is full")
+            return Result.success() // songs stay queued until the user frees space and taps Retry
+        }
+        if (paused()) return Result.success()
+        if (waitingForWifi()) { repo.reportError("Waiting for Wi-Fi"); return Result.success() }
+        if (lowOnSpace()) return stopForStorage()
+
         // The server may take a while to start sending a song it has to convert first.
         // One connection per song (HTTP/1.1): with HTTP/2 every download shares a single connection,
         // and one hiccup on the server resets all of them at once.
@@ -210,95 +351,144 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val claim = Mutex()
         val completed = AtomicInteger()
         val failuresInRow = AtomicInteger()
-        // While the server is struggling, every lane waits until this time, then only lane 0 runs until a song succeeds.
-        val backoffUntil = AtomicLong(0)
-        val struggling = AtomicBoolean(false)
-        val waitingForWifi = AtomicBoolean(false)
-        fun paused() = c.session.settings.value.downloadsPaused
+        val busy = AtomicInteger()
+        val halt = AtomicReference<Halt?>(null)
         runCatching { setForeground(foregroundInfo(0)) }
 
-        /** One download lane: takes the next queued song until the queue is empty. Several run side by side. */
-        suspend fun lane(index: Int) {
-            while (true) {
-                val settings = c.session.settings.value
-                if (paused() || index >= settings.parallelDownloads) return
-                if (settings.wifiOnlyDownloads && !c.network.onWifi()) { waitingForWifi.set(true); return }
-                val wait = backoffUntil.get() - System.currentTimeMillis()
-                if (wait > 0 || (index > 0 && struggling.get())) { delay(wait.coerceIn(2_000, MAX_BACKOFF_MS)); continue }
-                val next = claim.withLock {
-                    dao.nextQueued()?.copy(state = DownloadState.DOWNLOADING)?.also { dao.upsert(it) }
-                } ?: return
-
-                val file = try {
-                    fetch(c, http, next.songId, c.downloads.dir, settings.downloadBitrate)
-                } catch (e: CancellationException) {
-                    // Android stopped the job: not a failure, carry on next time.
-                    if (dao.get(next.songId) != null) dao.upsert(next.copy(state = DownloadState.QUEUED))
-                    throw e
-                } catch (e: Exception) {
-                    if (paused()) {
-                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED)) }
-                        return
-                    }
-                    if (e is java.io.IOException && (c.downloads.attempts.merge(next.songId, 1, Int::plus) ?: 0) < MAX_CONNECTION_TRIES) {
-                        // The connection dropped: send the song to the back of the queue and move straight on.
-                        // Only if several in a row drop is the server struggling: then go one at a time and
-                        // wait briefly (10s, 20s, 40s… up to 2 min).
-                        dao.get(next.songId)?.let { dao.upsert(next.copy(state = DownloadState.QUEUED, addedAt = System.currentTimeMillis())) }
-                        val n = failuresInRow.incrementAndGet()
-                        if (n >= 3) {
-                            struggling.set(true)
-                            val pause = (BACKOFF_MS shl (n - 3).coerceAtMost(4)).coerceAtMost(MAX_BACKOFF_MS)
-                            backoffUntil.set(System.currentTimeMillis() + pause)
-                            c.downloads.reportError("${describe(e)}. Server busy, trying again in ${pause / 1000}s")
-                        } else {
-                            c.downloads.reportError("${describe(e)}. Will try that song again later")
-                        }
-                        continue
-                    }
-                    c.downloads.reportError(describe(e))
-                    null
-                }
-
-                when {
-                    dao.get(next.songId) == null -> file?.delete() // removed while downloading
-                    file != null -> {
-                        dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
-                        c.downloads.markDone(next.songId, file.absolutePath)
-                        runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
-                        failuresInRow.set(0)
-                        struggling.set(false)
-                        c.downloads.reportError(null)
-                        runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
-                    }
-                    else -> {
-                        c.downloads.attempts.merge(next.songId, 1, Int::plus)
-                        dao.upsert(next.copy(state = DownloadState.FAILED))
-                        // Several in a row usually means the server is briefly unreachable: pause, then carry on.
-                        if (failuresInRow.incrementAndGet() >= 3) {
-                            delay(BACKOFF_MS)
-                            failuresInRow.set(0)
-                        }
-                    }
-                }
+        /** Puts a song back in the queue, unless the user removed it meanwhile. */
+        suspend fun requeue(entry: DownloadEntity, toBack: Boolean = false) {
+            if (dao.get(entry.songId) != null) {
+                dao.upsert(entry.copy(state = DownloadState.QUEUED, addedAt = if (toBack) System.currentTimeMillis() else entry.addedAt))
             }
         }
 
-        while (true) {
-            if (paused()) return Result.success()
-            coroutineScope {
-                repeat(c.session.settings.value.parallelDownloads.coerceIn(1, MAX_PARALLEL)) { i -> launch { lane(i) } }
+        /** Downloads one claimed song. Returns false when the lane should stop. */
+        suspend fun process(next: DownloadEntity, bitrate: Int): Boolean {
+            val file = try {
+                fetch(c, http, next.songId, repo.dir, bitrate)
+            } catch (e: CancellationException) {
+                // Android stopped the job: not a failure, carry on next time. Room needs a live coroutine.
+                withContext(NonCancellable) { requeue(next) }
+                throw e
+            } catch (e: Exception) {
+                if (paused()) { requeue(next); return false }
+                val removed = next.songId in repo.cancelled || dao.get(next.songId) == null
+                val tries = if (!removed && e is IOException && !DownloadPolicy.isStorageFull(e)) {
+                    repo.attempts.merge(next.songId, 1, Int::plus) ?: 1
+                } else 0
+                when (DownloadPolicy.classify(e, removed, tries)) {
+                    DownloadPolicy.Failure.Cancelled -> {
+                        repo.cancelled.remove(next.songId)
+                        return true
+                    }
+                    DownloadPolicy.Failure.StorageFull -> {
+                        requeue(next)
+                        halt.set(Halt.STORAGE)
+                        return false
+                    }
+                    DownloadPolicy.Failure.Transient -> {
+                        // The connection dropped: send the song to the back of the queue and move straight on.
+                        // Only if several in a row drop is the server struggling: then every lane waits
+                        // briefly (10s, 20s, 40s… up to 2 min).
+                        requeue(next, toBack = true)
+                        val pause = DownloadPolicy.backoffMs(failuresInRow.incrementAndGet())
+                        if (pause > 0) {
+                            repo.backoffUntil.value = System.currentTimeMillis() + pause
+                            repo.setBackingOff(true)
+                            repo.reportError("${describe(e)}. Server busy, trying again in ${pause / 1000}s")
+                        } else {
+                            repo.reportError("${describe(e)}. Will try that song again later")
+                        }
+                        return true
+                    }
+                    DownloadPolicy.Failure.SongFailed -> {
+                        repo.reportError(describe(e))
+                        null
+                    }
+                }
             }
-            if (paused()) return Result.success()
-            if (waitingForWifi.get()) {
-                c.downloads.reportError("Waiting for Wi-Fi")
-                return Result.retry()
+
+            when {
+                dao.get(next.songId) == null -> file?.delete() // removed while downloading
+                file != null -> {
+                    dao.upsert(next.copy(state = DownloadState.DONE, path = file.absolutePath, bytes = file.length()))
+                    repo.markDone(next.songId, file.absolutePath)
+                    runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
+                    failuresInRow.set(0)
+                    repo.reportError(null)
+                    runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
+                }
+                else -> {
+                    repo.attempts.merge(next.songId, 1, Int::plus)
+                    dao.upsert(next.copy(state = DownloadState.FAILED))
+                    // Several in a row usually means the server is briefly unreachable: pause, then carry on.
+                    if (failuresInRow.incrementAndGet() >= 3) {
+                        delay(DownloadPolicy.BACKOFF_MS)
+                        failuresInRow.set(0)
+                    }
+                }
             }
-            // Queue done: give songs that failed another go, a little later, up to 3 tries each.
-            val retry = dao.failed().filter { (c.downloads.attempts[it.songId] ?: 0) < MAX_TRIES }
-            if (retry.isEmpty()) return Result.success()
-            delay(RETRY_DELAY_MS)
-            retry.forEach { dao.upsert(it.copy(state = DownloadState.QUEUED)) }
+            return true
+        }
+
+        /**
+         * One download lane: takes the next queued song until the queue is empty. Several run side by
+         * side. An idle lane waits while others are busy, since they may send songs back to the queue.
+         */
+        suspend fun lane(index: Int) {
+            while (true) {
+                val settings = c.session.settings.value
+                if (halt.get() != null || paused() || index >= parallel()) return
+                if (waitingForWifi()) { halt.compareAndSet(null, Halt.WIFI); return }
+                val wait = repo.backoffUntil.value - System.currentTimeMillis()
+                if (wait > 0) { delay(wait.coerceAtMost(RECHECK_MS)); continue } // short steps, so "Retry now" takes effect
+                if (repo.backingOff.value) repo.setBackingOff(false)
+                if (lowOnSpace()) { halt.compareAndSet(null, Halt.STORAGE); return }
+                val next = claim.withLock {
+                    dao.nextQueued()?.copy(state = DownloadState.DOWNLOADING)?.also { dao.upsert(it); busy.incrementAndGet() }
+                }
+                if (next == null) {
+                    if (DownloadPolicy.idleLaneShouldExit(busy.get())) return
+                    delay(RECHECK_MS)
+                    continue
+                }
+                val carryOn = try { process(next, settings.downloadBitrate) } finally { busy.decrementAndGet() }
+                if (!carryOn) return
+            }
+        }
+
+        /** Keeps the right number of lanes going, starting more if "Downloads at once" is raised mid-run. */
+        suspend fun runLanes() = coroutineScope {
+            val lanes = arrayOfNulls<Job>(MAX_PARALLEL)
+            while (true) {
+                if (halt.get() == null && !paused() && dao.hasQueued()) {
+                    for (i in 0 until parallel()) if (lanes[i]?.isActive != true) lanes[i] = launch { lane(i) }
+                }
+                if (lanes.none { it?.isActive == true }) break
+                delay(SUPERVISE_MS)
+            }
+        }
+
+        try {
+            while (true) {
+                if (paused()) return Result.success()
+                runLanes()
+                if (paused()) return Result.success()
+                when (halt.get()) {
+                    Halt.WIFI -> { repo.reportError("Waiting for Wi-Fi"); return Result.success() } // restarted when Wi-Fi returns
+                    Halt.STORAGE -> return stopForStorage()
+                    null -> {}
+                }
+                if (dao.hasQueued()) continue // queued while the last lane was finishing
+                // Queue done: give songs that failed another go, a little later, up to 3 tries each.
+                val retry = dao.failed().filter { (repo.attempts[it.songId] ?: 0) < MAX_TRIES }.map { it.songId }
+                if (retry.isEmpty()) return Result.success()
+                // Wait, but start straight away if new songs are queued meanwhile.
+                withTimeoutOrNull(RETRY_DELAY_MS) { while (!dao.hasQueued()) delay(RECHECK_MS) }
+                retry.chunked(500).forEach { dao.requeueFailed(it) }
+            }
+        } finally {
+            repo.setBackingOff(false)
         }
     }
 
@@ -314,7 +504,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     private suspend fun fetch(c: AppContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {
             val url = c.api.streamUrl(songId, bitrate) ?: error("Not logged in")
-            val tmp = File(dir, "$songId.part")
+            val tmp = File(dir, DownloadPolicy.partName(songId, System.nanoTime()))
             val call = http.newCall(Request.Builder().url(url).build())
             c.downloads.active[songId] = call
             try {
@@ -346,6 +536,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                         }
                     }
                 }
+                File(dir, songId).also { dest -> dest.delete(); check(tmp.renameTo(dest)) { "Rename failed" } }
             } catch (e: Exception) {
                 tmp.delete()
                 throw e
@@ -353,7 +544,6 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                 c.downloads.active.remove(songId)
                 c.downloads.clearProgress(songId)
             }
-            File(dir, songId).also { dest -> dest.delete(); check(tmp.renameTo(dest)) { "Rename failed" } }
         }
 
     private fun foregroundInfo(done: Int): ForegroundInfo {
@@ -380,9 +570,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         private const val NOTIFICATION_ID = 42
         private const val MAX_TRIES = 3
         const val MAX_PARALLEL = 4
-        private const val MAX_CONNECTION_TRIES = 6
-        private const val BACKOFF_MS = 10_000L
-        private const val MAX_BACKOFF_MS = 120_000L
         private const val RETRY_DELAY_MS = 30_000L
+        /** How often an idle or backing-off lane looks again. */
+        private const val RECHECK_MS = 2_000L
+        /** How often the worker checks whether more lanes should be running. */
+        private const val SUPERVISE_MS = 3_000L
     }
 }
