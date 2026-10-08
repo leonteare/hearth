@@ -7,6 +7,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.History
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
@@ -118,7 +120,9 @@ fun SearchScreen() {
             songs = emptyList(); albums = emptyList(); artists = emptyList(); return@LaunchedEffect
         }
         delay(120)
-        val r = c.library.searchIndex(c.session.lastSyncAt).search(q)
+        // Scanning ~7k songs is too slow for the main thread; a new keystroke cancels this anyway.
+        val index = c.library.searchIndex(c.session.lastSyncAt)
+        val r = withContext(Dispatchers.Default) { index.search(q) }
         artists = r.artists
         albums = r.albums
         songs = r.songs

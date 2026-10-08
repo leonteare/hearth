@@ -273,8 +273,8 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
+                // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }

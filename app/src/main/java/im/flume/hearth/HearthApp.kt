@@ -20,6 +20,7 @@ import im.flume.hearth.sync.LibrarySync
 import im.flume.hearth.update.Updater
 import im.flume.hearth.ui.theme.accentState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,6 +34,24 @@ import java.util.concurrent.TimeUnit
 
 fun crashFile(context: Context) = java.io.File(context.filesDir, "last-crash.txt")
 
+/** Saves [e] so it can be copied from Home next time the app opens. Never throws. */
+fun writeCrash(context: Context, where: String, e: Throwable) {
+    runCatching {
+        crashFile(context).writeText(
+            "Hearth ${BuildConfig.VERSION_NAME} on Android ${android.os.Build.VERSION.RELEASE}, " +
+                "${java.util.Date()}, $where\n\n${e.stackTraceToString()}"
+        )
+    }
+}
+
+/**
+ * For long-lived scopes: a failed background job (e.g. a database error) is recorded instead of
+ * crashing the app. Cancellation never reaches a handler, so it still propagates normally.
+ */
+fun crashLoggingHandler(context: Context, name: String) = CoroutineExceptionHandler { _, e ->
+    writeCrash(context, "caught in $name", e)
+}
+
 class HearthApp : Application(), SingletonImageLoader.Factory {
     lateinit var container: AppContainer
         private set
@@ -42,12 +61,7 @@ class HearthApp : Application(), SingletonImageLoader.Factory {
         // Keep the details of a crash so they can be copied from Home next time the app opens.
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-            runCatching {
-                crashFile(this).writeText(
-                    "Hearth ${BuildConfig.VERSION_NAME} on Android ${android.os.Build.VERSION.RELEASE}, " +
-                        "${java.util.Date()}, thread ${thread.name}\n\n${e.stackTraceToString()}"
-                )
-            }
+            writeCrash(this, "thread ${thread.name}", e)
             previous?.uncaughtException(thread, e)
         }
         container = AppContainer(this)
@@ -67,7 +81,7 @@ class HearthApp : Application(), SingletonImageLoader.Factory {
 
 /** Hand-wired singletons; small enough that a DI framework would be overkill. */
 class AppContainer(context: Context) {
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + crashLoggingHandler(context, "app"))
 
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)

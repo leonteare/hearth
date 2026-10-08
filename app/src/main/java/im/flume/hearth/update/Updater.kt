@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -53,19 +54,42 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
 
     val currentVersion: String get() = BuildConfig.VERSION_NAME
 
-    /** Checks at most every few hours unless [force]d. */
+    /**
+     * Asks GitHub at most every [CHECK_INTERVAL] unless [force]d. In between, a fresh start shows the
+     * result of the last check, so an available update still appears without a request.
+     */
     fun checkIfDue(force: Boolean = false) {
         val s = _state.value
         if (s is UpdateState.Checking || s is UpdateState.Downloading || s is UpdateState.Installing) return
-        if (!force && System.currentTimeMillis() - prefs.getLong("lastCheck", 0) < CHECK_INTERVAL && s !is UpdateState.Idle) return
+        val elapsed = System.currentTimeMillis() - prefs.getLong("lastCheck", 0)
+        if (!force && elapsed in 0 until CHECK_INTERVAL) {
+            if (s is UpdateState.Idle) savedRelease()?.let { _state.value = UpdateState.Available(it) }
+            return
+        }
         scope.launch { check() }
+    }
+
+    private fun savedRelease(): Release? {
+        val version = prefs.getString("version", null) ?: return null
+        if (!isNewer(version, currentVersion)) return null
+        return Release(version, prefs.getString("notes", "").orEmpty(), prefs.getString("apkUrl", null) ?: return null, prefs.getLong("size", 0))
     }
 
     private suspend fun check() {
         _state.value = UpdateState.Checking
         _state.value = try {
             val release = fetchLatest()
-            prefs.edit { putLong("lastCheck", System.currentTimeMillis()) }
+            prefs.edit {
+                putLong("lastCheck", System.currentTimeMillis())
+                if (release == null) {
+                    remove("version")
+                } else {
+                    putString("version", release.version)
+                    putString("notes", release.notes)
+                    putString("apkUrl", release.apkUrl)
+                    putLong("size", release.sizeBytes)
+                }
+            }
             if (release != null && isNewer(release.version, currentVersion)) UpdateState.Available(release) else UpdateState.UpToDate
         } catch (e: Exception) {
             UpdateState.Failed("Couldn't check for updates (${e.message ?: e.javaClass.simpleName})")
@@ -106,8 +130,12 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
         scope.launch {
             try {
                 val file = download(release)
-                _state.value = UpdateState.Installing(release)
+                val installing = UpdateState.Installing(release)
+                _state.value = installing
                 withContext(Dispatchers.IO) { installApk(file) }
+                // If Android silently blocks the confirmation, no result ever arrives; let the user try again.
+                delay(INSTALL_TIMEOUT)
+                if (_state.value === installing) _state.value = UpdateState.Available(release)
             } catch (e: Exception) {
                 _state.value = UpdateState.Failed("Update failed (${e.message ?: e.javaClass.simpleName})", release)
             }
@@ -167,7 +195,9 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
     }
 
     internal fun onInstallResult(status: Int, message: String?) {
-        val release = (_state.value as? UpdateState.Installing)?.release
+        val s = _state.value
+        // Available too: a slow confirmation may have hit the install timeout before this result came in.
+        val release = (s as? UpdateState.Installing)?.release ?: (s as? UpdateState.Available)?.release
         if (status != PackageInstaller.STATUS_SUCCESS && status != PackageInstaller.STATUS_PENDING_USER_ACTION) {
             _state.value = if (status == PackageInstaller.STATUS_FAILURE_ABORTED && release != null) {
                 UpdateState.Available(release)
@@ -184,7 +214,8 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
     }
 
     companion object {
-        private const val CHECK_INTERVAL = 3 * 60 * 60 * 1000L
+        private const val CHECK_INTERVAL = 6 * 60 * 60 * 1000L
+        private const val INSTALL_TIMEOUT = 2 * 60 * 1000L
 
         /** True if dotted version [candidate] is greater than [current]. */
         fun isNewer(candidate: String, current: String): Boolean {

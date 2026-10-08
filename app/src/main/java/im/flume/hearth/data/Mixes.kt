@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.core.content.edit
 import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.playback.QueuePlanner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -27,15 +29,18 @@ class MixRepository(
     private val prefs = context.getSharedPreferences("mixes", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Safe to call from the main thread: storage and the CPU-heavy building run on background threads. */
     suspend fun today(online: Boolean): List<Mix> {
         val key = "v3:${session.credentials.value?.username}:${LocalDate.now()}"
-        if (prefs.getString("key", null) == key) {
+        val cached = withContext(Dispatchers.IO) {
+            if (prefs.getString("key", null) != key) return@withContext null
             runCatching { json.decodeFromString<List<Mix>>(prefs.getString("mixes", "[]")!!) }.getOrNull()
-                ?.takeIf { it.isNotEmpty() }?.let { return it }
         }
-        val mixes = build(Random(key.hashCode()), online)
+        cached?.takeIf { it.isNotEmpty() }?.let { return it }
+        // Groups and sorts the whole library; database and server calls inside switch threads themselves.
+        val mixes = withContext(Dispatchers.Default) { build(Random(key.hashCode()), online) }
         if (mixes.isNotEmpty()) {
-            prefs.edit { putString("key", key); putString("mixes", json.encodeToString(mixes)) }
+            withContext(Dispatchers.IO) { prefs.edit { putString("key", key); putString("mixes", json.encodeToString(mixes)) } }
         }
         return mixes
     }

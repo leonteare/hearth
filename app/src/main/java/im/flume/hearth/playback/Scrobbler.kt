@@ -4,8 +4,12 @@ import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.data.LibraryDao
 import im.flume.hearth.data.PendingScrobbleEntity
 import im.flume.hearth.data.PlayHistoryEntity
+import im.flume.hearth.api.SubsonicException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Reports plays to Navidrome so play counts and "Most played" stay accurate. A song counts once
@@ -47,16 +51,49 @@ class Scrobbler(
             scope.launch {
                 dao.insertHistory(PlayHistoryEntity(songId = id, albumId = album, playedAt = time))
                 dao.incrementPlayCount(id)
-                val ok = runCatching { api.scrobble(id, submission = true, timeMs = time) }.isSuccess
-                if (ok) flushPending() else dao.insertPendingScrobble(PendingScrobbleEntity(songId = id, time = time))
+                val error = runCatching { api.scrobble(id, submission = true, timeMs = time) }.exceptionOrNull()
+                when {
+                    error == null -> flushPending()
+                    !isRejected(error) -> dao.insertPendingScrobble(PendingScrobbleEntity(songId = id, time = time))
+                }
             }
         }
     }
 
-    suspend fun flushPending() {
+    /** Sends queued plays, oldest first. Stops at a network problem (try again later). */
+    suspend fun flushPending() = flushLock.withLock {
         for (p in dao.pendingScrobbles()) {
-            if (runCatching { api.scrobble(p.songId, submission = true, timeMs = p.time) }.isFailure) return
+            try {
+                api.scrobble(p.songId, submission = true, timeMs = p.time)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // One the server refuses (e.g. the song was deleted) must not block the rest forever.
+                if (!isRejected(e)) return@withLock
+            }
             dao.deletePendingScrobble(p.rowId)
+        }
+    }
+
+    companion object {
+        // A single lock across instances, so two flushes never send the same play twice.
+        private val flushLock = Mutex()
+
+        /** Subsonic auth codes: every scrobble would fail the same way, so keep them for later. */
+        private val AUTH_ERRORS = setOf(40, 41, 42, 43, 44, 50)
+
+        /**
+         * True when the server answered and refused this particular scrobble (a Subsonic error such as
+         * 70 "not found", or HTTP 404/410), so retrying it is pointless. Network failures, server
+         * errors and login problems are false: those plays are kept and sent later.
+         */
+        fun isRejected(e: Throwable): Boolean {
+            if (e !is SubsonicException) return false
+            return when (e.code) {
+                404, 410 -> true
+                in 0..99 -> e.code !in AUTH_ERRORS
+                else -> false
+            }
         }
     }
 }

@@ -10,7 +10,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.concurrent.atomic.AtomicReference
 
 const val EXTRA_MANUAL = "manual"
 const val EXTRA_ALBUM_ID = "albumId"
@@ -69,21 +75,55 @@ data class SavedQueue(
     val repeatMode: Int,
 )
 
+/**
+ * Saves the queue to queue.json. Writes go through a temp file and an atomic rename, and the previous
+ * good save is kept as queue.json.bak in case the main file is ever unreadable.
+ */
 class QueueStore(dir: File) {
     private val file = File(dir, "queue.json")
+    private val tmp = File(dir, "queue.json.tmp")
+    private val backup = File(dir, "queue.json.bak")
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun save(q: SavedQueue) = withContext(Dispatchers.IO) {
-        runCatching {
-            val tmp = File(file.parentFile, "queue.json.tmp")
-            tmp.writeText(json.encodeToString(SavedQueue.serializer(), q))
-            tmp.renameTo(file)
+    /** Records [q] as the newest snapshot. Call in order (e.g. on the main thread), then [flush]. */
+    fun offer(q: SavedQueue) = latest.set(q)
+
+    /** Writes the newest offered snapshot, if any. Older snapshots that were overtaken are never written. */
+    suspend fun flush() = withContext(Dispatchers.IO) {
+        lock.withLock {
+            val q = latest.getAndSet(null) ?: return@withLock
+            runCatching {
+                FileOutputStream(tmp).use { out ->
+                    out.write(json.encodeToString(SavedQueue.serializer(), q).toByteArray())
+                    out.fd.sync()
+                }
+                if (file.exists()) Files.move(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            }
         }
     }
 
-    suspend fun load(): SavedQueue? = withContext(Dispatchers.IO) {
-        runCatching { json.decodeFromString(SavedQueue.serializer(), file.readText()) }.getOrNull()
+    suspend fun save(q: SavedQueue) {
+        offer(q)
+        flush()
     }
 
-    fun clear() { file.delete() }
+    suspend fun load(): SavedQueue? = withContext(Dispatchers.IO) {
+        lock.withLock { read(file) ?: read(backup) }
+    }
+
+    private fun read(f: File): SavedQueue? =
+        runCatching { json.decodeFromString(SavedQueue.serializer(), f.readText()) }.getOrNull()
+
+    fun clear() {
+        latest.set(null)
+        file.delete()
+        backup.delete()
+    }
+
+    private companion object {
+        // Process-wide: the service and Settings each make their own QueueStore for the same file.
+        val lock = Mutex()
+        val latest = AtomicReference<SavedQueue?>(null)
+    }
 }

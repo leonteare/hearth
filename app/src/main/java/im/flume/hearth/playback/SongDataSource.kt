@@ -13,6 +13,8 @@ import java.io.IOException
  * Resolves `hearth://song/{id}` at the moment a song starts loading: a downloaded file if there is
  * one, otherwise the (cached) stream at the bitrate that fits the current connection. Resolving late
  * means queued songs pick up downloads and quality changes made after they were queued.
+ * [streamTarget] must return the same bitrate for every open() of a song while it plays (retries
+ * resume at a byte offset), which PlaybackService ensures by pinning it per song.
  */
 @UnstableApi
 class SongDataSource(

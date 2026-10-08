@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -48,6 +49,13 @@ class LibrarySync(
         _state.value = SyncState.Running(0)
         try {
             val songs = fetchAllSongs()
+            // A server that rescanned with its music folder missing returns (almost) nothing; replacing
+            // the library with that would make every download and offline song disappear.
+            val localCount = db.library().songCount().first()
+            if (!looksComplete(songs.size, localCount)) {
+                _state.value = SyncState.Failed(SHRUNK_MESSAGE)
+                return@withLock
+            }
             val albums = pageAll { offset -> api.albumList("alphabeticalByName", PAGE, offset) }
             val artists = api.artists()
             val playlists = api.playlists()
@@ -107,5 +115,16 @@ class LibrarySync(
         const val PAGE = 500
         private const val SCHEMA = 3
         private const val SIX_HOURS = 6 * 60 * 60 * 1000L
+        const val SHRUNK_MESSAGE = "The server returned almost no songs, so the library wasn't changed"
+
+        /**
+         * False when the server's song list is suspiciously small: empty, or under half of a sizeable
+         * local library. Small libraries may legitimately shrink a lot, so only the empty case applies there.
+         */
+        fun looksComplete(remoteCount: Int, localCount: Int): Boolean = when {
+            remoteCount == 0 -> localCount == 0
+            localCount > 200 -> remoteCount * 2 >= localCount
+            else -> true
+        }
     }
 }

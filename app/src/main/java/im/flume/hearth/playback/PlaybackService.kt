@@ -10,6 +10,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.FileDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
@@ -35,14 +36,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import im.flume.hearth.crashLoggingHandler
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 @UnstableApi
 class PlaybackService : MediaSessionService() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val c by lazy { container }
+    private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + crashLoggingHandler(this, "playback")) }
 
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
@@ -62,7 +67,13 @@ class PlaybackService : MediaSessionService() {
     /** Epoch ms when playback will pause, [SLEEP_END_OF_SONG], or 0 for no timer. */
     private var sleepAt = 0L
     private var consecutiveErrors = 0
+    private var recoveryJob: Job? = null
+    private var recoveryAttempts = 0
     private var ticker: Job? = null
+    /** Song whose "now playing" and prefetch wait until playback actually starts (e.g. a restored queue). */
+    private var startPending: MediaItem? = null
+    /** Bitrate each song's stream was first opened at, so reconnects resume the same encoding. */
+    private val pinnedBitrates = ConcurrentHashMap<String, Int>()
 
     override fun onCreate() {
         super.onCreate()
@@ -186,8 +197,12 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun streamTarget(id: String): SongDataSource.StreamTarget? {
-        val s = c.session.settings.value
-        val bitrate = if (c.network.isMetered()) s.mobileBitrate else s.wifiBitrate
+        // A reconnect continues at a byte offset, which is only valid in the same encoding: never switch
+        // bitrate mid-song (e.g. Wi-Fi to mobile), and keep the choice for prefetched upcoming songs too.
+        val bitrate = pinnedBitrates.computeIfAbsent(id) {
+            val s = c.session.settings.value
+            if (c.network.isMetered()) s.mobileBitrate else s.wifiBitrate
+        }
         return c.api.streamUrl(id, bitrate)?.let { SongDataSource.StreamTarget(it, "$id@$bitrate") }
     }
 
@@ -210,6 +225,22 @@ class PlaybackService : MediaSessionService() {
                 if (!isActive) break
             }
         }
+    }
+
+    private fun onTrackStarted(item: MediaItem) {
+        prefetchUpcoming()
+        scrobbler.onTrackStarted(
+            item.mediaId,
+            item.mediaMetadata.extras?.getString(EXTRA_ALBUM_ID),
+            item.mediaMetadata.durationMs ?: 0L,
+        )
+    }
+
+    /** Forgets pinned bitrates except for the current song and the few prefetched after it. */
+    private fun unpinPassedSongs() {
+        val cur = player.currentMediaItemIndex
+        val keep = (cur..minOf(player.mediaItemCount - 1, cur + PREFETCH_COUNT)).mapTo(HashSet()) { player.getMediaItemAt(it).mediaId }
+        pinnedBitrates.keys.retainAll(keep)
     }
 
     /** [ms] > 0: pause after that long; [SLEEP_END_OF_SONG]: pause when this song ends; 0: cancel. */
@@ -317,8 +348,8 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun saveQueue() {
-        val snap = snapshot() ?: return
-        c.appScope.launch { store.save(snap) }
+        store.offer(snapshot() ?: return)
+        c.appScope.launch { store.flush() }
     }
 
     private fun saveQueueBlocking() {
@@ -437,12 +468,14 @@ class PlaybackService : MediaSessionService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem ?: return
             applyVolumeLevelling()
-            prefetchUpcoming()
-            scrobbler.onTrackStarted(
-                mediaItem.mediaId,
-                mediaItem.mediaMetadata.extras?.getString(EXTRA_ALBUM_ID),
-                mediaItem.mediaMetadata.durationMs ?: 0L,
-            )
+            unpinPassedSongs()
+            // A queue restored (or skipped through) while paused isn't "now playing" yet, and shouldn't use data.
+            if (player.playWhenReady) {
+                startPending = null
+                onTrackStarted(mediaItem)
+            } else {
+                startPending = mediaItem
+            }
             scope.launch {
                 refill()
                 saveQueue()
@@ -453,6 +486,10 @@ class PlaybackService : MediaSessionService() {
             ticker?.cancel()
             if (isPlaying) {
                 consecutiveErrors = 0
+                startPending?.let { pending ->
+                    startPending = null
+                    if (pending.mediaId == player.currentMediaItem?.mediaId) onTrackStarted(pending)
+                }
                 ticker = scope.launch {
                     var lastSave = System.currentTimeMillis()
                     while (isActive) {
@@ -477,19 +514,58 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_READY) recoveryAttempts = 0
+        }
+
         override fun onRepeatModeChanged(repeatMode: Int) {
             scope.launch { refill() }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            consecutiveErrors++
-            if (error.errorCode in NETWORK_ERRORS) c.network.reportServerFailure()
-            // Skip songs that won't load, but don't spin through the whole queue if the server is gone.
-            if (consecutiveErrors < 3 && player.hasNextMediaItem()) {
-                player.seekToNextMediaItem()
-                player.prepare()
-                player.play()
+            val action = PlaybackErrors.classify(error.errorCode, httpStatus(error))
+            if (action == ErrorAction.SKIP) {
+                consecutiveErrors++
+                // Skip songs that won't load, but don't spin through the whole queue if they're all broken.
+                if (consecutiveErrors < 3 && player.hasNextMediaItem()) {
+                    player.seekToNextMediaItem()
+                    player.prepare()
+                    player.play()
+                }
+                return
             }
+            // A connection problem isn't the song's fault: keep it and the position, and pick up again later.
+            if (action == ErrorAction.WAIT_FOR_CONNECTION) c.network.reportServerFailure()
+            val wasPlaying = player.playWhenReady
+            player.pause()
+            scheduleRecovery(wasPlaying, waitForConnection = action == ErrorAction.WAIT_FOR_CONNECTION)
+        }
+    }
+
+    private fun httpStatus(error: PlaybackException): Int? =
+        generateSequence(error.cause) { it.cause }
+            .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+            .firstOrNull()?.responseCode
+
+    /**
+     * Re-prepares the player after a network failure: once the server is reachable again, or after a
+     * short backoff for other temporary errors. Gives up quietly (staying paused) after a few tries.
+     */
+    private fun scheduleRecovery(wasPlaying: Boolean, waitForConnection: Boolean) {
+        recoveryJob?.cancel()
+        val attempt = recoveryAttempts++
+        if (attempt >= MAX_RECOVERY_ATTEMPTS) return
+        recoveryJob = scope.launch {
+            // Back off if retrying keeps failing, so a half-working server isn't hammered.
+            if (attempt > 0 || !waitForConnection) delay(minOf(60_000L, 3_000L shl attempt))
+            while (!c.network.isOnline.value) {
+                // The monitor only re-pings every few minutes while it thinks the server is fine.
+                c.network.checkServer()
+                withTimeoutOrNull(15_000) { c.network.isOnline.first { it } }
+            }
+            if (player.playerError == null || player.mediaItemCount == 0) return@launch
+            player.prepare()
+            if (wasPlaying) player.play()
         }
     }
 
@@ -513,11 +589,6 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_PENDING_COUNT = "pendingCount"
         private const val TICK_MS = 1000L
         private const val PREFETCH_COUNT = 3
-
-        private val NETWORK_ERRORS = setOf(
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
-        )
+        private const val MAX_RECOVERY_ATTEMPTS = 6
     }
 }

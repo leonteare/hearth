@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import im.flume.hearth.api.LyricLine
 import im.flume.hearth.api.SubsonicClient
+import im.flume.hearth.api.SubsonicException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -66,7 +67,8 @@ interface LyricsDao {
 
 /**
  * Lyrics from Navidrome (embedded tags or .lrc / .txt files next to the music), kept in Room so
- * they also work offline. "No lyrics" is remembered for a week so we don't keep asking.
+ * they also work offline. A confirmed "no lyrics" is remembered for a week so we don't keep asking;
+ * a failed request isn't remembered at all.
  */
 class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsDao) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -91,17 +93,29 @@ class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsD
         runCatching { fetch(song) }.getOrNull()?.let { store(song.id, it) }
     }
 
+    /**
+     * Throws when the server couldn't be asked properly (network, server error), so nothing gets
+     * cached and the next look tries again. Only a clear "no lyrics" answer comes back as empty.
+     */
     private suspend fun fetch(song: SongEntity): Lyrics {
-        val structured = runCatching { api.lyricsBySongId(song.id) }.getOrDefault(emptyList())
+        val structured = answeredOrNull { api.lyricsBySongId(song.id) }.orEmpty()
             .filter { l -> l.line.any { it.value.isNotBlank() } }
         val best = structured.firstOrNull { it.synced } ?: structured.firstOrNull()
         if (best != null) {
             val lines = if (best.synced) best.line.map { it.copy(start = it.start?.plus(best.offset)) } else best.line
             return Lyrics(best.synced, lines)
         }
-        val plain = runCatching { api.lyricsByName(song.artist, song.title) }.getOrNull()
+        val plain = answeredOrNull { api.lyricsByName(song.artist, song.title) }
         return Lyrics(false, plain?.lines()?.map { LyricLine(null, it) }.orEmpty())
     }
+
+    /** Null when the server answered with an API error or 404 (e.g. it lacks that call); rethrows anything else. */
+    private suspend fun <T> answeredOrNull(call: suspend () -> T): T? =
+        try {
+            call()
+        } catch (e: SubsonicException) {
+            if (e.code in 0..99 || e.code == 404) null else throw e
+        }
 
     private suspend fun store(songId: String, lyrics: Lyrics) {
         dao.put(LyricsEntity(songId, json.encodeToString(Lyrics.serializer(), lyrics), System.currentTimeMillis()))

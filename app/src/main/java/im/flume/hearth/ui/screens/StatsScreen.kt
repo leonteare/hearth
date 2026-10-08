@@ -53,6 +53,8 @@ import im.flume.hearth.ui.theme.Accent
 import im.flume.hearth.ui.theme.AccentDeep
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -62,7 +64,9 @@ private fun rememberStats(period: StatsPeriod): Stats? {
     var stats by remember(period) { mutableStateOf<Stats?>(null) }
     LaunchedEffect(period) {
         val r = period.range
-        stats = StatsCalculator.summarize(c.db.library().history(r.first, r.last + 1))
+        val rows = c.db.library().history(r.first, r.last + 1)
+        // A year can be thousands of plays; keep the grouping off the main thread.
+        stats = withContext(Dispatchers.Default) { StatsCalculator.summarize(rows) }
     }
     return stats
 }
