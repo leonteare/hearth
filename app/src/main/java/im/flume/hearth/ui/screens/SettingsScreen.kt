@@ -58,9 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.work.WorkManager
 import im.flume.hearth.container
-import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.playback.QueueStore
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.formatBytes
@@ -131,7 +129,7 @@ fun GeneralSettings() {
         Section("Account")
         Info("Signed in as", creds?.username.orEmpty())
         Info("Server", creds?.serverUrl.orEmpty())
-        Clickable("Sign out", "Removes downloads and the library index from this phone", color = Destructive) {
+        Clickable("Sign out", "Your downloads stay on this phone", color = Destructive) {
             confirmLogout = true
         }
 
@@ -182,18 +180,20 @@ fun GeneralSettings() {
         AlertDialog(
             onDismissRequest = { confirmLogout = false },
             title = { Text("Sign out?") },
-            text = { Text("Downloaded music on this phone will be deleted.") },
+            text = { Text("Your downloads stay on this phone, ready for when you sign in again. Anything still waiting to download carries on after you sign back in.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLogout = false
                     c.player.stopAndClear()
                     c.appScope.launch {
-                        WorkManager.getInstance(context).cancelUniqueWork(DownloadRepository.WORK_NAME)
-                        c.db.clearAllTables()
-                        c.downloads.dir.listFiles()?.forEach { it.delete() }
+                        // Downloads, pins, lyrics, play history and the library index are kept: signing out
+                        // is usually an accident, and signing back in should find everything still there.
+                        // Wait for the download worker to stop before the login it uses goes away.
+                        c.downloads.stopWorker()
                         QueueStore(context.filesDir).clear()
                         c.nativeApi.forgetSession()
                         c.session.logout()
+                        c.downloads.reset()
                     }
                 }) { Text("Sign out", color = Destructive) }
             },
@@ -208,12 +208,21 @@ fun StorageSettings() {
     val scope = rememberCoroutineScope()
     val settings by c.session.settings.collectAsStateWithLifecycle()
     val downloadedBytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    val counts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+    val actions = LocalActions.current
     var cacheCleared by remember { mutableStateOf(false) }
     var confirmRemoveAll by remember { mutableStateOf(false) }
 
     SettingsPage("Storage") {
         Section("Downloads")
-        Info("Space used", formatBytes(downloadedBytes))
+        Clickable(
+            "Downloads",
+            listOfNotNull(
+                "${formatBytes(downloadedBytes)} used",
+                "${counts.left} left to download".takeIf { counts.left > 0 },
+                "${counts.failed} couldn't download".takeIf { counts.failed > 0 },
+            ).joinToString(" · "),
+        ) { actions.open("downloads") }
         Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } }
         Choice("Downloads at once", settings.parallelDownloads, PARALLEL) { v ->
             c.session.updateSettings { it.copy(parallelDownloads = v) }

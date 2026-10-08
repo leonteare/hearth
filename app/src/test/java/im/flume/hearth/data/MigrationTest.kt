@@ -40,4 +40,19 @@ class MigrationTest {
         }
         assertEquals(after - before.keys, added)
     }
+
+    @Test
+    fun `migration 4 to 5 matches the exported schema`() {
+        val before = columns(createSql(4, "downloads"))
+        val after = columns(createSql(5, "downloads"))
+        val prefix = "ALTER TABLE downloads ADD COLUMN "
+        val added = AppDatabase.MIGRATION_4_5_SQL.filter { it.startsWith(prefix) }.associate { stmt ->
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ") to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        // Room's createSql uses a TABLE_NAME placeholder; the migration creates the table under its real name.
+        val prefs = createSql(5, "song_download_prefs").replace("`\${TABLE_NAME}`", "`song_download_prefs`")
+        assertTrue(AppDatabase.MIGRATION_4_5_SQL.contains(prefs))
+    }
 }

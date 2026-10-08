@@ -28,8 +28,25 @@ class LibrarySync(
     private val api: SubsonicClient,
     private val db: AppDatabase,
     private val session: SessionStore,
-    private val onPlaylistsSynced: suspend () -> Unit = {},
+    /**
+     * Called after playlists (or the whole library) changed. [removedPlaylists] maps playlists the
+     * server no longer has to the songs they held; [complete] is true after a full sync that passed
+     * [looksComplete], when anything missing from the library really is gone from the server.
+     */
+    private val onSynced: suspend (removedPlaylists: Map<String, List<String>>, complete: Boolean) -> Unit = { _, _ -> },
 ) {
+    /**
+     * Songs of playlists about to be dropped, for un-downloading them. Only the signed-in user's own
+     * playlists count: someone else's can vanish just because a different account signed in, and
+     * their downloads must stay.
+     */
+    private suspend fun songsOf(playlistIds: Collection<String>): Map<String, List<String>> {
+        val me = session.credentials.value?.username ?: return emptyMap()
+        return playlistIds
+            .filter { id -> db.library().playlistOnce(id)?.owner.equals(me, ignoreCase = true) }
+            .associateWith { id -> db.library().playlistSongsOnce(id).map { it.id } }
+    }
+
     private val mutex = Mutex()
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state.asStateFlow()
@@ -78,8 +95,9 @@ class LibrarySync(
                 changed[pl.id] = songs.entry.mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
             }
             val removed = local.keys - remote.mapTo(HashSet()) { it.id }
+            val removedSongs = songsOf(removed)
             db.library().applyPlaylists(entities, changed, removed.toList())
-            if (changed.isNotEmpty() || removed.isNotEmpty()) onPlaylistsSynced()
+            if (changed.isNotEmpty() || removed.isNotEmpty()) onSynced(removedSongs, false)
         }
     }
 
@@ -105,6 +123,8 @@ class LibrarySync(
             val playlistSongs = playlists.flatMap { pl ->
                 api.playlist(pl.id)?.entry.orEmpty().mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
             }
+            val remoteIds = playlists.mapTo(HashSet()) { it.id }
+            val removedSongs = songsOf(db.library().playlistsOnce().map { it.id }.filter { it !in remoteIds })
             db.library().replaceLibrary(
                 songs = songs.map { it.toEntity() },
                 albums = albums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
@@ -115,7 +135,7 @@ class LibrarySync(
             session.lastSyncAt = System.currentTimeMillis()
             session.syncedSchema = SCHEMA
             if (lastScan != null) session.lastScan = lastScan
-            onPlaylistsSynced()
+            onSynced(removedSongs, true)
             _state.value = SyncState.Idle
         } catch (e: CancellationException) {
             _state.value = SyncState.Idle

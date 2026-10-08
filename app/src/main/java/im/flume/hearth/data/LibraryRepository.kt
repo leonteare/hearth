@@ -95,7 +95,7 @@ class LibraryRepository(
         dao.setStarred(songId, starred)
         runCatching { if (starred) api.star(songId) else api.unstar(songId) }
             .onFailure { dao.setStarred(songId, !starred); throw it }
-        if (starred) downloads.refreshPinned()
+        if (starred) downloads.onLiked(songId)
     }
 
     /** Saves an album to (or removes it from) Your Library. Updates the row first; reverts and throws on failure. */

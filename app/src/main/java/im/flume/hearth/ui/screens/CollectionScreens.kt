@@ -177,6 +177,38 @@ fun CollectionScreen(
             dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("Keep downloading") } },
         )
     }
+    // Removing a finished download always asks first, saying how much goes.
+    var confirmRemove by remember { mutableStateOf(false) }
+    var removal by remember { mutableStateOf<DownloadRepository.RemovalPlan?>(null) }
+    LaunchedEffect(confirmRemove) {
+        removal = null
+        if (confirmRemove) removal = c.downloads.removalPlan(pin?.kind, pin?.id, songs.map { it.id })
+    }
+    if (confirmRemove) {
+        val plan = removal
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text("Remove downloads?") },
+            text = {
+                Text(
+                    when {
+                        plan == null -> "Checking…"
+                        plan.songIds.isEmpty() -> "Nothing will be deleted: your other downloads or Liked Songs need all of these songs."
+                        else -> "${plural(plan.songIds.size, "song")}, ${formatBytes(plan.bytes)} will be removed from this phone. " +
+                            "Songs other downloads or Liked Songs need are kept."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = plan != null, onClick = {
+                    confirmRemove = false
+                    if (pin != null) c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
+                    else plan?.let { actions.removeDownload(it.songIds) }
+                }) { Text("Remove", color = Destructive) }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Cancel") } },
+        )
+    }
     val totalSec = remember(songs) { songs.sumOf { it.durationSec.toLong() } }
 
     // Stable row keys: the song id, plus a count for repeats (a playlist can hold a song twice).
@@ -226,14 +258,14 @@ fun CollectionScreen(
                     ) {
                         when {
                             anyDownloading -> confirmCancel = true
-                            pin != null && (isPinned || allDownloaded) -> c.downloads.unpinAndRemove(pin.kind, pin.id, songs.map { it.id })
+                            pin != null && (isPinned || allDownloaded) -> confirmRemove = true
                             pin != null -> {
                                 usage.track(im.flume.hearth.data.Usage.DOWNLOAD)
                                 c.downloads.pinAndDownload(pin.kind, pin.id, songs)
                                 // Keeping an album offline means you want it; removing the download doesn't unsave it.
                                 if (saved == false) onSavedChange(true)
                             }
-                            allDownloaded -> actions.removeDownload(songs.map { it.id })
+                            allDownloaded -> confirmRemove = true
                             else -> actions.download(songs)
                         }
                     }
@@ -626,8 +658,10 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                     // back is tied to the screen (this menu vanishes once the playlist row is deleted).
                     screenScope.launch {
                         val ok = c.appScope.async {
+                            // Read the songs first: deleting the playlist drops them, and its downloads would stay forever.
+                            val songIds = c.db.library().playlistSongsOnce(id).map { it.id }
                             runCatching { c.library.deletePlaylist(id) }
-                                .onSuccess { c.downloads.unpinAndRemove(DownloadRepository.KIND_PLAYLIST, id, emptyList()) }
+                                .onSuccess { c.downloads.unpinAndRemove(DownloadRepository.KIND_PLAYLIST, id, songIds) }
                                 .isSuccess
                         }.await()
                         if (ok) back?.onBackPressed() else actions.showMessage("Couldn't delete the playlist (offline?)")
@@ -823,149 +857,6 @@ fun LikedScreen() {
             { EmptyState(Icons.Default.FavoriteBorder, "Songs you like show up here. Tap the heart on any song to add it.") }
         } else null,
     )
-}
-
-@Composable
-fun DownloadsScreen() {
-    val c = LocalContext.current.container
-    val songs by remember { c.db.library().downloadedSongs() }.collectAsStateWithLifecycle(emptyList())
-    val pending by remember { c.db.library().pendingDownloadSongs() }.collectAsStateWithLifecycle(emptyList())
-    val bytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
-    // Download progress is deliberately not read here: it ticks every 256 KB, and reading it at this
-    // level would recompose the whole screen each time. Each queued row collects its own.
-    val settings by c.session.settings.collectAsStateWithLifecycle()
-    val onWifi by c.network.wifi.collectAsStateWithLifecycle()
-    val states = LocalRowContext.current.downloads
-    val (queued, failed) = remember(pending, states) { pending.partition { states[it.id] != DownloadState.FAILED } }
-    val userPaused = settings.downloadsPaused
-    val waitingForWifi = queued.isNotEmpty() && settings.wifiOnlyDownloads && !onWifi
-    val lastError by c.downloads.lastError.collectAsStateWithLifecycle()
-    val backingOff by c.downloads.backingOff.collectAsStateWithLifecycle()
-    val storageFull by c.downloads.storageFull.collectAsStateWithLifecycle()
-    var confirmRemoveAll by remember { mutableStateOf(false) }
-
-    if (confirmRemoveAll) {
-        AlertDialog(
-            onDismissRequest = { confirmRemoveAll = false },
-            title = { Text("Remove all downloads?") },
-            text = { Text("Everything downloaded to this phone will be deleted. You can download it again later.") },
-            confirmButton = {
-                TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
-                    Text("Remove", color = Destructive)
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },
-        )
-    }
-
-    CollectionScreen(
-        title = "Downloads",
-        subtitle = formatBytes(bytes),
-        cover = null,
-        songs = songs,
-        source = PlaySource.Downloads,
-        headerIcon = { size -> BigIcon(Icons.Default.DownloadDone, DownloadsColor, size) },
-        topContent = {
-            if (queued.isNotEmpty()) {
-                item(key = "q-head") {
-                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            when {
-                                userPaused -> "Paused"
-                                storageFull -> "Stopped"
-                                else -> "Downloading"
-                            } + " · ${queued.size} left",
-                            style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f),
-                        )
-                        if (userPaused) {
-                            TextButton(onClick = { c.downloads.resume() }) { Text("Resume") }
-                        } else if (!storageFull) {
-                            TextButton(onClick = { c.downloads.pause() }) { Text("Pause") }
-                        }
-                        TextButton(onClick = { c.downloads.cancelPending() }) { Text("Cancel all", color = TextSecondary) }
-                    }
-                    when {
-                        userPaused -> {}
-                        storageFull -> Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Phone storage is full. Free up some space, then try again.",
-                                color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
-                        }
-                        waitingForWifi -> Text(
-                            "Waiting for Wi-Fi. Turn off \"Download on Wi-Fi only\" in Settings → Storage to use mobile data.",
-                            color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                        backingOff -> Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                lastError ?: "Server busy, trying again shortly",
-                                color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now") }
-                        }
-                    }
-                }
-                items(queued.take(50), key = { "q:${it.id}" }) { song -> QueuedSongRow(song, Modifier.animateItem()) }
-                if (queued.size > 50) {
-                    item(key = "q-more") { Text("+ ${queued.size - 50} more waiting", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
-                }
-            }
-            if (failed.isNotEmpty()) {
-                item(key = "f-head") {
-                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("${failed.size} couldn't download", style = MaterialTheme.typography.titleMedium)
-                            // Storage and backoff messages are already shown above.
-                            if (!storageFull && !backingOff) {
-                                lastError?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium) }
-                            }
-                        }
-                        if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry") }
-                    }
-                }
-            }
-            if (songs.isNotEmpty() && (queued.isNotEmpty() || failed.isNotEmpty())) {
-                item(key = "d-head") { SectionHeader("Downloaded") }
-            }
-        },
-        extraContent = {
-            if (songs.isNotEmpty()) {
-                item {
-                    TextButton(onClick = { confirmRemoveAll = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text("Remove all downloads", color = Destructive)
-                    }
-                }
-            } else if (pending.isEmpty()) {
-                item {
-                    EmptyState(Icons.Outlined.ArrowCircleDown, "Nothing downloaded yet. Tap the download icon on an album or playlist to keep it on your phone.")
-                }
-            }
-        },
-    )
-}
-
-/** A song waiting to download, with a progress bar while it's on its way. Collects only its own progress. */
-@Composable
-private fun QueuedSongRow(song: SongEntity, modifier: Modifier = Modifier) {
-    val c = LocalContext.current.container
-    // null when not downloading; 0 when the size isn't known yet.
-    val progress by remember(song.id) {
-        c.downloads.progress.map { if (song.id in it) it[song.id] ?: 0f else null }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(null)
-    Column(modifier) {
-        SongRow(song, onClick = {})
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
-                trackColor = TextSecondary.copy(alpha = 0.25f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-        }
-    }
 }
 
 @Composable
