@@ -608,7 +608,7 @@ private fun BreakDots(active: Boolean, progress: Float, modifier: Modifier = Mod
 }
 
 @Composable
-fun QueueScreen() {
+fun QueueScreen(onBack: (() -> Unit)? = null) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val player = c.player
@@ -675,7 +675,7 @@ fun QueueScreen() {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Queue")
+        TopBar("Queue", onBack = onBack)
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (history.isNotEmpty()) {
                 item(key = "h-prev") { Box(Modifier.animateItem()) { QueueHeader("Previously played", 0.6f) } }

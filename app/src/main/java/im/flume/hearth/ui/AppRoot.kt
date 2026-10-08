@@ -79,6 +79,7 @@ import im.flume.hearth.ui.components.Actions
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.LocalRowContext
 import im.flume.hearth.ui.components.PlaylistPickerDialog
+import im.flume.hearth.ui.components.NewPlaylistDialog
 import im.flume.hearth.ui.components.RowContext
 import im.flume.hearth.ui.screens.AlbumScreen
 import im.flume.hearth.ui.screens.ArtistScreen
@@ -197,19 +198,34 @@ private class AppActions(
             c.downloads.download(c.library.songsByIds(songIds))
         }
     }
-    override fun openAlbum(id: String) = nav.navigate("album/${Uri.encode(id)}")
-    override fun openArtist(id: String) = nav.navigate("artist/${Uri.encode(id)}")
-    override fun openPlaylist(id: String) = nav.navigate("playlist/${Uri.encode(id)}")
-    override fun openGenre(name: String) = nav.navigate("genre/${Uri.encode(name)}")
+    override fun openAlbum(id: String) { closeOverlays(); nav.navigate("album/${Uri.encode(id)}") }
+    override fun openArtist(id: String) { closeOverlays(); nav.navigate("artist/${Uri.encode(id)}") }
+    override fun openPlaylist(id: String) { closeOverlays(); nav.navigate("playlist/${Uri.encode(id)}") }
+    override fun openGenre(name: String) { closeOverlays(); nav.navigate("genre/${Uri.encode(name)}") }
     override fun open(route: String) {
         when {
             route.startsWith("mix/") -> c.usage.track(im.flume.hearth.data.Usage.MIX)
             route.startsWith("stats/") -> c.usage.track(im.flume.hearth.data.Usage.STATS)
-            route == "queue" -> c.usage.track(im.flume.hearth.data.Usage.QUEUE)
         }
+        closeOverlays()
         nav.navigate(route)
     }
     override fun coverUrl(coverArt: String?, size: Int) = c.api.coverArtUrl(coverArt, size)
+
+    /** True while the "New playlist" name dialog (from Your Library) is open. */
+    val creatingPlaylist = mutableStateOf(false)
+    override fun newPlaylist() { creatingPlaylist.value = true }
+
+    /** Closes the player and queue overlays, so pages opened from them aren't hidden underneath. */
+    var closeOverlays: () -> Unit = {}
+
+    fun createEmptyPlaylist(name: String) {
+        creatingPlaylist.value = false
+        scope.launch {
+            val id = runCatching { c.library.createPlaylist(name, emptyList()) }.getOrNull()
+            if (id != null) openPlaylist(id) else snackbar.showSnackbar("Couldn't create the playlist (offline?)")
+        }
+    }
 
     /** Songs waiting for the "Add to playlist" picker, or null when it's closed. */
     val playlistPicker = mutableStateOf<List<String>?>(null)
@@ -283,6 +299,9 @@ fun AppRoot() {
     val actions = remember { AppActions(c, nav, scope, snackbar) }
     actions.haptics = LocalHapticFeedback.current
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
+    // The queue lives inside the player: back from the queue returns to Now Playing.
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    actions.closeOverlays = { queueOpen = false; nowPlayingOpen = false }
 
     val playerState by c.player.state.collectAsStateWithLifecycle()
     val online by c.network.isOnline.collectAsStateWithLifecycle()
@@ -359,12 +378,15 @@ fun AppRoot() {
                         screen("artist/{id}") { ArtistScreen(it.arguments!!.getString("id")!!) }
                         screen("playlist/{id}") { PlaylistScreen(it.arguments!!.getString("id")!!) }
                         screen("genre/{name}") { GenreScreen(it.arguments!!.getString("name")!!) }
-                        screen("queue") { QueueScreen() }
                         screen("mix/{index}") { MixScreen(it.arguments!!.getString("index")!!.toInt()) }
                         screen("stats/{key}") { StatsScreen(it.arguments!!.getString("key")!!) }
                         screen("playlist-edit/{id}") { PlaylistEditScreen(it.arguments!!.getString("id")!!) }
                     }
                 }
+            }
+
+            if (actions.creatingPlaylist.value) {
+                NewPlaylistDialog(onDismiss = { actions.creatingPlaylist.value = false }, onCreate = actions::createEmptyPlaylist)
             }
 
             actions.playlistPicker.value?.let { ids ->
@@ -381,12 +403,21 @@ fun AppRoot() {
                 enter = slideInVertically(tween(SLIDE_MS, easing = ease)) { it },
                 exit = slideOutVertically(tween(SLIDE_MS, easing = ease)) { it },
             ) {
-                BackHandler { nowPlayingOpen = false }
+                BackHandler(enabled = nowPlayingOpen && !queueOpen) { nowPlayingOpen = false }
                 NowPlayingScreen(
                     state = playerState,
                     onClose = { nowPlayingOpen = false },
-                    onOpenQueue = { nowPlayingOpen = false; actions.open("queue") },
+                    onOpenQueue = { c.usage.track(im.flume.hearth.data.Usage.QUEUE); queueOpen = true },
                 )
+            }
+
+            AnimatedVisibility(
+                visible = queueOpen && nowPlayingOpen && playerState.current != null,
+                enter = slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it },
+                exit = slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { it },
+            ) {
+                BackHandler(enabled = queueOpen) { queueOpen = false }
+                Box(Modifier.fillMaxSize().background(Background)) { QueueScreen(onBack = { queueOpen = false }) }
             }
         }
     }

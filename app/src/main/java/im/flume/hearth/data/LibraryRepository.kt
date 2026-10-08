@@ -155,9 +155,11 @@ class LibraryRepository(
         refreshPlaylist(playlistId)
     }
 
-    suspend fun createPlaylist(name: String, songIds: List<String>) {
-        val id = api.createPlaylist(name, songIds) ?: api.playlists().firstOrNull { it.name == name }?.id ?: return
+    /** Returns the new playlist's id, or null if the server didn't say. */
+    suspend fun createPlaylist(name: String, songIds: List<String>): String? {
+        val id = api.createPlaylist(name, songIds) ?: api.playlists().firstOrNull { it.name == name }?.id ?: return null
         refreshPlaylist(id)
+        return id
     }
 
     suspend fun renamePlaylist(playlistId: String, name: String) {

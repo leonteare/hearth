@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Person
@@ -408,6 +409,13 @@ fun LibraryScreen() {
             LazyColumn(Modifier.fillMaxSize()) {
                 when (tab) {
                     LibraryTab.PLAYLISTS -> {
+                        item {
+                            MediaRow(
+                                "New playlist", null,
+                                onClick = { actions.newPlaylist() },
+                                cover = { IconTile(Icons.Default.Add, SurfaceHigh) },
+                            )
+                        }
                         item {
                             MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(Icons.Default.Favorite, LikedColor) })
                         }

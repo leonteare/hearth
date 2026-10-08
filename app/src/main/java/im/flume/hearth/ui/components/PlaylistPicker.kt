@@ -16,11 +16,36 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.PlaylistRules
+
+/** Asks for a name for a new playlist, with the keyboard already up. */
+@Composable
+fun NewPlaylistDialog(onDismiss: () -> Unit, onCreate: (name: String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New playlist") },
+        text = {
+            OutlinedTextField(
+                value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text("Playlist name") },
+                modifier = Modifier.focusRequester(focus),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = { onCreate(name.trim()) }) { Text("Create") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
 
 /** Pick one of your own (or shared-with-you, can add) playlists, or create a new one, to add [songIds] to. */
 @Composable
@@ -35,20 +60,9 @@ fun PlaylistPickerDialog(
     // Yours, plus shared ones you can add to; view-only and others' playlists are left out.
     val mine = remember(all) { PlaylistRules.editable(all).map { it.playlist } }
     var creating by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
 
     if (creating) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("New playlist") },
-            text = {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, placeholder = { Text("Playlist name") })
-            },
-            confirmButton = {
-                TextButton(enabled = name.isNotBlank(), onClick = { onCreate(name.trim()) }) { Text("Create") }
-            },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        )
+        NewPlaylistDialog(onDismiss = onDismiss, onCreate = onCreate)
         return
     }
 
