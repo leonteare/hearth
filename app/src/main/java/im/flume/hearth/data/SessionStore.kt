@@ -104,12 +104,19 @@ class SessionStore(context: Context) {
         _credentials.value = c
     }
 
+    /**
+     * Forgets the login only. Settings (and downloads, elsewhere) are kept: on a two-person home
+     * server a sign-out is usually an accident, and signing back in should feel like nothing happened.
+     */
     fun logout() {
-        prefs.edit { clear() }
+        // Per-account state goes too, so whoever signs in next gets a fresh sync of their own stars and invites.
+        prefs.edit {
+            listOf("serverUrl", "username", "salt", "token", "lastSyncAt", "lastScan", "acceptedPlaylists", "declinedPlaylists")
+                .forEach(::remove)
+        }
         vault.clear()
         _playlistDecisions.value = emptyMap()
         _credentials.value = null
-        _settings.value = Settings()
     }
 
     private fun readSettings() = Settings(
