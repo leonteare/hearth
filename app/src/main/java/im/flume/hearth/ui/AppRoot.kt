@@ -29,6 +29,12 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.ui.theme.NoticeDot
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -235,9 +241,16 @@ private class AppActions(
             val result = runCatching {
                 if (playlistId == null) c.library.createPlaylist(name, songIds) else c.library.addToPlaylist(playlistId, songIds)
             }
+            val error = result.exceptionOrNull()
             snackbar.showSnackbar(
-                if (result.isSuccess) (if (playlistId == null) "Created \"$name\"" else "Added to \"$name\"")
-                else "Couldn't update the playlist (offline?)"
+                when {
+                    error == null -> if (playlistId == null) "Created \"$name\"" else "Added to \"$name\""
+                    else -> {
+                        val owner = playlistId?.let { c.library.dao.playlistOnce(it) }
+                            ?.let { PlaylistRules.access(it, c.session.credentials.value?.username).owner }
+                        PlaylistRules.editError(error, owner, "Couldn't update the playlist (offline?)")
+                    }
+                }
             )
         }
     }
@@ -279,6 +292,9 @@ fun AppRoot() {
     // The tab you're "in" is the last tab page on the back stack, even when deep inside an album.
     val backStack by nav.currentBackStack.collectAsStateWithLifecycle()
     val currentTab = backStack.lastOrNull { it.destination.route in TAB_ROUTES }?.destination?.route ?: "home"
+    // A red dot on Your Library while a playlist invite is waiting for an answer.
+    val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
+    val badged = if (PlaylistRules.pendingInvites(playlistItems).isNotEmpty()) "library" else null
 
     val onTabClick: (String) -> Unit = { dest ->
         if (dest == currentTab) {
@@ -300,7 +316,7 @@ fun AppRoot() {
     CompositionLocalProvider(LocalActions provides actions, LocalRowContext provides rowContext) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
-                if (landscape) SideRail(currentTab, onTabClick)
+                if (landscape) SideRail(currentTab, badged, onTabClick)
                 Scaffold(
                     modifier = if (landscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End)) else Modifier,
                     containerColor = Background,
@@ -309,7 +325,7 @@ fun AppRoot() {
                     bottomBar = {
                         Column(if (landscape) Modifier.navigationBarsPadding().padding(bottom = 8.dp) else Modifier) {
                             if (playerState.current != null) MiniPlayer(playerState, onOpen = { nowPlayingOpen = true })
-                            if (!landscape) BottomBar(currentTab, onTabClick)
+                            if (!landscape) BottomBar(currentTab, badged, onTabClick)
                         }
                     },
                 ) { padding ->
@@ -384,13 +400,21 @@ private fun NavGraphBuilder.screen(route: String, content: @Composable (NavBackS
 }
 
 @Composable
-private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
+private fun TabIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, dot: Boolean) {
+    if (!dot) return Icon(icon, contentDescription = null)
+    BadgedBox(badge = { Badge(containerColor = NoticeDot, modifier = Modifier.semantics { contentDescription = "New playlist invite" }) }) {
+        Icon(icon, contentDescription = null)
+    }
+}
+
+@Composable
+private fun BottomBar(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
     NavigationBar(containerColor = NavBarColor) {
         TABS.forEach { (dest, label, icon) ->
             NavigationBarItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { Icon(icon, contentDescription = null) },
+                icon = { TabIcon(icon, dest == badged) },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.White,
@@ -405,14 +429,14 @@ private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
 }
 
 @Composable
-private fun SideRail(currentTab: String, onTabClick: (String) -> Unit) {
+private fun SideRail(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
     NavigationRail(containerColor = NavBarColor) {
         Spacer(Modifier.weight(1f))
         TABS.forEach { (dest, label, icon) ->
             NavigationRailItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { Icon(icon, contentDescription = null) },
+                icon = { TabIcon(icon, dest == badged) },
                 label = { Text(label) },
                 colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = Color.White,

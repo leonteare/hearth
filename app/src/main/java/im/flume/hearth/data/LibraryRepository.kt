@@ -1,7 +1,10 @@
 package im.flume.hearth.data
 
 import android.os.Bundle
+import im.flume.hearth.api.NavidromeNativeApi
 import im.flume.hearth.api.SubsonicClient
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import im.flume.hearth.download.DownloadRepository
 
 /** Something the user can press play on. Converted to a Bundle to travel to the playback service. */
@@ -35,8 +38,21 @@ class LibraryRepository(
     private val db: AppDatabase,
     private val api: SubsonicClient,
     private val downloads: DownloadRepository,
+    private val session: SessionStore,
+    private val native: NavidromeNativeApi,
 ) {
     val dao = db.library()
+
+    /** Every playlist with what you may do with it; screens filter with [PlaylistRules]. */
+    val playlistItems: Flow<List<PlaylistItem>> =
+        combine(dao.playlists(), session.credentials, session.playlistDecisions) { all, creds, decisions ->
+            PlaylistRules.items(all, creds?.username, decisions)
+        }
+
+    fun playlistItem(id: String): Flow<PlaylistItem?> =
+        combine(dao.playlist(id), session.credentials, session.playlistDecisions) { p, creds, decisions ->
+            p?.let { PlaylistItem(it, PlaylistRules.access(it, creds?.username, decisions)) }
+        }
 
     /** Songs for [source] in their natural order. When [offlineOnly], keeps just downloaded songs. */
     suspend fun resolve(source: PlaySource, offlineOnly: Boolean): List<SongEntity> {
@@ -162,6 +178,44 @@ class LibraryRepository(
 
     suspend fun removeFromPlaylist(playlistId: String, index: Int) {
         api.removeFromPlaylist(playlistId, index)
+        refreshPlaylist(playlistId)
+    }
+
+    /**
+     * Changes who a playlist is shared with. Re-reads the comment first so a change made on the other
+     * phone a moment ago isn't overwritten, then writes it back with public on while anyone's invited.
+     */
+    suspend fun updateSharing(playlistId: String, change: (Sharing) -> Sharing) {
+        val pl = api.playlist(playlistId) ?: throw java.io.IOException("Playlist not found")
+        val parsed = PlaylistSharing.parse(pl.comment)
+        val current = parsed.sharing ?: Sharing()
+        val next = change(current.copy(owner = current.owner ?: pl.owner?.lowercase()))
+        api.setPlaylistComment(playlistId, PlaylistSharing.serialize(parsed.text, next), public = !next.isEmpty)
+        refreshPlaylist(playlistId)
+    }
+
+    /**
+     * Accepts or declines an invite (declining also covers leaving). The answer is kept on this phone
+     * first, so it sticks even if the server won't take it (e.g. the account isn't an admin).
+     * Returns false when only the local copy could be saved.
+     */
+    suspend fun answerInvite(playlistId: String, accept: Boolean): Boolean {
+        val me = session.credentials.value?.username ?: return false
+        session.setPlaylistDecision(playlistId, accept)
+        val saved = runCatching { updateSharing(playlistId) { if (accept) it.accept(me) else it.remove(me) } }.isSuccess
+        // Once the server has the answer the local copy isn't needed, so a later re-invite still shows up.
+        if (saved) session.setPlaylistDecision(playlistId, null)
+        return saved
+    }
+
+    suspend fun setPlaylistPhoto(playlistId: String, jpeg: ByteArray) {
+        native.uploadPlaylistImage(playlistId, jpeg)
+        // The cover id changes with the photo, so re-reading the playlist also refreshes cached covers.
+        refreshPlaylist(playlistId)
+    }
+
+    suspend fun removePlaylistPhoto(playlistId: String) {
+        native.removePlaylistImage(playlistId)
         refreshPlaylist(playlistId)
     }
 

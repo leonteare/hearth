@@ -37,6 +37,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import im.flume.hearth.ui.components.EmptyState
+import im.flume.hearth.data.PlaylistRules
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import im.flume.hearth.ui.components.LoadingPage
 import im.flume.hearth.ui.components.UnavailablePage
 import kotlinx.coroutines.async
@@ -445,24 +450,29 @@ fun MixScreen(index: Int) {
 
 @Composable
 fun PlaylistScreen(id: String) {
-    val dao = LocalContext.current.container.db.library()
-    val playlist by remember(id) { dao.playlist(id) }.collectAsStateWithLifecycle(null)
     val c = LocalContext.current.container
+    val dao = c.db.library()
+    val item by remember(id) { c.library.playlistItem(id) }.collectAsStateWithLifecycle(null)
+    val playlist = item?.playlist
+    val access = item?.access
     val actions = LocalActions.current
-    val me = c.session.credentials.collectAsStateWithLifecycle().value?.username
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
     val loadedSongs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(null)
     val songs = loadedSongs.orEmpty()
     val screenScope = androidx.compose.runtime.rememberCoroutineScope()
+    // Shared playlists change from the other phone; re-read on open so those edits show up right away.
+    val shared = access != null && (access.isShared || !access.isOwner)
+    LaunchedEffect(id, shared, online) { if (shared && online) runCatching { c.library.refreshPlaylist(id) } }
     CollectionScreen(
         title = playlist?.name.orEmpty(),
         // Only name the owner when it's someone else's playlist.
-        subtitle = playlist?.owner?.takeIf { !it.equals(me, ignoreCase = true) }.orEmpty(),
-        onRemoveSong = if (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true)) { index ->
+        subtitle = if (access == null || access.isOwner) "" else "by ${PlaylistRules.displayName(access.owner)}",
+        onRemoveSong = if (access?.canEdit == true) { index ->
             val before = songs.map { it.id }
             c.appScope.launch {
                 runCatching { c.library.removeFromPlaylist(id, index) }
                     .onSuccess { actions.showUndo("Removed from playlist") { c.library.setPlaylistSongs(id, before) } }
-                    .onFailure { actions.showMessage("Couldn't remove the song (offline?)") }
+                    .onFailure { actions.showMessage(PlaylistRules.editError(it, access.owner, "Couldn't remove the song (offline?)")) }
             }
         } else null,
         cover = playlist?.coverArt,
@@ -472,28 +482,87 @@ fun PlaylistScreen(id: String) {
         emptyState = if (loadedSongs?.isEmpty() == true) {
             { EmptyState(Icons.AutoMirrored.Filled.QueueMusic, "This playlist is empty. Add songs from any song's menu.") }
         } else null,
+        topContent = {
+            item?.takeIf { it.access.invite != null }?.let { pending -> item(key = "invite") { InviteBanner(pending) } }
+        },
         headerActions = {
-            if (playlist != null && (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true))) {
-                PlaylistMenu(id, playlist!!.name, playlist?.coverArt, screenScope)
-            }
+            val current = item
+            if (current != null && (current.access.canEdit || current.access.isMember)) PlaylistMenu(current, screenScope)
         },
     )
 }
 
+/** The playlist's ⋯ menu. What's in it depends on whether you own it, can add to it, or only listen. */
 @Composable
-private fun PlaylistMenu(id: String, name: String, coverArt: String?, screenScope: kotlinx.coroutines.CoroutineScope) {
+private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: kotlinx.coroutines.CoroutineScope) {
     val c = LocalContext.current.container
+    val context = LocalContext.current
     val actions = LocalActions.current
     val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val id = item.playlist.id
+    val name = item.playlist.name
+    val access = item.access
     var open by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    // A photo action waiting for the password dialog to finish.
+    var afterPassword by remember { mutableStateOf<(() -> Unit)?>(null) }
     var newName by remember(name) { mutableStateOf(name) }
+
+    fun withPassword(action: () -> Unit) {
+        if (c.session.vault.hasPassword) action() else afterPassword = action
+    }
+    fun photoChange(progress: String, done: String, change: suspend () -> Unit) {
+        c.appScope.launch {
+            actions.showMessage(progress)
+            runCatching { change() }
+                .onSuccess { actions.showMessage(done) }
+                .onFailure { e ->
+                    actions.showMessage(
+                        if (e is im.flume.hearth.api.SubsonicException) PlaylistRules.editError(e, access.owner, "Couldn't change the photo (offline?)")
+                        else photoError(e) { c.session.vault.clear(); c.nativeApi.forgetSession() }
+                    )
+                }
+        }
+    }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) withPassword {
+            photoChange("Uploading photo…", "Photo updated") {
+                c.library.setPlaylistPhoto(id, im.flume.hearth.data.PhotoPrep.jpeg(context, uri))
+            }
+        }
+    }
+
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
-    ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = coverArt, fallback = name) {
-        MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
-        MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
-        MenuItem("Delete playlist", Icons.Default.Delete, tint = Destructive, tintText = true) { open = false; deleting = true }
+    ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = item.playlist.coverArt, fallback = name) {
+        if (access.canEdit) {
+            MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
+            MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
+            MenuItem("Change photo", Icons.Default.AddPhotoAlternate) {
+                open = false
+                picker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+            // Navidrome doesn't say whether the photo is custom; removing an automatic one is harmless.
+            MenuItem("Remove photo", Icons.Default.HideImage) {
+                open = false
+                withPassword { photoChange("Removing photo…", "Photo removed") { c.library.removePlaylistPhoto(id) } }
+            }
+        }
+        if (access.isOwner) {
+            MenuItem("Share", Icons.Default.GroupAdd) { open = false; sharing = true }
+            MenuItem("Delete playlist", Icons.Default.Delete, tint = Destructive, tintText = true) { open = false; deleting = true }
+        }
+        if (access.isMember) {
+            MenuItem("Leave playlist", Icons.AutoMirrored.Filled.ExitToApp, tint = Destructive, tintText = true) { open = false; leaving = true }
+        }
+    }
+    if (sharing) ShareSheet(item) { sharing = false }
+    afterPassword?.let { action ->
+        PasswordDialog(onDismiss = { afterPassword = null }, onSaved = { afterPassword = null; action() })
     }
     if (renaming) {
         AlertDialog(
@@ -505,11 +574,28 @@ private fun PlaylistMenu(id: String, name: String, coverArt: String?, screenScop
                     renaming = false
                     c.appScope.launch {
                         runCatching { c.library.renamePlaylist(id, newName.trim()) }
-                            .onFailure { actions.showMessage("Couldn't rename the playlist (offline?)") }
+                            .onFailure { actions.showMessage(PlaylistRules.editError(it, access.owner, "Couldn't rename the playlist (offline?)")) }
                     }
                 }) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+        )
+    }
+    if (leaving) {
+        AlertDialog(
+            onDismissRequest = { leaving = false },
+            title = { Text("Leave \"$name\"?") },
+            text = { Text("It disappears from your library. ${PlaylistRules.displayName(access.owner)} can invite you again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    leaving = false
+                    screenScope.launch {
+                        c.appScope.async { c.library.answerInvite(id, accept = false) }.await()
+                        back?.onBackPressed()
+                    }
+                }) { Text("Leave", color = Destructive) }
+            },
+            dismissButton = { TextButton(onClick = { leaving = false }) { Text("Cancel") } },
         )
     }
     if (deleting) {
@@ -543,6 +629,7 @@ fun PlaylistEditScreen(id: String) {
     val c = LocalContext.current.container
     val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val original by remember(id) { c.db.library().playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
+    val owner = remember(id) { c.library.playlistItem(id) }.collectAsStateWithLifecycle(null).value?.access?.owner
     val actions = LocalActions.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
@@ -559,9 +646,10 @@ fun PlaylistEditScreen(id: String) {
                 saving = true
                 val ids = order.map { it.second.id }
                 scope.launch {
-                    val ok = c.appScope.async { runCatching { c.library.setPlaylistSongs(id, ids) }.isSuccess }.await()
+                    val error = c.appScope.async { runCatching { c.library.setPlaylistSongs(id, ids) }.exceptionOrNull() }.await()
                     saving = false
-                    if (ok) back?.onBackPressed() else actions.showMessage("Couldn't save the new order (offline?)")
+                    if (error == null) back?.onBackPressed()
+                    else actions.showMessage(PlaylistRules.editError(error, owner, "Couldn't save the new order (offline?)"))
                 }
             }) { Text(if (saving) "Saving…" else "Save") }
         }

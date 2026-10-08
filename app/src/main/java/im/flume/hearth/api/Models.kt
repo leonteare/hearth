@@ -29,7 +29,15 @@ data class SubsonicResponse(
     val similarSongs: SongList? = null,
     val similarSongs2: SongList? = null,
     val starred2: Starred2? = null,
+    val users: Users? = null,
+    val user: UserDto? = null,
 )
+
+@Serializable
+data class Users(val user: List<UserDto> = emptyList())
+
+@Serializable
+data class UserDto(val username: String = "", val adminRole: Boolean = false)
 
 @Serializable
 data class Starred2(
@@ -150,6 +158,8 @@ data class PlaylistDto(
     val coverArt: String? = null,
     val owner: String? = null,
     val changed: String? = null,
+    val comment: String? = null,
+    @SerialName("public") val isPublic: Boolean = false,
     val entry: List<SongDto> = emptyList(),
 )
 

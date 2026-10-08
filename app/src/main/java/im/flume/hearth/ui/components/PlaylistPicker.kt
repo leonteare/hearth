@@ -20,8 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
+import im.flume.hearth.data.PlaylistRules
 
-/** Pick one of your own playlists, or create a new one, to add [songIds] to. */
+/** Pick one of your own (or shared-with-you, can add) playlists, or create a new one, to add [songIds] to. */
 @Composable
 fun PlaylistPickerDialog(
     songIds: List<String>,
@@ -30,9 +31,9 @@ fun PlaylistPickerDialog(
     onCreate: (name: String) -> Unit,
 ) {
     val c = LocalContext.current.container
-    val me = c.session.credentials.collectAsStateWithLifecycle().value?.username
-    val all by remember { c.db.library().playlists() }.collectAsStateWithLifecycle(emptyList())
-    val mine = all.filter { it.owner == null || it.owner.equals(me, ignoreCase = true) }
+    val all by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
+    // Yours, plus shared ones you can add to; view-only and others' playlists are left out.
+    val mine = remember(all) { PlaylistRules.editable(all).map { it.playlist } }
     var creating by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
 

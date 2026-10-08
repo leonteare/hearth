@@ -31,9 +31,13 @@ data class Settings(
     val smartShuffle: Boolean = true,
 )
 
-/** Login and preferences. Lives in private app storage; only the Subsonic token is kept, never the password. */
+/**
+ * Login and preferences. Lives in private app storage; login uses the Subsonic token. The password is
+ * only kept (encrypted, in [vault]) if the user agrees to it for playlist photos.
+ */
 class SessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
+    val vault = PasswordVault(context)
 
     private val _credentials = MutableStateFlow(readCredentials())
     val credentials: StateFlow<Credentials?> = _credentials.asStateFlow()
@@ -59,6 +63,29 @@ class SessionStore(context: Context) {
         get() = prefs.getString("lastScan", null)
         set(v) = prefs.edit { putString("lastScan", v) }
 
+    private val _playlistDecisions = MutableStateFlow(readDecisions())
+
+    /**
+     * Playlist invites answered on this phone (id to true = accepted, false = declined or left). Only
+     * needed when the answer couldn't be written to the server, but always applied so the UI is instant.
+     */
+    val playlistDecisions: StateFlow<Map<String, Boolean>> = _playlistDecisions.asStateFlow()
+
+    private fun readDecisions(): Map<String, Boolean> =
+        prefs.getStringSet("acceptedPlaylists", emptySet()).orEmpty().associateWith { true } +
+            prefs.getStringSet("declinedPlaylists", emptySet()).orEmpty().associateWith { false }
+
+    fun setPlaylistDecision(playlistId: String, accepted: Boolean?) {
+        val next = _playlistDecisions.value.toMutableMap().apply {
+            if (accepted == null) remove(playlistId) else put(playlistId, accepted)
+        }
+        prefs.edit {
+            putStringSet("acceptedPlaylists", next.filterValues { it }.keys)
+            putStringSet("declinedPlaylists", next.filterValues { !it }.keys)
+        }
+        _playlistDecisions.value = next
+    }
+
     private fun readCredentials(): Credentials? {
         val url = prefs.getString("serverUrl", null) ?: return null
         val user = prefs.getString("username", null) ?: return null
@@ -79,6 +106,8 @@ class SessionStore(context: Context) {
 
     fun logout() {
         prefs.edit { clear() }
+        vault.clear()
+        _playlistDecisions.value = emptyMap()
         _credentials.value = null
         _settings.value = Settings()
     }

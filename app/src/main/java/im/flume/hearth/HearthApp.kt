@@ -93,7 +93,8 @@ class AppContainer(context: Context) {
     val api = SubsonicClient(http) { session.credentials.value }
     val network = NetworkMonitor(context, api, session, appScope)
     val downloads = DownloadRepository(context, db, session, appScope)
-    val library = LibraryRepository(db, api, downloads)
+    val nativeApi = im.flume.hearth.api.NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
+    val library = LibraryRepository(db, api, downloads, session, nativeApi)
     val lyrics = LyricsRepository(api, db.lyrics())
     val mixes = im.flume.hearth.data.MixRepository(context, db, api, session)
     val usage = im.flume.hearth.data.Usage(context)

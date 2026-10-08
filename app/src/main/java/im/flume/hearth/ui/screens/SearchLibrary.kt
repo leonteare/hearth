@@ -10,6 +10,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.text.style.TextAlign
 import im.flume.hearth.data.YourLibrary
+import im.flume.hearth.data.PlaylistItem
+import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.ui.theme.NoticeDot
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.flow.combine
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -344,7 +349,9 @@ fun LibraryScreen() {
     val dao = c.db.library()
     val actions = LocalActions.current
     var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
-    val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
+    val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
+    // Yours, ones you've joined, and invites waiting for an answer. Other people's playlists stay hidden.
+    val playlists = remember(playlistItems) { PlaylistRules.visible(playlistItems) }
     // Personal: saved albums, and artists you follow or saved an album by. The whole server is under Search.
     val albums by remember { dao.savedAlbums() }.collectAsStateWithLifecycle(emptyList())
     val artists by remember { combine(dao.artists(), dao.savedAlbums(), YourLibrary::artists) }.collectAsStateWithLifecycle(emptyList())
@@ -359,8 +366,8 @@ fun LibraryScreen() {
         LibraryTab.ALBUMS -> ALBUM_SORTS
     }
     val sortedPlaylists = when (sort) {
-        1 -> playlists.sortedByDescending { it.changed }
-        2 -> playlists.sortedByDescending { it.songCount }
+        1 -> playlists.sortedByDescending { it.playlist.changed }
+        2 -> playlists.sortedByDescending { it.playlist.songCount }
         else -> playlists
     }
     val sortedArtists = remember(artists, sort, tab) { if (tab == LibraryTab.ARTISTS) sortArtists(artists, sort) else artists }
@@ -407,9 +414,7 @@ fun LibraryScreen() {
                         item {
                             MediaRow("Downloads", null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
                         }
-                        items(sortedPlaylists, key = { it.id }) { p ->
-                            MediaRow(p.name, "Playlist • ${plural(p.songCount, "song")}", onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt)
-                        }
+                        items(sortedPlaylists, key = { it.playlist.id }) { item -> PlaylistListRow(item) }
                     }
                     LibraryTab.ARTISTS -> {
                         if (sortedArtists.isEmpty()) item {
@@ -443,6 +448,25 @@ fun LibraryScreen() {
             }
         }
     }
+}
+
+@Composable
+private fun PlaylistListRow(item: PlaylistItem) {
+    val actions = LocalActions.current
+    val p = item.playlist
+    val a = item.access
+    val owner = PlaylistRules.displayName(a.owner)
+    val subtitle = when {
+        a.invite != null -> "$owner invited you"
+        a.isOwner -> "Playlist • ${plural(p.songCount, "song")}"
+        else -> "Playlist • by $owner"
+    }
+    MediaRow(
+        p.name, subtitle, onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt,
+        trailing = if (a.invite != null) {
+            { Box(Modifier.padding(end = 12.dp).size(10.dp).clip(CircleShape).background(NoticeDot).semantics { contentDescription = "New invite" }) }
+        } else null,
+    )
 }
 
 @Composable

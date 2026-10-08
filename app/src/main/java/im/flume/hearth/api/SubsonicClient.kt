@@ -42,7 +42,10 @@ data class Credentials(
     }
 }
 
-class SubsonicException(val code: Int, message: String) : IOException(message)
+class SubsonicException(val code: Int, message: String) : IOException(message) {
+    /** Subsonic error 50: the user isn't allowed to do this (e.g. edit someone else's playlist). */
+    val notAuthorized: Boolean get() = code == 50
+}
 
 class SubsonicClient(
     private val http: OkHttpClient,
@@ -185,6 +188,18 @@ class SubsonicClient(
             songIds.forEach { addQueryParameter("songId", it) }
         }
     }
+
+    /** Sets the playlist's comment (where Hearth keeps sharing details) and whether others can see it. */
+    suspend fun setPlaylistComment(playlistId: String, comment: String, public: Boolean) {
+        call("updatePlaylist") {
+            addQueryParameter("playlistId", playlistId)
+            addQueryParameter("comment", comment)
+            addQueryParameter("public", public.toString())
+        }
+    }
+
+    /** Every account on the server. Admin only; others get an error. */
+    suspend fun users(): List<UserDto> = call("getUsers").users?.user.orEmpty()
 
     suspend fun deletePlaylist(playlistId: String) {
         call("deletePlaylist") { addQueryParameter("id", playlistId) }

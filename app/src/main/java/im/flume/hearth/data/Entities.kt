@@ -1,5 +1,6 @@
 package im.flume.hearth.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -69,6 +70,9 @@ data class PlaylistEntity(
     val coverArt: String?,
     val owner: String?,
     val changed: String?,
+    /** Navidrome comment; Hearth keeps its sharing details on the last line (see [PlaylistSharing]). */
+    val comment: String? = null,
+    @ColumnInfo(defaultValue = "0") val isPublic: Boolean = false,
 )
 
 @Entity(tableName = "playlist_songs", primaryKeys = ["playlistId", "position"])
@@ -150,4 +154,4 @@ fun AlbumDto.toEntity() = AlbumEntity(
 
 fun ArtistDto.toEntity() = ArtistEntity(id, name, albumCount, coverArt, starred != null)
 
-fun PlaylistDto.toEntity() = PlaylistEntity(id, name, songCount, duration, coverArt, owner, changed)
+fun PlaylistDto.toEntity() = PlaylistEntity(id, name, songCount, duration, coverArt, owner, changed, comment, isPublic)

@@ -168,6 +168,19 @@ interface LibraryDao {
     @Query("SELECT * FROM playlists WHERE id = :id")
     fun playlist(id: String): Flow<PlaylistEntity?>
 
+    @Query("SELECT * FROM playlists WHERE id = :id")
+    suspend fun playlistOnce(id: String): PlaylistEntity?
+
+    @Query("SELECT * FROM playlists") suspend fun playlistsOnce(): List<PlaylistEntity>
+
+    /** Brings the playlist list in line with the server: [changed] rows get their songs replaced, missing ones go. */
+    @Transaction
+    suspend fun applyPlaylists(all: List<PlaylistEntity>, changed: Map<String, List<PlaylistSongEntity>>, removed: List<String>) {
+        insertPlaylists(all)
+        changed.forEach { (id, songs) -> clearPlaylistSongs(id); insertPlaylistSongs(songs) }
+        removed.forEach { clearPlaylistSongs(it); deletePlaylistRow(it) }
+    }
+
     // --- bulk sync ---
     @Query("DELETE FROM songs") suspend fun clearSongs()
     @Query("DELETE FROM albums") suspend fun clearAlbums()
@@ -252,7 +265,7 @@ class Converters {
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -276,10 +289,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Playlist comment (holds sharing details) and public flag. Must match [PlaylistEntity] exactly. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_3_4_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_3_4_SQL = listOf(
+            "ALTER TABLE playlists ADD COLUMN comment TEXT",
+            "ALTER TABLE playlists ADD COLUMN isPublic INTEGER NOT NULL DEFAULT 0",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

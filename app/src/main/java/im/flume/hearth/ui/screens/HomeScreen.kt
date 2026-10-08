@@ -68,6 +68,7 @@ import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.LikedColor
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.data.PlaylistRules
 import java.util.Calendar
 
 @Composable
@@ -80,7 +81,9 @@ fun HomeScreen() {
     val sync by c.sync.state.collectAsStateWithLifecycle()
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
-    val playlists by remember { dao.playlists() }.collectAsStateWithLifecycle(emptyList())
+    val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
+    // Yours and ones you've joined; everyone else's stay out of sight.
+    val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
 
     var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
     LaunchedEffect(online, songCount > 0) {
@@ -145,8 +148,10 @@ fun HomeScreen() {
             item {
                 SectionHeader("Your playlists")
                 LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
-                    items(playlists, key = { it.id }) { p ->
-                        MediaCard(p.name, plural(p.songCount, "song"), onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt)
+                    items(playlists, key = { it.playlist.id }) { item ->
+                        val p = item.playlist
+                        val by = if (item.access.isOwner) "" else " • by ${PlaylistRules.displayName(item.access.owner)}"
+                        MediaCard(p.name, plural(p.songCount, "song") + by, onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt)
                     }
                 }
             }

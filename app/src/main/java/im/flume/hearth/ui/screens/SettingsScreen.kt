@@ -192,6 +192,7 @@ fun GeneralSettings() {
                         c.db.clearAllTables()
                         c.downloads.dir.listFiles()?.forEach { it.delete() }
                         QueueStore(context.filesDir).clear()
+                        c.nativeApi.forgetSession()
                         c.session.logout()
                     }
                 }) { Text("Sign out", color = Destructive) }

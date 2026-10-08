@@ -44,6 +44,7 @@ class LibrarySync(
             fullSync(scan?.lastScan)
         } else {
             refreshStars()
+            refreshPlaylists()
         }
     }
 
@@ -56,6 +57,29 @@ class LibrarySync(
         mutex.withLock {
             val starred = runCatching { api.starred() }.getOrNull() ?: return
             db.library().applyStars(starred.album.map { it.id }, starred.artist.map { it.id })
+        }
+    }
+
+    /**
+     * The playlist list is one cheap request, and shared playlists change from the other phone, so it
+     * runs on every check: new invites show up quickly. Only playlists whose details changed are re-read.
+     */
+    suspend fun refreshPlaylists() {
+        if (mutex.isLocked) return
+        mutex.withLock {
+            val remote = runCatching { api.playlists() }.getOrNull() ?: return
+            val local = db.library().playlistsOnce().associateBy { it.id }
+            val entities = remote.map { it.toEntity() }
+            val changed = HashMap<String, List<PlaylistSongEntity>>()
+            for (pl in entities) {
+                val old = local[pl.id]
+                if (old != null && old.changed == pl.changed && old.songCount == pl.songCount) continue
+                val songs = runCatching { api.playlist(pl.id) }.getOrNull() ?: continue
+                changed[pl.id] = songs.entry.mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
+            }
+            val removed = local.keys - remote.mapTo(HashSet()) { it.id }
+            db.library().applyPlaylists(entities, changed, removed.toList())
+            if (changed.isNotEmpty() || removed.isNotEmpty()) onPlaylistsSynced()
         }
     }
 
@@ -138,7 +162,7 @@ class LibrarySync(
 
     companion object {
         const val PAGE = 500
-        private const val SCHEMA = 3
+        private const val SCHEMA = 4 // 4: playlist comment and public flag
         private const val SIX_HOURS = 6 * 60 * 60 * 1000L
         const val SHRUNK_MESSAGE = "The server returned almost no songs, so the library wasn't changed"
 

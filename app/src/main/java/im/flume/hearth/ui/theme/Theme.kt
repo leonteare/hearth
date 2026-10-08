@@ -52,6 +52,9 @@ val DownloadsColor = Color(0xFF1E6B52)
 val Destructive = Color(0xFFF2B8B5)
 val DestructiveFill = Color(0xFFB3261E)
 
+/** The small red dot for something waiting on you (a playlist invite). */
+val NoticeDot = Color(0xFFE5484D)
+
 /** Hairline between groups. Translucent so it reads the same on the page and on sheets. */
 val DividerColor = Color.White.copy(alpha = 0.08f)
 
