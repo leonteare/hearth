@@ -37,6 +37,14 @@ interface LibraryDao {
     @Query("SELECT * FROM songs")
     suspend fun allSongsOnce(): List<SongEntity>
 
+    @Query(
+        """SELECT h.songId AS songId, h.playedAt AS playedAt, s.title AS title, s.artist AS artist, s.artistId AS artistId,
+                  s.album AS album, s.albumId AS albumId, s.durationSec AS durationSec, s.coverArt AS coverArt
+           FROM play_history h JOIN songs s ON s.id = h.songId
+           WHERE h.playedAt >= :from AND h.playedAt < :to ORDER BY h.playedAt"""
+    )
+    suspend fun history(from: Long, to: Long): List<HistoryRow>
+
     @Query("SELECT songId FROM play_history WHERE playedAt >= :since")
     suspend fun recentHistorySongIds(since: Long): List<String>
 

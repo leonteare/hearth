@@ -51,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.Mix
+import im.flume.hearth.data.StatsPeriod
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.AlbumRow
@@ -125,6 +126,8 @@ fun HomeScreen() {
                 }
             )
         }
+
+        items(StatsPeriod.current(), key = { "stats:${it.key}" }) { StatsCard(it) }
 
         if (mixes.isNotEmpty()) {
             item {
