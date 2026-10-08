@@ -1,5 +1,8 @@
 package im.flume.hearth.ui.screens
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import im.flume.hearth.ui.theme.HearthShapes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -269,17 +272,24 @@ fun AppearanceSettings() {
         ) {
             AccentChoices.forEach { (name, argb) ->
                 val selected = settings.accent == argb.toInt()
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // The whole swatch + label is one 48dp+ radio target; TalkBack reads the colour name and whether it is selected.
+                Column(
+                    Modifier
+                        .clip(HearthShapes.Card)
+                        .selectable(selected = selected, role = Role.RadioButton) {
+                            c.session.updateSettings { it.copy(accent = argb.toInt()) }
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Box(
                         Modifier
-                            .size(44.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(Color(argb))
-                            .border(if (selected) 3.dp else 0.dp, Color.White, CircleShape)
-                            .clickable { c.session.updateSettings { it.copy(accent = argb.toInt()) } },
+                            .border(if (selected) 3.dp else 0.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (selected) Icon(Icons.Default.Check, name, tint = Color.Black)
+                        if (selected) Icon(Icons.Default.Check, null, tint = Color.Black)
                     }
                     Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) Color.White else TextSecondary)
                 }

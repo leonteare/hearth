@@ -2,7 +2,13 @@ package im.flume.hearth.ui.components
 
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -152,5 +158,46 @@ fun BannerCard(
         }
         content?.invoke(this)
         if (actions != null) Row(content = actions)
+    }
+}
+
+/** A sub-page that is still loading: the back bar (with [title] if known) over a centred spinner. */
+@Composable
+fun LoadingPage(title: String? = null) {
+    Column(Modifier.fillMaxSize()) {
+        TopBar(title)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+    }
+}
+
+/** A sub-page whose content can't be shown (e.g. a stale link): the back bar over a centred [EmptyState]. */
+@Composable
+fun UnavailablePage(icon: ImageVector, message: String) {
+    Column(Modifier.fillMaxSize()) {
+        TopBar(null)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { EmptyState(icon, message) }
+    }
+}
+
+/** Empty list placeholder: a muted icon, one line of text and an optional action button. */
+@Composable
+fun EmptyState(
+    icon: ImageVector,
+    message: String,
+    modifier: Modifier = Modifier,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, tint = TextSecondary, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(12.dp))
+        Text(message, color = TextSecondary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+        if (action != null && onAction != null) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onAction) { Text(action) }
+        }
     }
 }

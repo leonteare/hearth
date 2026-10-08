@@ -51,6 +51,7 @@ import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.components.LoadingPage
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.AccentDeep
@@ -110,7 +111,7 @@ fun StatsCard(period: StatsPeriod) {
 fun StatsScreen(key: String) {
     val period = remember(key) { StatsPeriod(key) }
     val actions = LocalActions.current
-    val stats = rememberStats(period) ?: return
+    val stats = rememberStats(period) ?: return LoadingPage()
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item {
@@ -168,7 +169,7 @@ fun StatsScreen(key: String) {
 @Composable
 private fun StatTile(value: String, label: String, modifier: Modifier) {
     Column(modifier.clip(HearthShapes.Card).background(Color.Black.copy(alpha = 0.3f)).padding(12.dp)) {
-        Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(label, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
     }
 }

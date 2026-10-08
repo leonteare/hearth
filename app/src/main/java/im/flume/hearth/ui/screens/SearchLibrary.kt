@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -112,6 +114,8 @@ fun SearchScreen() {
     var albums by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
     var artists by remember { mutableStateOf<List<ArtistEntity>>(emptyList()) }
     var closeMatches by remember { mutableStateOf(false) }
+    // True while the search index is being built (the first search after launch or a sync).
+    var indexing by remember { mutableStateOf(false) }
     val c = LocalContext.current.container
     val genres by remember { dao.genres() }.collectAsStateWithLifecycle(emptyList())
 
@@ -130,6 +134,7 @@ fun SearchScreen() {
     DisposableEffect(Unit) { onDispose { if (hadResults) saveRecent(latestQuery) } }
 
     val focus = remember { FocusRequester() }
+    val gridColumns = gridColumns()
     LaunchedEffect(Unit) { focus.requestFocus() }
 
     LaunchedEffect(query) {
@@ -139,7 +144,8 @@ fun SearchScreen() {
         }
         delay(120)
         // Scanning ~7k songs is too slow for the main thread; a new keystroke cancels this anyway.
-        val index = c.library.searchIndex(c.session.lastSyncAt)
+        indexing = true
+        val index = try { c.library.searchIndex(c.session.lastSyncAt) } finally { indexing = false }
         val r = withContext(Dispatchers.Default) { index.search(q) }
         artists = r.artists
         albums = r.albums
@@ -154,7 +160,7 @@ fun SearchScreen() {
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Dimens.Gutter)
-                .height(44.dp)
+                .heightIn(min = 48.dp)
                 .clip(HearthShapes.Card)
                 .background(SearchFieldColor)
                 .padding(start = 12.dp),
@@ -214,20 +220,29 @@ fun SearchScreen() {
                     }
                 }
                 if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
-                items(genres.chunked(2)) { pair ->
+                items(genres.chunked(gridColumns)) { pair ->
                     Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         pair.forEach { g ->
                             Box(
-                                Modifier.weight(1f).height(72.dp).clip(HearthShapes.Card)
+                                Modifier.weight(1f).heightIn(min = 72.dp).clip(HearthShapes.Card)
                                     .background(genreColor(g.genre)).clickable { actions.openGenre(g.genre) }.padding(12.dp)
                             ) {
                                 Text(g.genre, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        repeat(gridColumns - pair.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             } else {
+                if (indexing) {
+                    item(key = "indexing") {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Getting your library ready to search…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
                 if (closeMatches && (artists.isNotEmpty() || albums.isNotEmpty() || songs.isNotEmpty())) {
                     item {
                         Text(
@@ -253,7 +268,7 @@ fun SearchScreen() {
                         })
                     }
                 }
-                if (artists.isEmpty() && albums.isEmpty() && songs.isEmpty()) {
+                if (!indexing && artists.isEmpty() && albums.isEmpty() && songs.isEmpty()) {
                     item { Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
                 }
             }
@@ -264,7 +279,7 @@ fun SearchScreen() {
 @Composable
 private fun BrowseTile(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     Row(
-        modifier.height(56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        modifier.heightIn(min = 56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
@@ -475,4 +490,22 @@ private fun BrowseList(title: String, prefKey: String, sortOptions: List<String>
         }
         LazyColumn(Modifier.fillMaxSize()) { content(sort) }
     }
+}
+
+/** Columns for tile grids (genres, Home's quick tiles): 2 on phones, 3-4 on wide windows. */
+@Composable
+internal fun gridColumns(): Int {
+    val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    return when {
+        width > 840 -> 4
+        width > 600 -> 3
+        else -> 2
+    }
+}
+
+/** True when the window is wider than tall (landscape), so tall headers go side by side. */
+@Composable
+internal fun isWideWindow(): Boolean {
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    return config.screenWidthDp > config.screenHeightDp
 }

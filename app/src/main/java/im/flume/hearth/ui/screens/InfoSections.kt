@@ -1,5 +1,7 @@
 package im.flume.hearth.ui.screens
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Box
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.animateContentSize
@@ -79,15 +81,20 @@ fun AboutText(title: String, text: String, link: String?) {
             modifier = Modifier.clickable { expanded = !expanded },
         )
         if (link != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Read more on Last.fm",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                },
-            )
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    "Read more on Last.fm",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }

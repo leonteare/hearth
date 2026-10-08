@@ -16,7 +16,20 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import im.flume.hearth.data.DownloadState
+import im.flume.hearth.ui.components.SongInfoDialog
+import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.playback.PlaybackService
 import androidx.compose.material3.DropdownMenuItem
 import im.flume.hearth.data.currentIndex
@@ -160,7 +173,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     val player = c.player
     val meta = state.current?.mediaMetadata ?: return
     val pos = rememberPosition(state)
-    val tint = lerp(rememberCoverColor(state.coverArt, AccentDeep), Color.Black, 0.35f)
+    val tint = lerp(rememberCoverColor(state.coverArt), Color.Black, 0.15f)
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val swipe = remember { Animatable(0f) }
@@ -169,7 +182,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(HearthShapes.Card)
             .background(tint)
             .clickable(onClick = onOpen)
             // Swipe sideways to skip, like Spotify.
@@ -197,7 +210,8 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CoverArt(state.coverArt, 42.dp, requestSize = 150, fallback = meta.albumTitle?.toString())
+            // Same 4dp cover corner (HearthShapes.Cover) as list rows.
+            CoverArt(state.coverArt, 42.dp, corner = im.flume.hearth.ui.theme.Dimens.CoverCorner, requestSize = 150, fallback = meta.albumTitle?.toString())
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(meta.title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
@@ -205,7 +219,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             }
             IconButton(onClick = { player.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
             IconButton(onClick = { player.playPause() }) {
-                Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, "Play/pause", Modifier.size(30.dp))
+                PlayPauseIcon(state.isPlaying, Modifier.size(30.dp))
             }
             IconButton(onClick = { player.next() }) { Icon(Icons.Default.SkipNext, "Next") }
         }
@@ -220,6 +234,14 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     }
 }
 
+/** Play / pause glyph that crossfades between states and says what tapping it will do. */
+@Composable
+private fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
+    Crossfade(isPlaying, animationSpec = tween(150), label = "playPause") { playing ->
+        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pause" else "Play", modifier)
+    }
+}
+
 @Composable
 fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () -> Unit) {
     val c = LocalContext.current.container
@@ -227,7 +249,7 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     val songId = current.mediaId
     val song by remember(songId) { c.db.library().songFlow(songId) }.collectAsStateWithLifecycle(null)
     var showLyrics by rememberSaveable { mutableStateOf(false) }
-    val topColor = rememberCoverColor(state.coverArt, lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.6f))
+    val topColor = rememberCoverColor(state.coverArt)
 
     val player = c.player
     val haptics = LocalHapticFeedback.current
@@ -281,18 +303,28 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
         val landscape = maxWidth > maxHeight
         val artOrLyrics: @Composable (Modifier) -> Unit = { m ->
             Box(if (showLyrics) m else m.playerGestures(allowSkip = true), contentAlignment = Alignment.Center) {
-                if (showLyrics) {
-                    LyricsView(song, state, Modifier.fillMaxSize())
-                } else {
-                    CoverArt(
-                        state.coverArt, null,
-                        Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).graphicsLayer {
-                            translationX = coverSwipe.value
-                            rotationZ = coverSwipe.value / 60f
-                            alpha = 1f - (kotlin.math.abs(coverSwipe.value) / (skipAt * 4)).coerceAtMost(0.5f)
-                        },
-                        corner = 8.dp, requestSize = 900, fallback = current.mediaMetadata.albumTitle?.toString(),
-                    )
+                AnimatedContent(
+                    showLyrics,
+                    transitionSpec = { fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.96f) togetherWith fadeOut(tween(150)) },
+                    contentAlignment = Alignment.Center,
+                    label = "coverLyrics",
+                ) { lyricsShown ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (lyricsShown) {
+                            LyricsView(song, state, Modifier.fillMaxSize())
+                        } else {
+                            CoverArt(
+                                state.coverArt, null,
+                                Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).graphicsLayer {
+                                    translationX = coverSwipe.value
+                                    rotationZ = coverSwipe.value / 60f
+                                    alpha = 1f - (kotlin.math.abs(coverSwipe.value) / (skipAt * 4)).coerceAtMost(0.5f)
+                                },
+                                corner = im.flume.hearth.ui.theme.Dimens.CardCorner, requestSize = 900,
+                                fallback = current.mediaMetadata.albumTitle?.toString(),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -344,19 +376,25 @@ private fun PlayerControls(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(meta.title?.toString().orEmpty(), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                meta.artist?.toString().orEmpty(),
-                color = TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = song?.artistId != null) {
-                    onClose(); song?.artistId?.let(actions::openArtist)
-                },
-            )
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(enabled = song?.artistId != null, role = Role.Button, onClickLabel = "Go to artist") {
+                        onClose(); song?.artistId?.let(actions::openArtist)
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    meta.artist?.toString().orEmpty(),
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         val starred = song?.starred == true
         IconButton(onClick = { actions.setStarred(songId, !starred) }) {
-            Icon(if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Like", tint = if (starred) accent else Color.White)
+            Icon(if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder, if (starred) "Unlike" else "Like", tint = if (starred) accent else Color.White)
         }
     }
 
@@ -377,7 +415,7 @@ private fun PlayerControls(
 
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         IconButton(onClick = { player.toggleShuffle() }) {
-            Icon(Icons.Default.Shuffle, "Shuffle", tint = if (state.shuffle) accent else Color.White)
+            Icon(Icons.Default.Shuffle, if (state.shuffle) "Shuffle on" else "Shuffle off", tint = if (state.shuffle) accent else Color.White)
         }
         IconButton(onClick = { player.previous() }, Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(40.dp)) }
         FilledIconButton(
@@ -386,13 +424,17 @@ private fun PlayerControls(
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
         ) {
-            Icon(if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, "Play/pause", Modifier.size(40.dp))
+            PlayPauseIcon(state.isPlaying, Modifier.size(40.dp))
         }
         IconButton(onClick = { player.next() }, Modifier.size(56.dp)) { Icon(Icons.Default.SkipNext, "Next", Modifier.size(40.dp)) }
         IconButton(onClick = { player.cycleRepeat() }) {
             Icon(
                 if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                "Repeat",
+                when (state.repeatMode) {
+                    Player.REPEAT_MODE_ONE -> "Repeat one"
+                    Player.REPEAT_MODE_ALL -> "Repeat all"
+                    else -> "Repeat off"
+                },
                 tint = if (state.repeatMode == Player.REPEAT_MODE_OFF) Color.White else accent,
             )
         }
@@ -400,7 +442,7 @@ private fun PlayerControls(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         val usage = LocalContext.current.container.usage
         IconButton(onClick = { if (!showLyrics) usage.track(im.flume.hearth.data.Usage.LYRICS); onToggleLyrics() }) {
-            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, "Lyrics", tint = if (showLyrics) accent else Color.White)
+            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, if (showLyrics) "Hide lyrics" else "Show lyrics",tint = if (showLyrics) accent else Color.White)
         }
         IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
     }
@@ -436,30 +478,34 @@ private fun LyricsMessage(text: String, modifier: Modifier) {
 private fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit) {
     val actions = LocalActions.current
     val player = LocalContext.current.container.player
-    val downloaded = song != null && LocalRowContext.current.downloads[song.id] != null
+    val dl = song?.let { LocalRowContext.current.downloads[it.id] }
     var open by remember { mutableStateOf(false) }
     var sleepPicker by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf(false) }
     val usage = LocalContext.current.container.usage
     if (sleepPicker) {
         SleepTimerSheet(active = sleepAt != 0L, onPick = { if (it != 0L) usage.track(im.flume.hearth.data.Usage.SLEEP); player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
     }
-    IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More") }
+    if (info && song != null) SongInfoDialog(song, onDismiss = { info = false })
+    IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More options") }
     ActionSheet(open, { open = false }, title = song?.title, subtitle = song?.artist, coverArt = song?.coverArt, fallback = song?.album) {
         if (song != null) {
+            MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { open = false; actions.playNext(listOf(song.id)) }
+            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { open = false; actions.addToQueue(listOf(song.id)) }
             MenuItem("Start radio", Icons.Default.Radio) { open = false; actions.startRadio(song) }
             MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(listOf(song.id)) }
+            when (dl) {
+                null -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) { open = false; actions.download(listOf(song)) }
+                DownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) { open = false; actions.removeDownload(listOf(song.id)) }
+                else -> MenuItem("Cancel download", Icons.Default.Close) { open = false; actions.removeDownload(listOf(song.id)) }
+            }
         }
         MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", Icons.Outlined.Bedtime, tint = if (sleepAt != 0L) MaterialTheme.colorScheme.primary else Color.White) {
             open = false; sleepPicker = true
         }
         song?.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { open = false; onClose(); actions.openAlbum(id) } }
         song?.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { open = false; onClose(); actions.openArtist(id) } }
-        if (song != null) {
-            MenuItem(if (downloaded) "Remove download" else "Download", if (downloaded) Icons.Default.CheckCircle else Icons.Outlined.ArrowCircleDown) {
-                open = false
-                if (downloaded) actions.removeDownload(listOf(song.id)) else actions.download(listOf(song))
-            }
-        }
+        if (song != null) MenuItem("Song info", Icons.Outlined.Info) { open = false; info = true }
     }
 }
 
@@ -632,8 +678,8 @@ fun QueueScreen() {
         TopBar("Queue")
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (history.isNotEmpty()) {
-                item(key = "h-prev") { QueueHeader("Previously played", 0.6f) }
-                items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e.index) }) }
+                item(key = "h-prev") { Box(Modifier.animateItem()) { QueueHeader("Previously played", 0.6f) } }
+                items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e.index) }, modifier = Modifier.animateItem()) }
             }
             state.current?.let { cur ->
                 item(key = "h-now") {
@@ -641,7 +687,7 @@ fun QueueScreen() {
                         { Text("$position of $total", color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(end = 12.dp)) }
                     } else null)
                 }
-                item(key = "now") { QueueRow(QueueEntry(state.currentIndex, cur), isCurrent = true) }
+                item(key = "now") { QueueRow(QueueEntry(state.currentIndex, cur), isCurrent = true, modifier = Modifier.animateItem()) }
             }
             if (repeatOne) {
                 item(key = "repeat-one") {
@@ -649,11 +695,11 @@ fun QueueScreen() {
                 }
             }
             if (manual.isNotEmpty()) {
-                item(key = "h-manual") { QueueHeader("Next in queue", upcomingAlpha) }
+                item(key = "h-manual") { Box(Modifier.animateItem()) { QueueHeader("Next in queue", upcomingAlpha) } }
                 items(manual, key = { it.key }) { e -> Upcoming(e) }
             }
             if (auto.isNotEmpty()) {
-                item(key = "h-auto") { QueueHeader("Next from: ${state.sourceLabel.ifBlank { "your queue" }}", upcomingAlpha) }
+                item(key = "h-auto") { Box(Modifier.animateItem()) { QueueHeader("Next from: ${state.sourceLabel.ifBlank { "your queue" }}", upcomingAlpha) } }
                 items(auto, key = { it.key }) { e -> Upcoming(e) }
             }
             if (later.isNotEmpty()) {
@@ -783,13 +829,14 @@ private fun QueueRow(
     alpha: Float = 1f,
     onClick: () -> Unit = {},
     handle: (@Composable () -> Modifier)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val meta = entry.item.mediaMetadata
     MediaRow(
         meta.title?.toString().orEmpty(),
         meta.artist?.toString().orEmpty(),
         onClick = if (isCurrent) null else onClick,
-        modifier = Modifier.background(if (dragging) SurfaceHigh else if (isCurrent) Surface else Background),
+        modifier = modifier.background(if (dragging) SurfaceHigh else if (isCurrent) Surface else Background),
         coverArt = meta.extras?.getString(EXTRA_COVER_ART),
         fallback = meta.albumTitle?.toString(),
         titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = alpha),

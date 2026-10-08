@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -175,11 +176,12 @@ private data class QuickTile(
 
 @Composable
 private fun QuickGrid(tiles: List<QuickTile>) {
+    val columns = gridColumns()
     Column(Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        tiles.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        tiles.chunked(columns).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 row.forEach { t -> QuickTileView(t, Modifier.weight(1f)) }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -188,7 +190,7 @@ private fun QuickGrid(tiles: List<QuickTile>) {
 @Composable
 private fun QuickTileView(t: QuickTile, modifier: Modifier) {
     Row(
-        modifier.height(56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = t.onClick),
+        modifier.heightIn(min = 56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = t.onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (t.icon != null) {
@@ -203,7 +205,7 @@ private fun QuickTileView(t: QuickTile, modifier: Modifier) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
 }

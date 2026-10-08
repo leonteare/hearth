@@ -29,6 +29,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Dp
+import im.flume.hearth.ui.components.EmptyState
+import im.flume.hearth.ui.components.LoadingPage
+import im.flume.hearth.ui.components.UnavailablePage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -119,7 +129,10 @@ fun CollectionScreen(
     source: PlaySource,
     pin: PinTarget? = null,
     showTrackNumbers: Boolean = false,
-    headerIcon: (@Composable () -> Unit)? = null,
+    /** Replaces the cover art in the header; drawn at the given size. */
+    headerIcon: (@Composable (Dp) -> Unit)? = null,
+    /** Shown in place of the song list when the caller knows the list is loaded and empty. */
+    emptyState: (@Composable () -> Unit)? = null,
     extraContent: LazyListScope.() -> Unit = {},
     topContent: LazyListScope.() -> Unit = {},
     onRemoveSong: ((index: Int) -> Unit)? = null,
@@ -176,34 +189,25 @@ fun CollectionScreen(
     val usage = c.usage
     androidx.activity.compose.BackHandler(enabled = selection != null) { selection = null }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val collapsed by remember { androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex > 0 } }
-
-    Box(Modifier.fillMaxSize()) {
-    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
-        item {
-            Box(
-                Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))
-            ) {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        BackButton()
-                        Spacer(Modifier.weight(1f))
-                        Box(Modifier.statusBarsPadding()) { headerActions() }
-                    }
-                    if (headerIcon != null) headerIcon() else CoverArt(cover, 220.dp, requestSize = 600, fallback = title)
-                    Spacer(Modifier.height(16.dp))
-                    Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
-                    Text(
-                        listOfNotNull(subtitle.takeIf { it.isNotBlank() }, plural(songs.size, "song"), formatLongDuration(totalSec).takeIf { totalSec > 0 })
-                            .joinToString(" • "),
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
+    // The slim top bar fades in over the second half of the header's scroll instead of popping in.
+    var headerHeight by remember { mutableIntStateOf(0) }
+    val barAlpha by remember {
+        derivedStateOf {
+            when {
+                listState.firstVisibleItemIndex > 0 -> 1f
+                headerHeight == 0 -> 0f
+                else -> ((listState.firstVisibleItemScrollOffset - headerHeight * 0.45f) / (headerHeight * 0.4f)).coerceIn(0f, 1f)
             }
         }
-        item {
+    }
+    val showBar by remember { derivedStateOf { barAlpha > 0f } }
+    val wide = isWideWindow()
+    val subtitleLine = listOfNotNull(subtitle.takeIf { it.isNotBlank() }, plural(songs.size, "song"), formatLongDuration(totalSec).takeIf { totalSec > 0 })
+        .joinToString(" • ")
+    val art: @Composable (Dp) -> Unit = { size ->
+        if (headerIcon != null) headerIcon(size) else CoverArt(cover, size, requestSize = 600, fallback = title)
+    }
+    val buttons: @Composable () -> Unit = {
             PlayShuffleButtons(
                 onPlay = { actions.play(source) },
                 onShuffle = { actions.play(source, shuffle = true) },
@@ -237,35 +241,83 @@ fun CollectionScreen(
                     }
                 },
             )
+    }
+
+    Box(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { headerHeight = it.height }
+                    .background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))
+            ) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        BackButton()
+                        Spacer(Modifier.weight(1f))
+                        Box(Modifier.statusBarsPadding()) { headerActions() }
+                    }
+                    if (wide) {
+                        // Landscape: art on the left, title and buttons beside it, so the list stays in view.
+                        Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                            art(160.dp)
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter))
+                                Text(
+                                    subtitleLine, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp),
+                                )
+                                buttons()
+                            }
+                        }
+                    } else {
+                        art(220.dp)
+                        Spacer(Modifier.height(16.dp))
+                        Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+                        Text(
+                            subtitleLine,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
         }
+        if (!wide) item { buttons() }
         topContent()
+        if (emptyState != null) item(key = "empty") { emptyState() }
         val multiDisc = showTrackNumbers && songs.any { it.disc != songs[0].disc }
         itemsIndexed(songs, key = { i, _ -> keys[i] }) { index, song ->
             val key = keys[index]
-            if (multiDisc && (index == 0 || songs[index - 1].disc != song.disc)) {
-                Text(
-                    "Disc ${song.disc}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(start = 16.dp, top = if (index == 0) 4.dp else 16.dp, bottom = 4.dp),
+            Column(Modifier.animateItem()) {
+                if (multiDisc && (index == 0 || songs[index - 1].disc != song.disc)) {
+                    Text(
+                        "Disc ${song.disc}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(start = 16.dp, top = if (index == 0) 4.dp else 16.dp, bottom = 4.dp),
+                    )
+                }
+                SongRow(
+                    song,
+                    onClick = {
+                        val sel = selection
+                        if (sel != null) selection = (if (key in sel) sel - key else sel + key).takeIf { it.isNotEmpty() }
+                        else actions.play(source, startSongId = song.id)
+                    },
+                    onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
+                    showCover = !showTrackNumbers,
+                    leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
+                    selected = selection?.let { key in it },
+                    onLongPress = {
+                        if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
+                        selection = (selection ?: emptySet()) + key
+                    },
                 )
             }
-            SongRow(
-                song,
-                onClick = {
-                    val sel = selection
-                    if (sel != null) selection = (if (key in sel) sel - key else sel + key).takeIf { it.isNotEmpty() }
-                    else actions.play(source, startSongId = song.id)
-                },
-                onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
-                showCover = !showTrackNumbers,
-                leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
-                selected = selection?.let { key in it },
-                onLongPress = {
-                    if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
-                    selection = (selection ?: emptySet()) + key
-                },
-            )
         }
         extraContent()
     }
@@ -283,21 +335,23 @@ fun CollectionScreen(
             onSelectAll = { selection = keys.toSet() },
         )
     } else {
-        // Slim bar with the title and a play button once the big header has scrolled away.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = collapsed,
-            enter = androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.fadeOut(),
-        ) {
+        // Slim bar with the title and a play button, fading in as the big header scrolls away.
+        if (showBar) {
             Row(
-                Modifier.fillMaxWidth().background(lerp(headerColor, Background, 0.35f)).statusBarsPadding().padding(end = 12.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = barAlpha }
+                    .background(lerp(headerColor, Background, 0.35f))
+                    .statusBarsPadding()
+                    .padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BackButton()
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 FilledIconButton(
                     onClick = { actions.play(source) },
-                    modifier = Modifier.size(40.dp),
+                    // 40dp circle inside a 48dp touch target.
+                    modifier = Modifier.minimumInteractiveComponentSize().size(40.dp),
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
                 ) { Icon(Icons.Default.PlayArrow, "Play") }
@@ -367,18 +421,22 @@ fun MixScreen(index: Int) {
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     var mix by remember { mutableStateOf<im.flume.hearth.data.Mix?>(null) }
     var songs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
+    var loaded by remember { mutableStateOf(false) }
     LaunchedEffect(index) {
-        mix = c.mixes.today(online).getOrNull(index)
+        mix = runCatching { c.mixes.today(online).getOrNull(index) }.getOrNull()
         songs = mix?.let { c.library.songsByIds(it.songIds) }.orEmpty()
+        loaded = true
     }
-    val m = mix ?: return
+    if (!loaded) return LoadingPage()
+    // A stale link (e.g. today's mixes were rebuilt with fewer entries).
+    val m = mix ?: return UnavailablePage(Icons.Default.Radio, "This mix isn't available any more")
     CollectionScreen(
         title = m.title,
         subtitle = m.subtitle,
         cover = m.covers.firstOrNull(),
         songs = songs,
         source = PlaySource(PlaySource.Kind.SONGS, label = "${m.title} · ${m.subtitle}", songIds = m.songIds),
-        headerIcon = { MixCover(m, 220.dp) },
+        headerIcon = { size -> MixCover(m, size) },
     )
 }
 
@@ -389,7 +447,8 @@ fun PlaylistScreen(id: String) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val me = c.session.credentials.collectAsStateWithLifecycle().value?.username
-    val songs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(emptyList())
+    val loadedSongs by remember(id) { dao.playlistSongs(id) }.collectAsStateWithLifecycle(null)
+    val songs = loadedSongs.orEmpty()
     val screenScope = androidx.compose.runtime.rememberCoroutineScope()
     CollectionScreen(
         title = playlist?.name.orEmpty(),
@@ -407,6 +466,9 @@ fun PlaylistScreen(id: String) {
         songs = songs,
         source = PlaySource(PlaySource.Kind.PLAYLIST, id, playlist?.name.orEmpty()),
         pin = PinTarget(DownloadRepository.KIND_PLAYLIST, id),
+        emptyState = if (loadedSongs?.isEmpty() == true) {
+            { EmptyState(Icons.AutoMirrored.Filled.QueueMusic, "This playlist is empty. Add songs from any song's menu.") }
+        } else null,
         headerActions = {
             if (playlist != null && (playlist?.owner == null || playlist?.owner.equals(me, ignoreCase = true))) {
                 PlaylistMenu(id, playlist!!.name, playlist?.coverArt, screenScope)
@@ -528,34 +590,50 @@ fun ArtistScreen(id: String) {
     val name = artist?.name ?: songs.firstOrNull()?.artist.orEmpty()
     val source = PlaySource(PlaySource.Kind.ARTIST, id, name)
 
+    val wide = isWideWindow()
+    val artistCover = artist?.coverArt ?: albums.firstOrNull()?.coverArt
+    val counts = "${plural(albums.size, "album")} • ${plural(songs.size, "song")}"
+    val buttons: @Composable () -> Unit = {
+        PlayShuffleButtons(
+            onPlay = { actions.play(source) },
+            onShuffle = { actions.play(source, shuffle = true) },
+            extra = {
+                artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
+                Spacer(Modifier.width(4.dp))
+                TextButton(onClick = { actions.startArtistRadio(id, name) }) {
+                    Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Radio")
+                }
+            },
+        )
+    }
+
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            val artistColor = rememberCoverColor(artist?.coverArt ?: albums.firstOrNull()?.coverArt)
+            val artistColor = rememberCoverColor(artistCover)
             Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(artistColor, Color.Transparent)))) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth()) { BackButton() }
-                    CoverArt(artist?.coverArt ?: albums.firstOrNull()?.coverArt, 180.dp, Modifier.clip(CircleShape), requestSize = 600)
-                    Spacer(Modifier.height(16.dp))
-                    Text(name, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-                    Text("${plural(albums.size, "album")} • ${plural(songs.size, "song")}", color = TextSecondary, modifier = Modifier.padding(4.dp))
+                    if (wide) {
+                        Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                            CoverArt(artistCover, 160.dp, Modifier.clip(CircleShape), requestSize = 600, fallback = name)
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text(name, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter))
+                                Text(counts, color = TextSecondary, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp))
+                                buttons()
+                            }
+                        }
+                    } else {
+                        CoverArt(artistCover, 180.dp, Modifier.clip(CircleShape), requestSize = 600)
+                        Spacer(Modifier.height(16.dp))
+                        Text(name, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+                        Text(counts, color = TextSecondary, modifier = Modifier.padding(4.dp))
+                    }
                 }
             }
         }
-        item {
-            PlayShuffleButtons(
-                onPlay = { actions.play(source) },
-                onShuffle = { actions.play(source, shuffle = true) },
-                extra = {
-                    artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
-                    Spacer(Modifier.width(4.dp))
-                    TextButton(onClick = { actions.startArtistRadio(id, name) }) {
-                        Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Radio")
-                    }
-                },
-            )
-        }
+        if (!wide) item { buttons() }
         if (songs.isNotEmpty()) {
             item { SectionHeader("Popular") }
             items(songs.take(5), key = { "top:${it.id}" }) { s ->
@@ -600,28 +678,35 @@ private fun FollowButton(following: Boolean, onClick: () -> Unit) {
 @Composable
 fun GenreScreen(name: String) {
     val dao = LocalContext.current.container.db.library()
-    val songs by remember(name) { dao.genreSongs(name) }.collectAsStateWithLifecycle(emptyList())
+    val loaded by remember(name) { dao.genreSongs(name) }.collectAsStateWithLifecycle(null)
+    val songs = loaded.orEmpty()
     CollectionScreen(
         title = name,
         subtitle = "Genre",
         cover = songs.firstOrNull()?.coverArt,
         songs = songs,
         source = PlaySource(PlaySource.Kind.GENRE, name, name),
+        emptyState = if (loaded?.isEmpty() == true) {
+            { EmptyState(Icons.Default.MusicNote, "No songs in this genre any more") }
+        } else null,
     )
 }
 
 @Composable
 fun LikedScreen() {
     val dao = LocalContext.current.container.db.library()
-    val songs by remember { dao.starredSongs() }.collectAsStateWithLifecycle(emptyList())
+    val loaded by remember { dao.starredSongs() }.collectAsStateWithLifecycle(null)
     CollectionScreen(
         title = "Liked Songs",
         subtitle = "",
         cover = null,
-        songs = songs,
+        songs = loaded.orEmpty(),
         source = PlaySource.Liked,
         pin = PinTarget(DownloadRepository.KIND_LIKED, "liked"),
-        headerIcon = { BigIcon(Icons.Default.Favorite, LikedColor) },
+        headerIcon = { size -> BigIcon(Icons.Default.Favorite, LikedColor, size) },
+        emptyState = if (loaded?.isEmpty() == true) {
+            { EmptyState(Icons.Default.FavoriteBorder, "Songs you like show up here. Tap the heart on any song to add it.") }
+        } else null,
     )
 }
 
@@ -664,7 +749,7 @@ fun DownloadsScreen() {
         cover = null,
         songs = songs,
         source = PlaySource.Downloads,
-        headerIcon = { BigIcon(Icons.Default.DownloadDone, DownloadsColor) },
+        headerIcon = { size -> BigIcon(Icons.Default.DownloadDone, DownloadsColor, size) },
         topContent = {
             if (queued.isNotEmpty()) {
                 item(key = "q-head") {
@@ -707,7 +792,7 @@ fun DownloadsScreen() {
                         }
                     }
                 }
-                items(queued.take(50), key = { "q:${it.id}" }) { song -> QueuedSongRow(song) }
+                items(queued.take(50), key = { "q:${it.id}" }) { song -> QueuedSongRow(song, Modifier.animateItem()) }
                 if (queued.size > 50) {
                     item(key = "q-more") { Text("+ ${queued.size - 50} more waiting", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
                 }
@@ -739,11 +824,7 @@ fun DownloadsScreen() {
                 }
             } else if (pending.isEmpty()) {
                 item {
-                    Text(
-                        "Nothing downloaded yet. Tap the download icon on an album or playlist to keep it on your phone.",
-                        color = TextSecondary,
-                        modifier = Modifier.padding(16.dp),
-                    )
+                    EmptyState(Icons.Outlined.ArrowCircleDown, "Nothing downloaded yet. Tap the download icon on an album or playlist to keep it on your phone.")
                 }
             }
         },
@@ -752,13 +833,13 @@ fun DownloadsScreen() {
 
 /** A song waiting to download, with a progress bar while it's on its way. Collects only its own progress. */
 @Composable
-private fun QueuedSongRow(song: SongEntity) {
+private fun QueuedSongRow(song: SongEntity, modifier: Modifier = Modifier) {
     val c = LocalContext.current.container
     // null when not downloading; 0 when the size isn't known yet.
     val progress by remember(song.id) {
         c.downloads.progress.map { if (song.id in it) it[song.id] ?: 0f else null }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(null)
-    Column {
+    Column(modifier) {
         SongRow(song, onClick = {})
         if (progress != null) {
             LinearProgressIndicator(
@@ -773,8 +854,8 @@ private fun QueuedSongRow(song: SongEntity) {
 }
 
 @Composable
-private fun BigIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
-    Box(Modifier.size(180.dp).clip(HearthShapes.Cover).background(color), contentAlignment = Alignment.Center) {
+private fun BigIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, size: Dp = 220.dp) {
+    Box(Modifier.size(size * 0.82f).clip(HearthShapes.Cover).background(color), contentAlignment = Alignment.Center) {
         Icon(icon, null, Modifier.size(72.dp), tint = Color.White)
     }
 }

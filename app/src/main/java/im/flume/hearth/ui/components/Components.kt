@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -271,7 +272,7 @@ fun SongRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (dl) {
                     DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = accent)
-                    DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, null, Modifier.size(14.dp), tint = TextSecondary)
+                    DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, "Downloading", Modifier.size(14.dp), tint = TextSecondary)
                     else -> {}
                 }
                 if (dl != null && dl != DownloadState.FAILED) Spacer(Modifier.width(4.dp))
@@ -284,7 +285,7 @@ fun SongRow(
                 )
             }
         }
-        if (song.starred) Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = accent)
+        if (song.starred) Icon(Icons.Default.Favorite, "Liked", Modifier.size(16.dp), tint = accent)
         if (selected == null) {
             IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
             SongMenu(song, menu, onDismiss = { menu = false }, onRemoveFromPlaylist = onRemoveFromPlaylist)
@@ -344,8 +345,8 @@ fun SongInfoDialog(song: SongEntity, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 rows.forEach { (label, value) ->
                     Row {
-                        Text(label, color = TextSecondary, modifier = Modifier.width(88.dp))
-                        Text(value)
+                        Text(label, color = TextSecondary, modifier = Modifier.widthIn(min = 88.dp).padding(end = 12.dp))
+                        Text(value, modifier = Modifier.weight(1f))
                     }
                 }
             }

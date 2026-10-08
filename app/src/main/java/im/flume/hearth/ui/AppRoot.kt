@@ -5,6 +5,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -248,17 +250,16 @@ private val TABS = listOf(
 )
 private val TAB_ROUTES = TABS.map { it.first }
 
-/**
- * Remembers the last tab switch so its page slides in from the side the tab is on
- * (left-hand tab from the left, right-hand tab from the right).
- */
-private class TransitionFlags {
-    var tabSwitchAt = 0L
-    var direction = 1
-    val isTabSwitch: Boolean get() = System.currentTimeMillis() - tabSwitchAt < 600
-}
-
 private const val SLIDE_MS = 280
+private const val TAB_FADE_MS = 150
+
+/**
+ * A forward navigation is a tab switch (crossfade) rather than drilling into a page (slide) when it
+ * lands on a tab page, or when the page we left was popped off the back stack by the switch (switching
+ * tabs saves and pops the old tab's pages; restoring a tab can land straight on one of its detail pages).
+ */
+private fun isTabSwitch(nav: NavHostController, initial: NavBackStackEntry, target: NavBackStackEntry): Boolean =
+    target.destination.route in TAB_ROUTES || nav.currentBackStack.value.none { it.id == initial.id }
 
 @Composable
 fun AppRoot() {
@@ -268,7 +269,6 @@ fun AppRoot() {
     val snackbar = remember { SnackbarHostState() }
     val actions = remember { AppActions(c, nav, scope, snackbar) }
     actions.haptics = LocalHapticFeedback.current
-    val flags = remember { TransitionFlags() }
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
 
     val playerState by c.player.state.collectAsStateWithLifecycle()
@@ -285,8 +285,6 @@ fun AppRoot() {
             // Tapping the tab you're already in goes back to its main page.
             nav.popBackStack(dest, inclusive = false)
         } else {
-            flags.direction = if (TAB_ROUTES.indexOf(dest) > TAB_ROUTES.indexOf(currentTab)) 1 else -1
-            flags.tabSwitchAt = System.currentTimeMillis()
             nav.navigate(dest) {
                 popUpTo("home") { saveState = true }
                 launchSingleTop = true
@@ -320,12 +318,12 @@ fun AppRoot() {
                         startDestination = "home",
                         modifier = Modifier.padding(padding),
                         enterTransition = {
-                            val dir = if (flags.isTabSwitch) flags.direction else 1
-                            slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it * dir }
+                            if (isTabSwitch(nav, initialState, targetState)) fadeIn(tween(TAB_FADE_MS))
+                            else slideInHorizontally(tween(SLIDE_MS, easing = ease)) { it }
                         },
                         exitTransition = {
-                            val dir = if (flags.isTabSwitch) flags.direction else 1
-                            slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { -it * dir / 4 }
+                            if (isTabSwitch(nav, initialState, targetState)) fadeOut(tween(TAB_FADE_MS))
+                            else slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { -it / 4 }
                         },
                         popEnterTransition = { slideInHorizontally(tween(SLIDE_MS, easing = ease)) { -it / 4 } },
                         popExitTransition = { slideOutHorizontally(tween(SLIDE_MS, easing = ease)) { it } },
@@ -392,7 +390,7 @@ private fun BottomBar(currentTab: String, onTabClick: (String) -> Unit) {
             NavigationBarItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { Icon(icon, label) },
+                icon = { Icon(icon, contentDescription = null) },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.White,
@@ -414,7 +412,7 @@ private fun SideRail(currentTab: String, onTabClick: (String) -> Unit) {
             NavigationRailItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { Icon(icon, label) },
+                icon = { Icon(icon, contentDescription = null) },
                 label = { Text(label) },
                 colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = Color.White,
