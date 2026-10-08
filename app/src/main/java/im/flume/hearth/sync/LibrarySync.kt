@@ -97,7 +97,13 @@ class LibrarySync(
             _state.value = SyncState.Idle
             throw e
         } catch (e: Exception) {
-            _state.value = SyncState.Failed(e.message ?: "Sync failed")
+            val message = when (e) {
+                is java.net.UnknownHostException -> "Couldn't find the server (is Tailscale connected?)"
+                is java.net.ConnectException, is java.net.SocketTimeoutException -> "Couldn't reach the server"
+                is java.io.IOException -> "Lost connection to the server"
+                else -> e.message ?: "Sync failed"
+            }.replace(Regex("""https?://\S+"""), "the server") // URLs can carry the login token
+            _state.value = SyncState.Failed(message)
         }
     }
 
