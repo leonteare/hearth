@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.ui.components.SongInfoDialog
+import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.playback.PlaybackService
 import androidx.compose.material3.DropdownMenuItem
@@ -722,9 +723,7 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
             }
             state.current?.let { cur ->
                 item(key = "h-now") {
-                    SectionHeader("Now playing", trailing = if (total > 1) {
-                        { Text("$position of $total", color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(end = 12.dp)) }
-                    } else null)
+                    QueueHeader("Now playing", trailing = if (total > 1) "$position of $total" else null)
                 }
                 item(key = "now") { QueueRow(QueueEntry(state.currentIndex, cur), isCurrent = true, modifier = Modifier.animateItem()) }
             }
@@ -856,8 +855,19 @@ private fun LaterRow(song: SongEntity, alpha: Float) {
 }
 
 @Composable
-private fun QueueHeader(text: String, alpha: Float = 1f) {
-    SectionHeader(text, color = Color.White.copy(alpha = alpha))
+private fun QueueHeader(text: String, alpha: Float = 1f, trailing: String? = null) {
+    // Compact compared with page section headers: the queue is a dense list, not a page of carousels.
+    Row(
+        Modifier.fillMaxWidth().padding(start = Dimens.Gutter, end = Dimens.Gutter, top = 14.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = alpha), modifier = Modifier.weight(1f),
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        trailing?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.labelMedium) }
+    }
 }
 
 @Composable
