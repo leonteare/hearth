@@ -87,12 +87,13 @@ class CoverBitmapLoader(
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
         // Only our own artwork: never fetch arbitrary URIs a controller might hand us.
         val id = CoverArt.idFrom(uri) ?: return Futures.immediateFailedFuture(IOException("Unsupported artwork URI"))
-        val url = api.coverArtUrl(id) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
+        // Large enough to stay sharp on the lock screen and car displays.
+        val url = api.coverArtUrl(id, 1000) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
         val future = SettableFuture.create<Bitmap>()
         scope.launch {
             val result = runCatching {
                 SingletonImageLoader.get(context).execute(
-                    ImageRequest.Builder(context).data(url).size(600).allowHardware(false).build()
+                    ImageRequest.Builder(context).data(url).size(1000).allowHardware(false).build()
                 )
             }.getOrNull()
             val bitmap = (result as? SuccessResult)?.image?.toBitmap()

@@ -45,6 +45,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import androidx.media3.session.CommandButton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import im.flume.hearth.crashLoggingHandler
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
@@ -142,6 +146,13 @@ class PlaybackService : MediaSessionService() {
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) }
         )
+
+        // Like and Shuffle buttons on the lock screen / notification follow the current song and mode.
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        scope.launch {
+            currentSongId.flatMapLatest { id -> if (id == null) flowOf(null) else c.db.library().songFlow(id) }
+                .collect { song -> currentLiked = song?.starred == true; updateMediaButtons() }
+        }
 
         restoring = scope.launch { restoreQueue(playWhenReady = false) }
         scope.launch { c.session.settings.collect { applyVolumeLevelling() } }
@@ -459,7 +470,33 @@ class PlaybackService : MediaSessionService() {
         return taken
     }
 
+    /** Song id now playing, for the lock-screen Like button. */
+    private val currentSongId = MutableStateFlow<String?>(null)
+    private var currentLiked = false
+
+    /** Two extra buttons next to play/skip on the lock screen and notification: Like and Shuffle. */
+    private fun updateMediaButtons() {
+        val like = CommandButton.Builder(if (currentLiked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
+            .setDisplayName(if (currentLiked) "Unlike" else "Like")
+            .setSessionCommand(SessionCommand(CMD_LIKE, Bundle.EMPTY))
+            .build()
+        val shuffle = CommandButton.Builder(if (shuffled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
+            .setDisplayName(if (shuffled) "Shuffle off" else "Shuffle on")
+            .setSessionCommand(SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY))
+            .build()
+        session.setMediaButtonPreferences(listOf(like, shuffle))
+    }
+
+    private fun toggleLike() {
+        val id = player.currentMediaItem?.mediaId ?: return
+        val liked = !currentLiked
+        currentLiked = liked
+        updateMediaButtons()
+        scope.launch { runCatching { c.library.setStarred(id, liked) } }
+    }
+
     private fun publishExtras() {
+        updateMediaButtons()
         session.setSessionExtras(Bundle().apply {
             putBoolean(EXTRA_SHUFFLE, shuffled)
             putString(EXTRA_SOURCE_LABEL, sourceLabel)
@@ -533,7 +570,12 @@ class PlaybackService : MediaSessionService() {
             // System UI, Bluetooth and other apps get the standard player controls only; Hearth's own
             // queue and playback commands are for this app.
             if (controller.packageName != packageName) {
-                return MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
+                // Only the Like and Shuffle buttons, so the lock screen and notification can use them.
+                val buttons = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                    .add(SessionCommand(CMD_LIKE, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                    .build()
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(buttons).build()
             }
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().apply {
                 CUSTOM_COMMANDS.forEach { add(SessionCommand(it, Bundle.EMPTY)) }
@@ -549,7 +591,7 @@ class PlaybackService : MediaSessionService() {
             customCommand: SessionCommand,
             args: Bundle,
         ): ListenableFuture<SessionResult> {
-            if (controller.packageName != packageName) {
+            if (controller.packageName != packageName && customCommand.customAction !in BUTTON_COMMANDS) {
                 return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
             }
             when (customCommand.customAction) {
@@ -563,6 +605,7 @@ class PlaybackService : MediaSessionService() {
                 CMD_PLAY_NEXT -> scope.launch { insertSongs(args.getStringArrayList(ARG_SONG_IDS).orEmpty(), next = true) }
                 CMD_ADD_TO_QUEUE -> scope.launch { insertSongs(args.getStringArrayList(ARG_SONG_IDS).orEmpty(), next = false) }
                 CMD_TOGGLE_SHUFFLE -> toggleShuffle()
+                CMD_LIKE -> toggleLike()
                 CMD_MOVE_NEXT -> moveToNext(args.getString(ARG_KEY), args.getString(ARG_SONG_ID))
                 CMD_SKIP_TO -> skipTo(args.getString(ARG_KEY), args.getString(ARG_SONG_ID))
                 CMD_REMOVE -> removeEntry(args.getString(ARG_KEY), args.getString(ARG_SONG_ID))
@@ -618,6 +661,7 @@ class PlaybackService : MediaSessionService() {
 
     private inner class PlayerListener : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            currentSongId.value = mediaItem?.mediaId
             mediaItem ?: return
             // Offline and the next song isn't on the phone: go straight to one that is, rather than
             // waiting for it to fail (only for automatic advances; a song picked by hand gets its try).
@@ -780,6 +824,9 @@ class PlaybackService : MediaSessionService() {
         const val CMD_PLAY_NEXT = "hearth.PLAY_NEXT"
         const val CMD_ADD_TO_QUEUE = "hearth.ADD_TO_QUEUE"
         const val CMD_TOGGLE_SHUFFLE = "hearth.TOGGLE_SHUFFLE"
+        const val CMD_LIKE = "hearth.LIKE"
+        /** Commands any controller may send: the lock-screen / notification buttons. */
+        val BUTTON_COMMANDS = setOf(CMD_LIKE, CMD_TOGGLE_SHUFFLE)
         const val CMD_MOVE_NEXT = "hearth.MOVE_NEXT"
         const val CMD_SLEEP = "hearth.SLEEP"
         const val CMD_SKIP_TO = "hearth.SKIP_TO"
@@ -789,7 +836,7 @@ class PlaybackService : MediaSessionService() {
         const val CMD_REMOVE_QUEUED = "hearth.REMOVE_QUEUED"
         /** Only this app's own controllers may send these. */
         private val CUSTOM_COMMANDS = listOf(
-            CMD_PLAY_SOURCE, CMD_PLAY_NEXT, CMD_ADD_TO_QUEUE, CMD_TOGGLE_SHUFFLE, CMD_MOVE_NEXT, CMD_SLEEP,
+            CMD_PLAY_SOURCE, CMD_PLAY_NEXT, CMD_ADD_TO_QUEUE, CMD_TOGGLE_SHUFFLE, CMD_LIKE, CMD_MOVE_NEXT, CMD_SLEEP,
             CMD_SKIP_TO, CMD_REMOVE, CMD_MOVE_AFTER, CMD_RESTORE, CMD_REMOVE_QUEUED,
         )
         const val ARG_SLEEP_MS = "sleepMs"
