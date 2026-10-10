@@ -93,6 +93,10 @@ interface LibraryDao {
 
     /** Adds songs this phone doesn't know yet without touching ones it does (keeps local stars and counts). */
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertMissingSongs(items: List<SongEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertMissingAlbums(items: List<AlbumEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertMissingArtists(items: List<ArtistEntity>)
+
+    @Query("SELECT * FROM albums WHERE id = :id") suspend fun albumOnce(id: String): AlbumEntity?
 
     @Query("SELECT s.* FROM downloads d JOIN songs s ON s.id = d.songId WHERE d.state = 'DONE' ORDER BY s.artist, s.album, s.disc, s.track")
     suspend fun downloadedSongsOnce(): List<SongEntity>
@@ -294,6 +298,18 @@ interface DownloadDao {
     @Query("DELETE FROM pinned") suspend fun clearPinned()
 }
 
+@Dao
+interface RequestDao {
+    @Query("SELECT * FROM requests ORDER BY requestedAt DESC") fun all(): Flow<List<RequestEntity>>
+    @Query("SELECT * FROM requests ORDER BY requestedAt DESC") suspend fun allOnce(): List<RequestEntity>
+    @Query("SELECT * FROM requests WHERE status IN ('REQUESTED', 'DOWNLOADING', 'ADDING') ORDER BY requestedAt")
+    suspend fun active(): List<RequestEntity>
+    @Query("SELECT * FROM requests WHERE type = :type AND tidalId = :tidalId") suspend fun get(type: String, tidalId: String): RequestEntity?
+    @Upsert suspend fun upsert(item: RequestEntity)
+    @Query("DELETE FROM requests WHERE type = :type AND tidalId = :tidalId") suspend fun delete(type: String, tidalId: String)
+    @Query("DELETE FROM requests WHERE status = 'DONE'") suspend fun clearDone()
+}
+
 data class DownloadCounts(val queued: Int = 0, val downloading: Int = 0, val failed: Int = 0) {
     /** Songs still to come (waiting or on their way). */
     val left: Int get() = queued + downloading
@@ -310,6 +326,9 @@ data class DownloadCounts(val queued: Int = 0, val downloading: Int = 0, val fai
 class Converters {
     @TypeConverter fun fromState(s: DownloadState): String = s.name
     @TypeConverter fun toState(s: String): DownloadState = DownloadState.valueOf(s)
+    @TypeConverter fun fromRequestStatus(s: RequestStatus): String = s.name
+    @TypeConverter fun toRequestStatus(s: String): RequestStatus =
+        RequestStatus.entries.firstOrNull { it.name == s } ?: RequestStatus.FAILED
 }
 
 @Database(
@@ -317,9 +336,9 @@ class Converters {
         SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class,
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
-        SongDownloadPrefEntity::class,
+        SongDownloadPrefEntity::class, RequestEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -327,6 +346,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
     abstract fun downloads(): DownloadDao
     abstract fun lyrics(): LyricsDao
+    abstract fun requests(): RequestDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -367,10 +387,22 @@ abstract class AppDatabase : RoomDatabase() {
             "CREATE TABLE IF NOT EXISTS `song_download_prefs` (`songId` TEXT NOT NULL, `wanted` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`songId`))",
         )
 
+        /** Song ISRCs (to spot music already on the server) and the Tidarr requests table. Must match the entities exactly. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_5_6_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_5_6_SQL = listOf(
+            "ALTER TABLE songs ADD COLUMN isrc TEXT",
+            "CREATE TABLE IF NOT EXISTS `requests` (`tidalId` TEXT NOT NULL, `type` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `coverUuid` TEXT, `isrc` TEXT, `albumTitle` TEXT, `durationSec` INTEGER, `requestedAt` INTEGER NOT NULL, `requestedBy` TEXT NOT NULL, `status` TEXT NOT NULL, `errorMessage` TEXT, `matchedIds` TEXT, `updatedAt` INTEGER NOT NULL, `seenInQueue` INTEGER NOT NULL, `finishedAt` INTEGER, `lookupAttempts` INTEGER NOT NULL, PRIMARY KEY(`type`, `tidalId`))",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
     }
 }

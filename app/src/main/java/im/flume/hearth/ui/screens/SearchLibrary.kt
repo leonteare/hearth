@@ -145,6 +145,27 @@ fun SearchScreen() {
     val gridColumns = gridColumns()
     LaunchedEffect(Unit) { focus.requestFocus() }
 
+    // "On Tidal": music that isn't on the server, fetched separately so the library results never wait on it.
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
+    val requestList by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+    val requestsByKey = remember(requestList) { requestList.associateBy { "${it.type}:${it.tidalId}" } }
+    val requester = rememberTidalRequester()
+    var tidal by remember { mutableStateOf<TidalSearchState>(TidalSearchState.Hidden) }
+    LaunchedEffect(query, online, settings.tidalSearchEnabled) {
+        val q = query.trim()
+        if (!settings.tidalSearchEnabled || !online || q.length < 2) { tidal = TidalSearchState.Hidden; return@LaunchedEffect }
+        delay(400)
+        tidal = TidalSearchState.Loading
+        tidal = try {
+            TidalSearchState.Results(withContext(Dispatchers.IO) { c.requests.searchTidal(q) })
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TidalSearchState.Unavailable
+        }
+    }
+
     LaunchedEffect(query) {
         val q = query.trim()
         if (q.isEmpty()) {
@@ -199,6 +220,7 @@ fun SearchScreen() {
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
             if (query.isBlank()) {
+                requestsEntry(requestList) { actions.open("requests") }
                 if (recent.isNotEmpty()) {
                     item {
                         SectionHeader("Recent searches") {
@@ -278,11 +300,16 @@ fun SearchScreen() {
                     }
                 }
                 if (!indexing && artists.isEmpty() && albums.isEmpty() && songs.isEmpty()) {
-                    item { Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
+                    item {
+                        val where = if (tidal == TidalSearchState.Hidden) "" else " on your server"
+                        Text("No results$where for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
+                    }
                 }
+                tidalResults(tidal, requestsByKey, requester)
             }
         }
     }
+    TidalSheets(requester, requestsByKey)
 }
 
 @Composable

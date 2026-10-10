@@ -329,6 +329,14 @@ fun AppRoot() {
         }
     }
 
+    // Pages opened from outside, e.g. tapping an "Added to your phone" notification.
+    val pendingRoute by c.pendingRoute.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingRoute) {
+        val route = pendingRoute ?: return@LaunchedEffect
+        c.pendingRoute.value = null
+        runCatching { actions.open(route) }
+    }
+
     val config = LocalConfiguration.current
     val landscape = config.screenWidthDp > config.screenHeightDp
     val ease = FastOutSlowInEasing
@@ -372,6 +380,7 @@ fun AppRoot() {
                         screen("browse/songs") { BrowseSongsScreen() }
                         screen("liked") { LikedScreen() }
                         screen("downloads") { DownloadsScreen() }
+                        screen("requests") { im.flume.hearth.ui.screens.RequestsScreen() }
                         screen("settings") { SettingsScreen() }
                         screen("settings/general") { GeneralSettings() }
                         screen("settings/storage") { StorageSettings() }

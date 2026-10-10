@@ -82,7 +82,15 @@ data class SongDto(
     val created: String? = null,
     val isDir: Boolean = false,
     val replayGain: ReplayGain? = null,
-)
+    /** OpenSubsonic: Navidrome sends a list of strings; tolerate a single string too. */
+    val isrc: kotlinx.serialization.json.JsonElement? = null,
+) {
+    fun isrcCodes(): List<String> = when (val v = isrc) {
+        is kotlinx.serialization.json.JsonArray -> v.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        is kotlinx.serialization.json.JsonPrimitive -> if (v.isString) listOf(v.content) else emptyList()
+        else -> emptyList()
+    }.map { it.trim().uppercase() }.filter { it.isNotEmpty() }.distinct()
+}
 
 @Serializable
 data class AlbumDto(

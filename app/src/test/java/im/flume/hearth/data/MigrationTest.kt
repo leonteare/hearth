@@ -55,4 +55,21 @@ class MigrationTest {
         val prefs = createSql(5, "song_download_prefs").replace("`\${TABLE_NAME}`", "`song_download_prefs`")
         assertTrue(AppDatabase.MIGRATION_4_5_SQL.contains(prefs))
     }
+
+    @Test
+    fun `migration 5 to 6 matches the exported schema`() {
+        val before = columns(createSql(5, "songs"))
+        val after = columns(createSql(6, "songs"))
+        val prefix = "ALTER TABLE songs ADD COLUMN "
+        val added = AppDatabase.MIGRATION_5_6_SQL.filter { it.startsWith(prefix) }.associate { stmt ->
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ") to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        val requests = createSql(6, "requests").replace("`\${TABLE_NAME}`", "`requests`")
+        assertTrue(AppDatabase.MIGRATION_5_6_SQL.contains(requests))
+        // Every other table is unchanged.
+        val tables = listOf("albums", "artists", "playlists", "playlist_songs", "downloads", "pinned", "play_history", "pending_scrobbles", "lyrics", "song_download_prefs")
+        tables.forEach { assertEquals(it, createSql(5, it), createSql(6, it)) }
+    }
 }

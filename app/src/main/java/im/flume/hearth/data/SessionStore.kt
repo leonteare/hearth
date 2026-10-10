@@ -29,7 +29,18 @@ data class Settings(
     val volumeLevelling: Int = 1,
     /** Spread out songs by the same artist when shuffling. */
     val smartShuffle: Boolean = true,
-)
+    /** Tidarr, for requesting music that isn't on the server. Blank = not set up. */
+    val tidarrUrl: String = DEFAULT_TIDARR_URL,
+    /** Show "On Tidal" results under the library results in Search. */
+    val tidalInSearch: Boolean = true,
+) {
+    /** Tidal results are shown when switched on and Tidarr has an address. */
+    val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank()
+
+    companion object {
+        const val DEFAULT_TIDARR_URL = "https://tidal.home"
+    }
+}
 
 /**
  * Login and preferences. Lives in private app storage; login uses the Subsonic token. The password is
@@ -38,6 +49,8 @@ data class Settings(
 class SessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
     val vault = PasswordVault(context)
+    /** Optional Tidarr API key, encrypted like the password. Kept across sign-outs: it belongs to the home server. */
+    val tidarrVault = PasswordVault(context, prefsName = "tidarr-vault", alias = "hearth-tidarr-key")
 
     private val _credentials = MutableStateFlow(readCredentials())
     val credentials: StateFlow<Credentials?> = _credentials.asStateFlow()
@@ -133,6 +146,8 @@ class SessionStore(context: Context) {
         lyricsSpacing = prefs.getInt("lyricsSpacing", 1),
         volumeLevelling = prefs.getInt("volumeLevelling", 1),
         smartShuffle = prefs.getBoolean("smartShuffle", true),
+        tidarrUrl = prefs.getString("tidarrUrl", Settings.DEFAULT_TIDARR_URL).orEmpty(),
+        tidalInSearch = prefs.getBoolean("tidalInSearch", true),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -151,6 +166,8 @@ class SessionStore(context: Context) {
             putInt("lyricsSpacing", s.lyricsSpacing)
             putInt("volumeLevelling", s.volumeLevelling)
             putBoolean("smartShuffle", s.smartShuffle)
+            putString("tidarrUrl", s.tidarrUrl)
+            putBoolean("tidalInSearch", s.tidalInSearch)
         }
         _settings.value = s
     }

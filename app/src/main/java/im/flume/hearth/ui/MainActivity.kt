@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (savedInstanceState == null) takeRoute(intent)
 
         setContent {
             HearthTheme {
@@ -37,6 +38,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        takeRoute(intent)
+    }
+
+    /** A notification asked to open a page (see [EXTRA_ROUTE]). */
+    private fun takeRoute(intent: android.content.Intent?) {
+        val route = intent?.getStringExtra(EXTRA_ROUTE) ?: return
+        intent.removeExtra(EXTRA_ROUTE)
+        container.pendingRoute.value = route
     }
 
     override fun onStart() {
@@ -58,5 +71,9 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         container.player.disconnect()
         super.onStop()
+    }
+
+    companion object {
+        const val EXTRA_ROUTE = "im.flume.hearth.ROUTE"
     }
 }
