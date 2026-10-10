@@ -381,6 +381,8 @@ fun AppRoot() {
                         screen("liked") { LikedScreen() }
                         screen("downloads") { DownloadsScreen() }
                         screen("requests") { im.flume.hearth.ui.screens.RequestsScreen() }
+                        screen("tidal/artist/{id}") { im.flume.hearth.ui.screens.TidalArtistScreen(it.arguments!!.getString("id")!!) }
+                        screen("tidal/album/{id}") { im.flume.hearth.ui.screens.TidalAlbumScreen(it.arguments!!.getString("id")!!) }
                         screen("settings") { SettingsScreen() }
                         screen("settings/general") { GeneralSettings() }
                         screen("settings/storage") { StorageSettings() }

@@ -2,6 +2,8 @@ package im.flume.hearth.api
 
 import im.flume.hearth.util.scrubSecrets
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -46,6 +48,10 @@ data class TidalTrack(
     val albumId: String?,
     val albumTitle: String?,
     val cover: String?,
+    /** The first (main) artist's Tidal id, for "Go to artist". */
+    val artistId: String? = null,
+    val trackNumber: Int? = null,
+    val volumeNumber: Int? = null,
 ) {
     /** "Title (2001 Remaster)" when Tidal lists a version that isn't already part of the title. */
     val displayTitle: String get() = displayTitle(title, version)
@@ -60,6 +66,8 @@ data class TidalAlbum(
     val releaseDate: String?,
     val type: String?,
     val artists: List<String>,
+    val artistId: String? = null,
+    val durationSec: Int? = null,
 ) {
     val artist: String get() = artists.joinToString(", ")
     val year: String? get() = releaseDate?.take(4)?.takeIf { it.length == 4 && it.all(Char::isDigit) }
@@ -72,6 +80,38 @@ data class TidalSearchResults(
     val albums: List<TidalAlbum> = emptyList(),
     val artists: List<TidalArtist> = emptyList(),
 )
+
+/** Everything the Tidal artist page shows. */
+data class TidalArtistPage(
+    val artist: TidalArtist,
+    val topTracks: List<TidalTrack>,
+    val albums: List<TidalAlbum>,
+    val singles: List<TidalAlbum>,
+)
+
+/** A Tidal album and its tracks, in disc and track order. */
+data class TidalAlbumPage(val album: TidalAlbum, val tracks: List<TidalTrack>)
+
+/**
+ * A small in-memory cache whose entries expire after [ttlMs]; the least recently used entry goes
+ * once it holds [max]. Keeps going back and forth between Tidal pages instant.
+ */
+class TtlCache<K, V>(private val max: Int, private val ttlMs: Long, private val clock: () -> Long = System::currentTimeMillis) {
+    private val map = LinkedHashMap<K, Pair<Long, V>>(16, 0.75f, true)
+
+    @Synchronized
+    fun get(key: K): V? {
+        val (at, value) = map[key] ?: return null
+        if (clock() - at > ttlMs) { map.remove(key); return null }
+        return value
+    }
+
+    @Synchronized
+    fun put(key: K, value: V) {
+        map[key] = clock() to value
+        while (map.size > max) map.remove(map.keys.first())
+    }
+}
 
 /** One row of Tidarr's download queue. [status] is Tidarr's own word (queue_download, download, …). */
 data class TidarrQueueItem(
@@ -185,9 +225,40 @@ class TidarrClient(http: OkHttpClient, private val config: () -> TidarrConfig?) 
         return TidarrParsing.search(body)
     }
 
-    /** Adds [id] to Tidarr's download queue. */
-    suspend fun save(type: TidalType, id: String) {
-        send("api/save", verb = "POST", body = TidarrParsing.saveBody(type, id))
+    /** Adds [id] to Tidarr's download queue; [title] and [artist] are what Tidarr's own page shows. */
+    suspend fun save(type: TidalType, id: String, title: String? = null, artist: String? = null) {
+        send("api/save", verb = "POST", body = TidarrParsing.saveBody(type, id, title, artist))
+    }
+
+    private val pages = TtlCache<String, String>(max = 40, ttlMs = 10 * 60_000L)
+
+    /** GET on Tidal's v1 API through Tidarr's proxy; answers are cached for 10 minutes. */
+    private suspend fun tidal(path: String, params: Map<String, String> = emptyMap()): String {
+        val cfg = cfg()
+        val query = linkedMapOf("countryCode" to countryCode(cfg), "deviceType" to "BROWSER", "locale" to "en_US") + params
+        val key = cfg.url + "|" + path + "|" + query.entries.joinToString("&")
+        pages.get(key)?.let { return it }
+        return send("proxy/tidal/$path", query = query, cfg = cfg).also { pages.put(key, it) }
+    }
+
+    /** The artist, their 10 most played tracks, albums, and singles & EPs, fetched side by side. */
+    suspend fun artistPage(id: String): TidalArtistPage = coroutineScope {
+        val artist = async { TidarrParsing.artist(tidal("v1/artists/$id")) }
+        val top = async { TidarrParsing.tracks(tidal("v1/artists/$id/toptracks", mapOf("limit" to "10"))) }
+        val albums = async { TidarrParsing.albums(tidal("v1/artists/$id/albums", mapOf("limit" to "50"))) }
+        val singles = async { TidarrParsing.albums(tidal("v1/artists/$id/albums", mapOf("filter" to "EPSANDSINGLES", "limit" to "50"))) }
+        TidalArtistPage(
+            artist.await() ?: throw TidarrException("Tidal doesn't have this artist"),
+            top.await(), albums.await(), singles.await(),
+        )
+    }
+
+    suspend fun albumPage(id: String): TidalAlbumPage = coroutineScope {
+        val album = async { TidarrParsing.album(tidal("v1/albums/$id")) }
+        val tracks = async { TidarrParsing.tracks(tidal("v1/albums/$id/tracks", mapOf("limit" to "100"))) }
+        val a = album.await() ?: throw TidarrException("Tidal doesn't have this album")
+        // Album track lists may leave out the cover; the album has it.
+        TidalAlbumPage(a, tracks.await().sortedWith(compareBy({ it.volumeNumber ?: 1 }, { it.trackNumber ?: 0 })).map { t -> if (t.cover == null) t.copy(cover = a.cover, albumId = t.albumId ?: a.id, albumTitle = t.albumTitle ?: a.title) else t })
     }
 
     suspend fun queue(): List<TidarrQueueItem> = TidarrParsing.queue(send("api/queue/list"))
@@ -229,40 +300,66 @@ object TidarrParsing {
         o["artists"].arr()?.mapNotNull { it.obj()?.get("name").str() }?.takeIf { it.isNotEmpty() }
             ?: listOfNotNull(o["artist"].obj()?.get("name").str())
 
+    private fun firstArtistId(o: JsonObject): String? =
+        o["artists"].arr()?.firstOrNull()?.obj()?.get("id").str() ?: o["artist"].obj()?.get("id").str()
+
+    private fun parseTrack(t: JsonObject): TidalTrack? {
+        val album = t["album"].obj()
+        return TidalTrack(
+            id = t["id"].str() ?: return null,
+            title = t["title"].str() ?: return null,
+            version = t["version"].str(),
+            durationSec = t["duration"].int(),
+            isrc = t["isrc"].str()?.uppercase(),
+            explicit = t["explicit"].bool() ?: false,
+            artists = artistNames(t),
+            albumId = album?.get("id").str(),
+            albumTitle = album?.get("title").str(),
+            cover = album?.get("cover").str(),
+            artistId = firstArtistId(t),
+            trackNumber = t["trackNumber"].int(),
+            volumeNumber = t["volumeNumber"].int(),
+        )
+    }
+
+    private fun parseAlbum(a: JsonObject): TidalAlbum? = TidalAlbum(
+        id = a["id"].str() ?: return null,
+        title = a["title"].str() ?: return null,
+        cover = a["cover"].str(),
+        numberOfTracks = a["numberOfTracks"].int(),
+        releaseDate = a["releaseDate"].str(),
+        type = a["type"].str(),
+        artists = artistNames(a),
+        artistId = firstArtistId(a),
+        durationSec = a["duration"].int(),
+    )
+
+    private fun parseArtist(a: JsonObject): TidalArtist? =
+        TidalArtist(a["id"].str() ?: return null, a["name"].str() ?: return null, a["picture"].str())
+
     fun search(body: String): TidalSearchResults {
         val root = json.parseToJsonElement(body).obj() ?: return TidalSearchResults()
-        val tracks = items(root, "tracks").mapNotNull { t ->
-            val id = t["id"].str() ?: return@mapNotNull null
-            val album = t["album"].obj()
-            TidalTrack(
-                id = id,
-                title = t["title"].str() ?: return@mapNotNull null,
-                version = t["version"].str(),
-                durationSec = t["duration"].int(),
-                isrc = t["isrc"].str()?.uppercase(),
-                explicit = t["explicit"].bool() ?: false,
-                artists = artistNames(t),
-                albumId = album?.get("id").str(),
-                albumTitle = album?.get("title").str(),
-                cover = album?.get("cover").str(),
-            )
-        }
-        val albums = items(root, "albums").mapNotNull { a ->
-            TidalAlbum(
-                id = a["id"].str() ?: return@mapNotNull null,
-                title = a["title"].str() ?: return@mapNotNull null,
-                cover = a["cover"].str(),
-                numberOfTracks = a["numberOfTracks"].int(),
-                releaseDate = a["releaseDate"].str(),
-                type = a["type"].str(),
-                artists = artistNames(a),
-            )
-        }
-        val artists = items(root, "artists").mapNotNull { a ->
-            TidalArtist(a["id"].str() ?: return@mapNotNull null, a["name"].str() ?: return@mapNotNull null, a["picture"].str())
-        }
-        return TidalSearchResults(tracks, albums, artists)
+        return TidalSearchResults(
+            items(root, "tracks").mapNotNull(::parseTrack),
+            items(root, "albums").mapNotNull(::parseAlbum),
+            items(root, "artists").mapNotNull(::parseArtist),
+        )
     }
+
+    private fun rootItems(body: String): List<JsonObject> =
+        json.parseToJsonElement(body).obj()?.get("items").arr()?.mapNotNull { it.obj() }.orEmpty()
+
+    /** v1/artists/{id}: the artist, or null if the answer isn't one. */
+    fun artist(body: String): TidalArtist? = json.parseToJsonElement(body).obj()?.let(::parseArtist)
+
+    /** v1/albums/{id}. */
+    fun album(body: String): TidalAlbum? = json.parseToJsonElement(body).obj()?.let(::parseAlbum)
+
+    /** A page of albums (v1/artists/{id}/albums). */
+    fun albums(body: String): List<TidalAlbum> = rootItems(body).mapNotNull(::parseAlbum)
+
+    /** A page of tracks (v1/artists/{id}/toptracks, v1/albums/{id}/tracks). */
+    fun tracks(body: String): List<TidalTrack> = rootItems(body).mapNotNull(::parseTrack)
 
     fun queue(body: String): List<TidarrQueueItem> {
         val root = json.parseToJsonElement(body)
@@ -286,12 +383,14 @@ object TidarrParsing {
         json.parseToJsonElement(body).obj()?.get("tiddl_config").obj()?.get("auth").obj()?.get("country_code").str()
             ?.takeIf { it.length == 2 }?.uppercase()
 
-    fun saveBody(type: TidalType, id: String): String = buildJsonObject {
+    fun saveBody(type: TidalType, id: String, title: String? = null, artist: String? = null): String = buildJsonObject {
         put("item", buildJsonObject {
             put("id", id)
             put("url", "https://listen.tidal.com/${type.api}/$id")
             put("type", type.api)
             put("status", "queue_download")
+            title?.let { put("title", it) }
+            artist?.let { put("artist", it) }
         })
     }.toString()
 }

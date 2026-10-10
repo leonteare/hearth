@@ -21,6 +21,8 @@ import im.flume.hearth.HearthApp
 import im.flume.hearth.R
 import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.api.TidalAlbum
+import im.flume.hearth.api.TidalAlbumPage
+import im.flume.hearth.api.TidalArtistPage
 import im.flume.hearth.api.TidalArtist
 import im.flume.hearth.api.TidalSearchResults
 import im.flume.hearth.api.TidalTrack
@@ -75,6 +77,11 @@ class RequestsRepository(
 ) {
     private val dao = db.requests()
 
+    init {
+        // Before 2.3.1 a request that produced nothing was marked done ("On the server"); it actually failed.
+        scope.launch { runCatching { dao.allOnce().forEach { r -> RequestTracking.reclassified(r)?.let { dao.upsert(it) } } } }
+    }
+
     @Volatile private var apiKey: String? = null
     @Volatile private var apiKeyLoaded = false
 
@@ -111,7 +118,7 @@ class RequestsRepository(
     private suspend fun localCatalog(): RequestMatching.LocalCatalog = withContext(Dispatchers.Default) {
         val key = "${session.lastSyncAt}:$catalogVersion"
         catalog?.takeIf { it.first == key }?.second
-            ?: RequestMatching.LocalCatalog(db.library().allSongsOnce(), db.library().allAlbumsOnce()).also { catalog = key to it }
+            ?: RequestMatching.LocalCatalog(db.library().allSongsOnce(), db.library().allAlbumsOnce(), db.library().allArtistsOnce()).also { catalog = key to it }
     }
 
     /** Tidal results for [query] that aren't on the server yet: up to 5 songs, 5 albums and 3 artists. */
@@ -119,6 +126,29 @@ class RequestsRepository(
         val raw = tidarr.search(query, limit = 15)
         val filtered = localCatalog().filter(raw)
         return TidalSearchResults(filtered.tracks.take(5), filtered.albums.take(5), filtered.artists.take(3))
+    }
+
+    /** A Tidal artist's page, with what of it is already on the server. Throws (safe message) if Tidarr can't be reached. */
+    suspend fun tidalArtist(id: String): TidalArtistView {
+        val page = tidarr.artistPage(id)
+        val cat = localCatalog()
+        return TidalArtistView(
+            page,
+            localArtistId = cat.localArtist(page.artist.name)?.id,
+            localTracks = page.topTracks.mapNotNull { t -> cat.localTrack(t)?.let { t.id to it.id } }.toMap(),
+            localAlbums = (page.albums + page.singles).mapNotNull { a -> cat.localAlbum(a)?.let { a.id to it.id } }.toMap(),
+        )
+    }
+
+    /** A Tidal album's page, with which tracks (or the whole album) are already on the server. */
+    suspend fun tidalAlbum(id: String): TidalAlbumView {
+        val page = tidarr.albumPage(id)
+        val cat = localCatalog()
+        return TidalAlbumView(
+            page,
+            localAlbumId = cat.localAlbum(page.album)?.id,
+            localTracks = page.tracks.mapNotNull { t -> cat.localTrack(t)?.let { t.id to it.id } }.toMap(),
+        )
     }
 
     /** Checks that Tidarr answers at [url] and can search. Returns null when fine, or what went wrong. */
@@ -175,7 +205,7 @@ class RequestsRepository(
         val inQueue = runCatching { tidarr.queue() }.getOrNull()?.firstOrNull { it.id == draft.tidalId }
         val failedThere = inQueue != null && (inQueue.error || inQueue.status == "error")
         when {
-            inQueue == null -> tidarr.save(TidalType.of(draft.type), draft.tidalId)
+            inQueue == null -> tidarr.save(TidalType.of(draft.type), draft.tidalId, draft.title, draft.artist)
             failedThere -> tidarr.retryFailed()
         }
         val now = System.currentTimeMillis()
@@ -187,17 +217,23 @@ class RequestsRepository(
         return Outcome.REQUESTED
     }
 
-    /** Tries a failed request again: Tidarr retries its failed items, or it's added again if it's gone. */
+    /**
+     * Sends a request again. Tidarr retries it if it failed there; if it's listed as anything else
+     * (usually "finished" with nothing downloaded) it's taken out and added again, since Tidarr
+     * ignores a second save of an id it already has.
+     */
     suspend fun retry(r: RequestEntity) {
-        val inQueue = runCatching { tidarr.queue() }.getOrNull()?.firstOrNull { it.id == r.tidalId }
-        if (inQueue != null) tidarr.retryFailed() else tidarr.save(TidalType.of(r.type), r.tidalId)
-        val now = System.currentTimeMillis()
-        dao.upsert(
-            r.copy(
-                status = RequestStatus.REQUESTED, errorMessage = null, updatedAt = now,
-                seenInQueue = inQueue != null, finishedAt = null, lookupAttempts = 0,
-            )
-        )
+        val inQueue = tidarr.queue().firstOrNull { it.id == r.tidalId }
+        val action = RequestTracking.retryAction(inQueue)
+        when (action) {
+            RequestTracking.RetryAction.RETRY_FAILED -> tidarr.retryFailed()
+            RequestTracking.RetryAction.REMOVE_AND_SAVE -> {
+                tidarr.remove(r.tidalId)
+                tidarr.save(TidalType.of(r.type), r.tidalId, r.title, r.artist)
+            }
+            RequestTracking.RetryAction.SAVE -> tidarr.save(TidalType.of(r.type), r.tidalId, r.title, r.artist)
+        }
+        dao.upsert(RequestTracking.afterRetry(r, action, System.currentTimeMillis()))
         ensureTracking()
     }
 
@@ -270,6 +306,7 @@ class RequestsRepository(
         if (active.isEmpty()) return@withLock false
         val now = System.currentTimeMillis()
 
+        var justFinished = false
         if (config() != null && active.any { it.status == RequestStatus.REQUESTED || it.status == RequestStatus.DOWNLOADING }) {
             val queue = runCatching { tidarr.queue() }.getOrNull()
             if (queue != null) {
@@ -277,11 +314,23 @@ class RequestsRepository(
                 active.forEach { r ->
                     val next = RequestTracking.afterQueue(r, byId[r.tidalId], now)
                     if (next != r) dao.upsert(next)
+                    if (next.status == RequestStatus.ADDING && r.status != RequestStatus.ADDING) justFinished = true
                 }
             }
         }
+        // Tidarr's own rescan can fail (e.g. a wrong Navidrome password in its settings), so ask the
+        // server to scan too. Both users are admins; if this one isn't, the folder watcher still helps.
+        if (justFinished) api.startScan()
 
-        val due = dao.active().filter { mine(it) && it.status == RequestStatus.ADDING && RequestTracking.lookupDue(it, now) }
+        val adding = dao.active().filter { mine(it) && it.status == RequestStatus.ADDING }
+        // Long overdue (e.g. scan status never answered): one last look, then it failed.
+        for (r in adding.filter { RequestTracking.addingTimedOut(it, now) }) {
+            val result = runCatching { findOnServer(r) }
+            if (result.isFailure) continue
+            val found = result.getOrNull()
+            if (found != null) complete(r, found, notify = true) else giveUp(r)
+        }
+        val due = adding.filter { !RequestTracking.addingTimedOut(it, now) && RequestTracking.lookupDue(it, now) }
         if (due.isNotEmpty() && awaitScanIdle()) {
             for (r in due) {
                 val result = runCatching { findOnServer(r) }
@@ -389,11 +438,14 @@ class RequestsRepository(
         }
     }
 
-    /** Tidarr finished but the server never showed it: done, with a note, and a normal sync to pick it up later. */
+    /**
+     * Tidarr said "finished" but nothing turned up on the server. That's a failure, not a success:
+     * Tidarr marks a download that produced no files as finished (e.g. on a free Tidal account).
+     * A sync still runs in case it did arrive under a name that couldn't be matched.
+     */
     private suspend fun giveUp(r: RequestEntity) {
-        dao.upsert(r.copy(status = RequestStatus.DONE, errorMessage = NOT_MATCHED, updatedAt = System.currentTimeMillis()))
+        dao.upsert(RequestTracking.gaveUp(r, System.currentTimeMillis()))
         scope.launch { runCatching { sync.syncIfNeeded() } }
-        notifyDone(r, "Added to the server: ${r.title}", NOT_MATCHED, null)
     }
 
     private fun notifyDone(r: RequestEntity, title: String, text: String?, route: String?) {
@@ -422,9 +474,23 @@ class RequestsRepository(
         private const val FOREGROUND_POLL_MS = 20_000L
         private const val SCAN_WAIT_MS = 5 * 60_000L
         private const val SCAN_POLL_MS = 10_000L
-        const val NOT_MATCHED = "Added to the server — couldn't match it automatically"
     }
 }
+
+/** A Tidal artist page plus local ids: [localTracks] and [localAlbums] map Tidal ids to the server's. */
+data class TidalArtistView(
+    val page: TidalArtistPage,
+    val localArtistId: String?,
+    val localTracks: Map<String, String>,
+    val localAlbums: Map<String, String>,
+)
+
+/** A Tidal album page plus local ids; [localAlbumId] is set when the whole album is already on the server. */
+data class TidalAlbumView(
+    val page: TidalAlbumPage,
+    val localAlbumId: String?,
+    val localTracks: Map<String, String>,
+)
 
 /** Follows requests every 15 minutes while the app is closed; cancels itself once nothing is in progress. */
 class RequestsWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {

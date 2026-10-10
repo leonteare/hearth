@@ -162,4 +162,116 @@ class TidarrClientTest {
             assertTrue(e.message!!.contains("API key"))
         }
     }
+
+    @Test
+    fun `artist page parts parse`() {
+        val artist = TidarrParsing.artist(fixture("artist.json"))!!
+        assertEquals("3634161", artist.id)
+        assertEquals("Daft Punk", artist.name)
+        assertEquals("2b5e1a7e-3e9b-4f9e-9b36-bbb1d0d3e7a1", artist.picture)
+
+        val albums = TidarrParsing.albums(fixture("artist_albums.json"))
+        assertEquals(listOf("Random Access Memories", "Discovery"), albums.map { it.title })
+        assertEquals(4462, albums[0].durationSec)
+        assertEquals("3634161", albums[0].artistId)
+        assertEquals("2001", albums[1].year)
+        val singles = TidarrParsing.albums(fixture("artist_singles.json"))
+        assertEquals("SINGLE", singles.single().type)
+        assertEquals("Daft Punk, Pharrell Williams", singles.single().artist)
+
+        val top = TidarrParsing.tracks(fixture("toptracks.json"))
+        assertEquals(2, top.size)
+        assertEquals("Get Lucky (feat. Pharrell Williams & Nile Rodgers)", top[0].displayTitle)
+        assertEquals("USQX91300108", top[0].isrc)
+        assertEquals("3634161", top[0].artistId)
+        assertEquals("77646169", top[0].albumId)
+        assertEquals(8, top[0].trackNumber)
+    }
+
+    @Test
+    fun `album and its tracks parse`() {
+        val album = TidarrParsing.album(fixture("album.json"))!!
+        assertEquals("9001", album.id)
+        assertEquals("Alive 2007", album.title)
+        assertEquals(4560, album.durationSec)
+        assertEquals(3, album.numberOfTracks)
+        assertEquals("2007", album.year)
+        assertEquals("3634161", album.artistId)
+        val tracks = TidarrParsing.tracks(fixture("album_tracks.json"))
+        assertEquals(listOf(2, 1, 1), tracks.map { it.volumeNumber })
+        assertEquals("Touch It / Technologic (Live)", tracks[2].displayTitle)
+        assertTrue(tracks[2].explicit)
+        assertNull(TidarrParsing.artist("[]"))
+        assertTrue(TidarrParsing.tracks("{}").isEmpty())
+    }
+
+    @Test
+    fun `album page sorts by disc and track, fills in the cover, and is cached`() = runTest {
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                val path = request.requestUrl!!.encodedPath
+                return when {
+                    path == "/api/settings" -> MockResponse().setBody(fixture("settings.json"))
+                    path.endsWith("/v1/albums/9001/tracks") -> MockResponse().setBody(fixture("album_tracks.json"))
+                    path.endsWith("/v1/albums/9001") -> MockResponse().setBody(fixture("album.json"))
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+        val page = client.albumPage("9001")
+        assertEquals(listOf("9101", "9102", "9103"), page.tracks.map { it.id })
+        assertTrue(page.tracks.all { it.cover == "deadbeef-0000-1111-2222-333344445555" })
+        val count = server.requestCount
+        client.albumPage("9001")
+        assertEquals(count, server.requestCount)
+    }
+
+    @Test
+    fun `artist page asks tidal through the proxy with the country and filters`() = runTest {
+        val seen = java.util.concurrent.CopyOnWriteArrayList<okhttp3.HttpUrl>()
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                val url = request.requestUrl!!
+                seen += url
+                return when {
+                    url.encodedPath == "/api/settings" -> MockResponse().setBody(fixture("settings.json"))
+                    url.encodedPath.endsWith("/toptracks") -> MockResponse().setBody(fixture("toptracks.json"))
+                    url.encodedPath.endsWith("/albums") && url.queryParameter("filter") == "EPSANDSINGLES" -> MockResponse().setBody(fixture("artist_singles.json"))
+                    url.encodedPath.endsWith("/albums") -> MockResponse().setBody(fixture("artist_albums.json"))
+                    else -> MockResponse().setBody(fixture("artist.json"))
+                }
+            }
+        }
+        val page = client.artistPage("3634161")
+        assertEquals("Daft Punk", page.artist.name)
+        assertEquals(2, page.topTracks.size)
+        assertEquals(2, page.albums.size)
+        assertEquals(1, page.singles.size)
+        val tidal = seen.filter { it.encodedPath.startsWith("/proxy/tidal/v1/artists/3634161") }
+        assertEquals(4, tidal.size)
+        assertTrue(tidal.all { it.queryParameter("countryCode") == "GB" && it.queryParameter("deviceType") == "BROWSER" })
+        assertEquals("10", tidal.first { it.encodedPath.endsWith("/toptracks") }.queryParameter("limit"))
+    }
+
+    @Test
+    fun `save body carries the title and artist for the tidarr queue`() {
+        val o = Json.parseToJsonElement(TidarrParsing.saveBody(TidalType.TRACK, "1", "Get Lucky", "Daft Punk")).jsonObject["item"]!!.jsonObject
+        assertEquals("Get Lucky", o["title"]!!.jsonPrimitive.content)
+        assertEquals("Daft Punk", o["artist"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `ttl cache expires entries and drops the least recently used`() {
+        var now = 0L
+        val cache = TtlCache<String, Int>(max = 2, ttlMs = 100) { now }
+        cache.put("a", 1)
+        cache.put("b", 2)
+        assertEquals(1, cache.get("a"))
+        cache.put("c", 3)
+        assertNull(cache.get("b"))
+        assertEquals(1, cache.get("a"))
+        now = 101
+        assertNull(cache.get("a"))
+        assertNull(cache.get("c"))
+    }
 }

@@ -114,6 +114,24 @@ class RequestMatchingTest {
         assertNull(json.decodeFromString(SongDto.serializer(), """{"id":"1","title":"T"}""").toEntity().isrc)
         assertNull(json.decodeFromString(SongDto.serializer(), """{"id":"1","title":"T","isrc":[]}""").toEntity().isrc)
     }
+
+    @Test
+    fun `catalog finds the server copies for tidal pages`() {
+        val lucky = song("s1", "Get Lucky", "Daft Punk feat. Pharrell Williams", isrc = "USQX91300108")
+        val time = song("s2", "One More Time", "Daft Punk")
+        val cat = RequestMatching.LocalCatalog(
+            listOf(lucky, time),
+            listOf(album("a1", "Discovery", "Daft Punk")),
+            listOf(ArtistEntity("ar1", "Daft Punk", 2, null, false)),
+        )
+        assertEquals("s1", cat.localTrack(track("Something Else", listOf("X"), isrc = "USQX91300108"))?.id)
+        assertEquals("s2", cat.localTrack(track("One More Time", listOf("Daft Punk")))?.id)
+        assertNull(cat.localTrack(track("Aerodynamic", listOf("Daft Punk"))))
+        assertEquals("a1", cat.localAlbum(tidalAlbum("Discovery", listOf("Daft Punk")))?.id)
+        assertNull(cat.localAlbum(tidalAlbum("Homework", listOf("Daft Punk"))))
+        assertEquals("ar1", cat.localArtist("daft punk")?.id)
+        assertNull(cat.localArtist("Justice"))
+    }
 }
 
 class RequestTrackingTest {
@@ -174,5 +192,51 @@ class RequestTrackingTest {
         assertFalse(RequestTracking.lookupExhausted(r.copy(lookupAttempts = 5)))
         assertTrue(RequestTracking.lookupExhausted(r.copy(lookupAttempts = 6)))
         assertFalse(RequestTracking.lookupDue(r.copy(lookupAttempts = 6), now = Long.MAX_VALUE))
+    }
+
+    @Test
+    fun `retry re-adds what tidarr calls finished, and retries what failed there`() {
+        assertEquals(RequestTracking.RetryAction.SAVE, RequestTracking.retryAction(null))
+        assertEquals(RequestTracking.RetryAction.RETRY_FAILED, RequestTracking.retryAction(item("error")))
+        assertEquals(RequestTracking.RetryAction.RETRY_FAILED, RequestTracking.retryAction(item("download", error = true)))
+        assertEquals(RequestTracking.RetryAction.REMOVE_AND_SAVE, RequestTracking.retryAction(item("finished")))
+        assertEquals(RequestTracking.RetryAction.REMOVE_AND_SAVE, RequestTracking.retryAction(item("queue_download")))
+    }
+
+    @Test
+    fun `a retried request starts over`() {
+        val failed = req(RequestStatus.FAILED, seen = true, finishedAt = 5, attempts = 6).copy(errorMessage = RequestTracking.NOTHING_ARRIVED)
+        val readded = RequestTracking.afterRetry(failed, RequestTracking.RetryAction.REMOVE_AND_SAVE, now = 99)
+        assertEquals(RequestStatus.REQUESTED, readded.status)
+        assertNull(readded.errorMessage)
+        assertNull(readded.finishedAt)
+        assertEquals(0, readded.lookupAttempts)
+        assertEquals(99L, readded.updatedAt)
+        // Re-added: it must show up in the queue again before vanishing means "finished".
+        assertFalse(readded.seenInQueue)
+        assertTrue(RequestTracking.afterRetry(failed, RequestTracking.RetryAction.RETRY_FAILED, now = 99).seenInQueue)
+    }
+
+    @Test
+    fun `nothing arriving is a failure, and old rows saying otherwise are corrected`() {
+        val given = RequestTracking.gaveUp(req(RequestStatus.ADDING, finishedAt = 0, attempts = 6), now = 7)
+        assertEquals(RequestStatus.FAILED, given.status)
+        assertEquals(RequestTracking.NOTHING_ARRIVED, given.errorMessage)
+        assertNull(given.matchedIds)
+
+        val old = req(RequestStatus.DONE).copy(errorMessage = RequestTracking.NOT_MATCHED)
+        val fixed = RequestTracking.reclassified(old)!!
+        assertEquals(RequestStatus.FAILED, fixed.status)
+        assertEquals(RequestTracking.NOTHING_ARRIVED, fixed.errorMessage)
+        assertNull(RequestTracking.reclassified(req(RequestStatus.DONE).copy(matchedIds = "s1")))
+        assertNull(RequestTracking.reclassified(req(RequestStatus.FAILED).copy(errorMessage = RequestTracking.NOT_MATCHED)))
+    }
+
+    @Test
+    fun `adding for over half an hour times out`() {
+        val r = req(RequestStatus.ADDING, finishedAt = 0)
+        assertFalse(RequestTracking.addingTimedOut(r, now = RequestTracking.ADDING_TIMEOUT_MS))
+        assertTrue(RequestTracking.addingTimedOut(r, now = RequestTracking.ADDING_TIMEOUT_MS + 1))
+        assertFalse(RequestTracking.addingTimedOut(req(RequestStatus.DOWNLOADING, finishedAt = 0), now = Long.MAX_VALUE / 2))
     }
 }

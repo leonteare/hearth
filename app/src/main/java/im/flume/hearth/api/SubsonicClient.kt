@@ -150,6 +150,9 @@ class SubsonicClient(
 
     suspend fun scanStatus(): ScanStatus? = runCatching { call("getScanStatus").scanStatus }.getOrNull()
 
+    /** Asks the server to look for new files (admins only). False if it refused or couldn't be reached. */
+    suspend fun startScan(): Boolean = runCatching { call("startScan") }.isSuccess
+
     /** Structured (possibly synced) lyrics; empty when the song has none. */
     suspend fun lyricsBySongId(songId: String): List<StructuredLyrics> =
         call("getLyricsBySongId") { addQueryParameter("id", songId) }.lyricsList?.structuredLyrics.orEmpty()

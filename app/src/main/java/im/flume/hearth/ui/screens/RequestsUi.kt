@@ -17,7 +17,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -118,6 +120,9 @@ sealed interface TidalSearchState {
 
 private fun RequestEntity.key() = "$type:$tidalId"
 
+fun tidalAlbumRoute(id: String) = "tidal/album/${android.net.Uri.encode(id)}"
+fun tidalArtistRoute(id: String) = "tidal/artist/${android.net.Uri.encode(id)}"
+
 /** Request sheets (details, artist confirmation) and the actions behind the Request buttons. */
 @Stable
 class TidalRequester(private val c: AppContainer, private val actions: Actions) {
@@ -132,6 +137,18 @@ class TidalRequester(private val c: AppContainer, private val actions: Actions) 
             is TidalItem.Album -> send(item.title, c.requests.album(item.a))
         }
     }
+
+    /** Songs open the details sheet; albums and artists open their Tidal page to look around first. */
+    fun open(item: TidalItem) {
+        when (item) {
+            is TidalItem.Track -> details = item
+            is TidalItem.Album -> openAlbum(item.id)
+            is TidalItem.Artist -> openArtist(item.id)
+        }
+    }
+
+    fun openAlbum(id: String) = actions.open(tidalAlbumRoute(id))
+    fun openArtist(id: String) = actions.open(tidalArtistRoute(id))
 
     fun requestArtist(a: TidalArtist) = send(a.name, c.requests.artist(a), artist = true)
 
@@ -212,7 +229,7 @@ private fun TidalRow(item: TidalItem, request: RequestEntity?, requester: TidalR
     MediaRow(
         title = item.title,
         subtitle = item.subtitle,
-        onClick = { requester.details = item },
+        onClick = { requester.open(item) },
         cover = { TidalCover(item.cover, item.title) },
         round = item is TidalItem.Artist,
         trailing = { RequestControl(request, onRequest = { requester.onRequest(item) }, onRetry = requester::retry) },
@@ -221,8 +238,8 @@ private fun TidalRow(item: TidalItem, request: RequestEntity?, requester: TidalR
 
 /** Album cover or artist picture from Tidal's public image server. */
 @Composable
-fun TidalCover(uuid: String?, title: String) {
-    val url = tidalImageUrl(uuid)
+fun TidalCover(uuid: String?, title: String, size: Int = 320) {
+    val url = tidalImageUrl(uuid, size)
     val placeholder = @Composable {
         Box(Modifier.fillMaxSize().background(SurfaceHigh), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.MusicNote, null, tint = TextSecondary)
@@ -236,7 +253,7 @@ fun TidalCover(uuid: String?, title: String) {
 
 /** "Request" button, or where the request is: Requested / Downloading / Adding / On your phone / Failed – Retry. */
 @Composable
-private fun RequestControl(request: RequestEntity?, onRequest: () -> Unit, onRetry: (RequestEntity) -> Unit) {
+internal fun RequestControl(request: RequestEntity?, onRequest: () -> Unit, onRetry: (RequestEntity) -> Unit) {
     if (request == null) {
         TextButton(onClick = onRequest) { Text("Request", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
         return
@@ -257,7 +274,7 @@ fun statusLabel(r: RequestEntity): String = when (r.status) {
 }
 
 @Composable
-private fun StatusChip(r: RequestEntity, modifier: Modifier = Modifier) {
+internal fun StatusChip(r: RequestEntity, modifier: Modifier = Modifier) {
     val accent = MaterialTheme.colorScheme.primary
     val (bg, fg) = when (r.status) {
         RequestStatus.DONE -> accent.copy(alpha = 0.2f) to accent
@@ -307,6 +324,10 @@ fun TidalSheets(requester: TidalRequester, requests: Map<String, RequestEntity>)
                 request.status == RequestStatus.FAILED -> MenuItem("Retry request", Icons.Default.Refresh) { requester.details = null; requester.retry(request) }
                 else -> MenuItem(statusLabel(request), Icons.Default.CloudDownload) { requester.details = null }
             }
+            if (item is TidalItem.Track) {
+                item.t.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { requester.details = null; requester.openAlbum(id) } }
+                item.t.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { requester.details = null; requester.openArtist(id) } }
+            }
         }
     }
     requester.confirmArtist?.let { a ->
@@ -354,6 +375,13 @@ fun RequestsScreen() {
     // Look at Tidarr straight away rather than waiting for the next round.
     LaunchedEffect(Unit) { runCatching { c.requests.poll() } }
 
+    /** Its Tidal page, for albums and artists that aren't on the server yet. */
+    fun tidalRoute(r: RequestEntity): String? = when (r.type) {
+        TidalType.ALBUM.api -> tidalAlbumRoute(r.tidalId)
+        TidalType.ARTIST.api -> tidalArtistRoute(r.tidalId)
+        else -> null
+    }
+
     fun open(r: RequestEntity) {
         val first = r.matchedIds?.split(',')?.firstOrNull { it.isNotBlank() } ?: return
         when (r.type) {
@@ -383,7 +411,14 @@ fun RequestsScreen() {
                     title = r.title,
                     subtitle = detail,
                     subtitleColor = if (r.status == RequestStatus.FAILED) Destructive else TextSecondary,
-                    onClick = { if (r.status == RequestStatus.DONE) open(r) else menuFor = r },
+                    onClick = {
+                        val tidal = tidalRoute(r)
+                        when {
+                            r.status == RequestStatus.DONE && !r.matchedIds.isNullOrEmpty() -> open(r)
+                            tidal != null -> actions.open(tidal)
+                            else -> menuFor = r
+                        }
+                    },
                     onLongClick = { menuFor = r },
                     round = r.type == TidalType.ARTIST.api,
                     cover = { TidalCover(r.coverUuid, r.title) },
@@ -406,8 +441,12 @@ fun RequestsScreen() {
             if (r.status == RequestStatus.DONE && !r.matchedIds.isNullOrEmpty()) {
                 MenuItem(if (r.type == TidalType.ARTIST.api) "Go to artist" else "Go to album", Icons.AutoMirrored.Filled.OpenInNew) { menuFor = null; open(r) }
             }
-            if (r.status == RequestStatus.FAILED) {
-                MenuItem("Retry", Icons.Default.Refresh) { menuFor = null; requester.retry(r) }
+            tidalRoute(r)?.let { route ->
+                MenuItem("Open on Tidal", Icons.AutoMirrored.Filled.OpenInNew) { menuFor = null; actions.open(route) }
+            }
+            // "Adding" can also be retried: Tidarr may have finished without downloading anything.
+            if (r.status == RequestStatus.FAILED || r.status == RequestStatus.ADDING) {
+                MenuItem(if (r.status == RequestStatus.FAILED) "Retry" else "Try again", Icons.Default.Refresh) { menuFor = null; requester.retry(r) }
             }
             val label = if (r.status.active || r.status == RequestStatus.FAILED) "Cancel request" else "Remove from this list"
             MenuItem(label, Icons.Default.Close, tint = Destructive, tintText = true) {

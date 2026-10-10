@@ -1,0 +1,4 @@
+{"limit": 50, "offset": 0, "totalNumberOfItems": 2, "items": [
+  {"id": 77646169, "title": "Random Access Memories", "duration": 4462, "numberOfTracks": 13, "numberOfVolumes": 1, "releaseDate": "2013-05-17", "type": "ALBUM", "cover": "69e3c5f7-d5d2-4e7a-a2c5-4b3a6e4f0c11", "explicit": false, "artist": {"id": 3634161, "name": "Daft Punk", "type": "MAIN"}, "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}]},
+  {"id": 4140100, "title": "Discovery", "duration": 3667, "numberOfTracks": 14, "releaseDate": "2001-03-07", "type": "ALBUM", "cover": "a1b2c3d4-0000-1111-2222-333344445555", "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}]}
+]}

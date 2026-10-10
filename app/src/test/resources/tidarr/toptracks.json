@@ -1,0 +1,4 @@
+{"limit": 10, "offset": 0, "totalNumberOfItems": 2, "items": [
+  {"id": 77646178, "title": "Get Lucky", "duration": 369, "trackNumber": 8, "volumeNumber": 1, "version": "feat. Pharrell Williams & Nile Rodgers", "isrc": "usqx91300108", "explicit": false, "artist": {"id": 3634161, "name": "Daft Punk"}, "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}, {"id": 1566, "name": "Pharrell Williams", "type": "FEATURED"}], "album": {"id": 77646169, "title": "Random Access Memories", "cover": "69e3c5f7-d5d2-4e7a-a2c5-4b3a6e4f0c11"}},
+  {"id": 4140103, "title": "One More Time", "duration": 320, "trackNumber": 1, "volumeNumber": 1, "isrc": "GBDUW0000053", "artists": [{"id": 3634161, "name": "Daft Punk"}], "album": {"id": 4140100, "title": "Discovery", "cover": "a1b2c3d4-0000-1111-2222-333344445555"}}
+]}

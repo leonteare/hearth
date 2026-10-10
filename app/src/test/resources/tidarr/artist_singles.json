@@ -1,0 +1,3 @@
+{"limit": 50, "offset": 0, "totalNumberOfItems": 1, "items": [
+  {"id": 555, "title": "Get Lucky", "duration": 248, "numberOfTracks": 1, "releaseDate": "2013-04-19", "type": "SINGLE", "cover": null, "artists": [{"id": 3634161, "name": "Daft Punk"}, {"id": 1566, "name": "Pharrell Williams"}]}
+]}

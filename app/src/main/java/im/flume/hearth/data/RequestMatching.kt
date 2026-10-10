@@ -45,26 +45,32 @@ object RequestMatching {
         norm(tidalTitle) == norm(localTitle) || (loose && baseTitle(tidalTitle).let { it.isNotEmpty() && it == baseTitle(localTitle) })
 
     /** What's already on the server, for hiding Tidal results you don't need to request. */
-    class LocalCatalog(songs: List<SongEntity>, albums: List<AlbumEntity>) {
-        private val isrcs: Set<String> = songs.flatMapTo(HashSet()) { isrcs(it.isrc) }
-        private val songsByTitle: Map<String, List<String>> =
-            songs.groupBy({ norm(it.title) }, { it.artist })
-        private val albumsByName: Map<String, List<String>> =
-            albums.groupBy({ norm(it.name) }, { it.artist })
+    class LocalCatalog(songs: List<SongEntity>, albums: List<AlbumEntity>, artists: List<ArtistEntity> = emptyList()) {
+        private val byIsrc: Map<String, SongEntity> = HashMap<String, SongEntity>().apply {
+            songs.forEach { s -> isrcs(s.isrc).forEach { putIfAbsent(it, s) } }
+        }
+        private val songsByTitle: Map<String, List<SongEntity>> = songs.groupBy { norm(it.title) }
+        private val albumsByName: Map<String, List<AlbumEntity>> = albums.groupBy { norm(it.name) }
+        private val artistsByName: Map<String, ArtistEntity> = artists.associateBy { norm(it.name) }
 
-        /** By ISRC when both sides have one, otherwise exact normalised title plus a matching artist. */
-        fun hasTrack(t: TidalTrack): Boolean {
-            if (t.isrc != null && t.isrc.uppercase() in isrcs) return true
+        /** The server's copy of [t]: by ISRC when both sides have one, otherwise exact normalised title plus a matching artist. */
+        fun localTrack(t: TidalTrack): SongEntity? {
+            t.isrc?.uppercase()?.let { byIsrc[it] }?.let { return it }
             // A "feat. X" version is a credit, not a different recording: the plain title counts too.
             val featuring = t.version?.trim()?.lowercase()?.let { it.startsWith("feat") || it.startsWith("with ") } == true
             val titles = listOfNotNull(norm(t.displayTitle), norm(t.title).takeIf { featuring })
-            return titles.any { title -> songsByTitle[title].orEmpty().any { artistMatches(t.artists, it) } }
+            return titles.firstNotNullOfOrNull { title -> songsByTitle[title].orEmpty().firstOrNull { artistMatches(t.artists, it.artist) } }
         }
 
-        fun hasAlbum(a: TidalAlbum): Boolean {
-            val artists = albumsByName[norm(a.title)] ?: return false
-            return artists.any { artistMatches(a.artists, it) }
-        }
+        fun hasTrack(t: TidalTrack): Boolean = localTrack(t) != null
+
+        fun localAlbum(a: TidalAlbum): AlbumEntity? =
+            albumsByName[norm(a.title)].orEmpty().firstOrNull { artistMatches(a.artists, it.artist) }
+
+        fun hasAlbum(a: TidalAlbum): Boolean = localAlbum(a) != null
+
+        /** The server's artist with the same (normalised) name. */
+        fun localArtist(name: String): ArtistEntity? = artistsByName[norm(name)]
 
         /** Drops songs and albums already on the server; artists are kept (a discography may be incomplete). */
         fun filter(r: TidalSearchResults): TidalSearchResults =
@@ -117,6 +123,50 @@ object RequestTracking {
     const val QUEUE_GRACE_MS = 60_000L
 
     const val FAILED_MESSAGE = "Tidarr couldn't download this — is the Tidal subscription active?"
+
+    /** What requests that never turned up on the server used to be marked with (as done). */
+    const val NOT_MATCHED = "Added to the server — couldn't match it automatically"
+
+    /** Tidarr says "finished" even when tiddl fetched nothing (e.g. a free Tidal account), so this is a failure. */
+    const val NOTHING_ARRIVED = "Tidarr finished, but nothing arrived on the server. Retry, or check Tidarr's page."
+
+    /** Waiting this long after Tidarr finished, with nothing found, means nothing is coming. */
+    const val ADDING_TIMEOUT_MS = 30 * 60_000L
+
+    /** How a retry gets Tidarr to really download again. */
+    enum class RetryAction {
+        /** Not in Tidarr's queue: add it. */
+        SAVE,
+        /** Failed there: Tidarr retries its failed items. */
+        RETRY_FAILED,
+        /** Listed with any other status (usually "finished" with nothing downloaded): take it out and add it again. */
+        REMOVE_AND_SAVE,
+    }
+
+    fun retryAction(item: TidarrQueueItem?): RetryAction = when {
+        item == null -> RetryAction.SAVE
+        item.error || item.status.equals("error", ignoreCase = true) -> RetryAction.RETRY_FAILED
+        else -> RetryAction.REMOVE_AND_SAVE
+    }
+
+    /** The request once it has been sent again: back to the start of its journey. */
+    fun afterRetry(r: RequestEntity, action: RetryAction, now: Long): RequestEntity = r.copy(
+        status = RequestStatus.REQUESTED, errorMessage = null, matchedIds = null, updatedAt = now,
+        // A retried failed item is still listed; a re-added one has to show up first.
+        seenInQueue = action == RetryAction.RETRY_FAILED, finishedAt = null, lookupAttempts = 0,
+    )
+
+    /** Tidarr finished but nothing turned up on the server. */
+    fun gaveUp(r: RequestEntity, now: Long): RequestEntity =
+        r.copy(status = RequestStatus.FAILED, errorMessage = NOTHING_ARRIVED, updatedAt = now)
+
+    /** Rows from before this was treated as a failure (done, "couldn't match"), as they should be; null if fine. */
+    fun reclassified(r: RequestEntity): RequestEntity? =
+        if (r.status == RequestStatus.DONE && r.errorMessage == NOT_MATCHED) r.copy(status = RequestStatus.FAILED, errorMessage = NOTHING_ARRIVED) else null
+
+    /** True when Tidarr finished over [ADDING_TIMEOUT_MS] ago and the request is still waiting for the server. */
+    fun addingTimedOut(r: RequestEntity, now: Long): Boolean =
+        r.status == RequestStatus.ADDING && now - (r.finishedAt ?: r.updatedAt) > ADDING_TIMEOUT_MS
 
     /**
      * The request after looking at Tidarr's queue ([item] is its row there, or null if it isn't
