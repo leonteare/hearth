@@ -90,7 +90,7 @@ fun SettingsScreen() {
     val actions = LocalActions.current
     SettingsPage("Settings") {
         listOf(
-            Triple("General", "Account, library, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
+            Triple("General", "Account, library, requests, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
             Triple("Storage", "Downloads, cache", Icons.Outlined.Storage) to "settings/storage",
             Triple("Appearance", "Accent colour, lyrics", Icons.Outlined.Palette) to "settings/appearance",
         ).forEach { (row, route) ->
@@ -139,6 +139,8 @@ fun GeneralSettings() {
             title = if (sync is SyncState.Running) "Syncing…" else "Resync library now",
             subtitle = (sync as? SyncState.Failed)?.message ?: "Fetches any changes from Navidrome",
         ) { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } }
+
+        TidarrSettings()
 
         Section("Playback")
         Choice("Volume levelling", settings.volumeLevelling, listOf(0 to "Off", 1 to "Per song", 2 to "Per album")) { v ->
@@ -372,4 +374,83 @@ private fun Choice(title: String, value: Int, options: List<Pair<Int, String>>, 
         Text(options.firstOrNull { it.first == value }?.second ?: "$value", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
     ChoiceSheet(open, title, options, value, onDismiss = { open = false }, onPick = onChange)
+}
+
+/** Requests (Tidarr): where Tidarr is, its optional API key, a connection test, and the Search toggle. */
+@Composable
+private fun TidarrSettings() {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val scope = rememberCoroutineScope()
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val requests by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+    var url by remember { mutableStateOf(settings.tidarrUrl) }
+    var key by remember { mutableStateOf("") }
+    var keyLoaded by remember { mutableStateOf(false) }
+    var testing by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        key = withContext(Dispatchers.IO) { c.requests.apiKey().orEmpty() }
+        keyLoaded = true
+    }
+    val dirty = keyLoaded && (url.trim() != settings.tidarrUrl || key.trim() != c.requests.apiKey().orEmpty())
+
+    fun save() {
+        val u = url.trim()
+        c.session.updateSettings { it.copy(tidarrUrl = u) }
+        scope.launch { withContext(Dispatchers.IO) { c.requests.setApiKey(key) } }
+    }
+
+    Section("Requests (Tidarr)")
+    Text(
+        "Search can show music that isn't on your server yet. Requesting it asks Tidarr to fetch it into your library; it's then liked and downloaded to this phone.",
+        color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    androidx.compose.material3.OutlinedTextField(
+        value = url, onValueChange = { url = it; result = null },
+        label = { Text("Tidarr address") }, singleLine = true,
+        placeholder = { Text(im.flume.hearth.data.Settings.DEFAULT_TIDARR_URL) },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+    androidx.compose.material3.OutlinedTextField(
+        value = key, onValueChange = { key = it; result = null },
+        label = { Text("API key (optional)") }, singleLine = true, enabled = keyLoaded,
+        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+    Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = { save(); actions.showMessage("Tidarr settings saved") }, enabled = dirty) { Text("Save") }
+        TextButton(
+            enabled = !testing && url.isNotBlank(),
+            onClick = {
+                testing = true; result = null
+                scope.launch {
+                    val error = c.requests.testConnection(url, key)
+                    result = if (error == null) "Connected to Tidarr" else "Failed: $error"
+                    testing = false
+                    if (error == null && dirty) save()
+                }
+            },
+        ) { Text(if (testing) "Testing…" else "Test connection") }
+    }
+    result?.let {
+        Text(
+            it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+    Toggle("Show Tidal results in Search", settings.tidalInSearch, "Under your library's results, for music not on the server") { v ->
+        c.session.updateSettings { it.copy(tidalInSearch = v) }
+    }
+    val inProgress = requests.count { it.status.active }
+    Clickable(
+        "Your requests",
+        when {
+            requests.isEmpty() -> "Nothing requested yet"
+            inProgress > 0 -> "$inProgress in progress"
+            else -> "${requests.size} requested"
+        },
+    ) { actions.open("requests") }
 }

@@ -1,0 +1,28 @@
+{
+  "artists": {
+    "limit": 3, "offset": 0, "totalNumberOfItems": 41,
+    "items": [
+      {"id": 3634161, "name": "Daft Punk", "artistTypes": ["ARTIST", "CONTRIBUTOR"], "url": "http://www.tidal.com/artist/3634161", "picture": "2b5e1a7e-3e9b-4f9e-9b36-bbb1d0d3e7a1", "popularity": 85, "artistRoles": []},
+      {"id": 999, "name": "Daft Punk Tribute Band", "picture": null, "popularity": 2}
+    ]
+  },
+  "albums": {
+    "limit": 3, "offset": 0, "totalNumberOfItems": 120,
+    "items": [
+      {"id": 77646169, "title": "Random Access Memories", "duration": 4462, "streamReady": true, "numberOfTracks": 13, "numberOfVolumes": 1, "releaseDate": "2013-05-17", "copyright": "(P) 2013 Daft Life Limited", "type": "ALBUM", "version": null, "url": "http://www.tidal.com/album/77646169", "cover": "69e3c5f7-d5d2-4e7a-a2c5-4b3a6e4f0c11", "explicit": false, "upc": "886443927087", "popularity": 80, "audioQuality": "LOSSLESS", "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}]},
+      {"id": 4140100, "title": "Discovery", "numberOfTracks": 14, "releaseDate": "2001-03-07", "type": "ALBUM", "cover": "a1b2c3d4-0000-1111-2222-333344445555", "upc": "724384960650", "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}]},
+      {"id": 555, "title": "Get Lucky", "numberOfTracks": 1, "releaseDate": "2013-04-19", "type": "SINGLE", "cover": null, "artists": [{"id": 3634161, "name": "Daft Punk"}, {"id": 1566, "name": "Pharrell Williams"}]}
+    ]
+  },
+  "playlists": {"limit": 3, "offset": 0, "totalNumberOfItems": 0, "items": []},
+  "tracks": {
+    "limit": 3, "offset": 0, "totalNumberOfItems": 300,
+    "items": [
+      {"id": 77646178, "title": "Get Lucky", "duration": 369, "replayGain": -9.8, "peak": 0.98, "allowStreaming": true, "streamReady": true, "trackNumber": 8, "volumeNumber": 1, "version": "feat. Pharrell Williams & Nile Rodgers", "popularity": 90, "copyright": "(P) 2013", "url": "http://www.tidal.com/track/77646178", "isrc": "USQX91300108", "editable": false, "explicit": false, "audioQuality": "LOSSLESS", "artists": [{"id": 3634161, "name": "Daft Punk", "type": "MAIN"}, {"id": 1566, "name": "Pharrell Williams", "type": "FEATURED"}], "album": {"id": 77646169, "title": "Random Access Memories", "cover": "69e3c5f7-d5d2-4e7a-a2c5-4b3a6e4f0c11", "vibrantColor": "#e4cf8d", "videoCover": null}, "mixes": {"TRACK_MIX": "001"}},
+      {"id": 4140112, "title": "One More Time", "duration": 320, "version": null, "isrc": "gbduw0000053", "explicit": true, "artists": [{"id": 3634161, "name": "Daft Punk"}], "album": {"id": 4140100, "title": "Discovery", "cover": "a1b2c3d4-0000-1111-2222-333344445555"}},
+      {"id": 1234, "title": "Harder, Better, Faster, Stronger (Remastered)", "duration": 224, "version": "Remastered", "isrc": null, "explicit": false, "artists": [{"id": 3634161, "name": "Daft Punk"}], "album": {"id": 4140100, "title": "Discovery", "cover": null}}
+    ]
+  },
+  "videos": {"limit": 3, "offset": 0, "totalNumberOfItems": 0, "items": []},
+  "topHits": {"limit": 3, "offset": 0, "totalNumberOfItems": 0, "items": []}
+}

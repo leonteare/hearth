@@ -1,0 +1,8 @@
+{
+  "output": "/music",
+  "tiddl_config": {
+    "auth": {"token": "redacted", "refresh_token": "redacted", "expires": 1760000000, "user_id": "123", "country_code": "gb"},
+    "download": {"quality": "high", "path": "/music"}
+  },
+  "noToken": false
+}

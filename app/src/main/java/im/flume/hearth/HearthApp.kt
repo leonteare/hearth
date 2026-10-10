@@ -124,12 +124,17 @@ class AppContainer(context: Context) {
     val player = PlayerConnection(context)
     val queueInfo = kotlinx.coroutines.flow.MutableStateFlow(im.flume.hearth.playback.QueueInfo())
     val updater = Updater(context, http, appScope)
+    val requests = im.flume.hearth.requests.RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
+
+    /** A page to open, e.g. from a notification tap; AppRoot navigates there and clears it. */
+    val pendingRoute = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     init {
         appScope.launch(Dispatchers.Main) {
             session.settings.collect { accentState.value = androidx.compose.ui.graphics.Color(it.accent) }
         }
         saveDownloadedAlbumsOnce()
+        requests.start()
     }
 
     /**

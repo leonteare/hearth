@@ -182,7 +182,7 @@ class LibrarySync(
 
     companion object {
         const val PAGE = 500
-        private const val SCHEMA = 4 // 4: playlist comment and public flag
+        private const val SCHEMA = 5 // 4: playlist comment and public flag; 5: song ISRCs
         private const val SIX_HOURS = 6 * 60 * 60 * 1000L
         const val SHRUNK_MESSAGE = "The server returned almost no songs, so the library wasn't changed"
 

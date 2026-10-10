@@ -34,6 +34,8 @@ data class SongEntity(
     val trackGain: Double? = null,
     val albumGain: Double? = null,
     val trackPeak: Double? = null,
+    /** ISRC code(s) from Navidrome (OpenSubsonic), comma-separated; used to spot songs already on the server. */
+    val isrc: String? = null,
 )
 
 @Entity(tableName = "albums", indices = [Index("artistId")])
@@ -148,6 +150,7 @@ fun SongDto.toEntity() = SongEntity(
     trackGain = replayGain?.trackGain,
     albumGain = replayGain?.albumGain,
     trackPeak = replayGain?.trackPeak,
+    isrc = isrcCodes().takeIf { it.isNotEmpty() }?.joinToString(","),
 )
 
 fun AlbumDto.toEntity() = AlbumEntity(
@@ -168,3 +171,49 @@ fun AlbumDto.toEntity() = AlbumEntity(
 fun ArtistDto.toEntity() = ArtistEntity(id, name, albumCount, coverArt, starred != null)
 
 fun PlaylistDto.toEntity() = PlaylistEntity(id, name, songCount, duration, coverArt, owner, changed, comment, isPublic)
+
+/** Where a "get this onto the server" request is. See RequestsRepository. */
+enum class RequestStatus {
+    /** Sent to Tidarr, waiting in its queue. */
+    REQUESTED,
+    /** Tidarr is downloading or processing it. */
+    DOWNLOADING,
+    /** Tidarr finished; waiting for Navidrome to scan it and for this phone to find it. */
+    ADDING,
+    DONE,
+    FAILED;
+
+    val active: Boolean get() = this != DONE && this != FAILED
+}
+
+/**
+ * Music this user asked Tidarr to fetch onto the server. Kept per phone: the phone that asked is the
+ * one that likes and downloads the result. [type] is "track", "album" or "artist" (Tidarr's names).
+ */
+@Entity(tableName = "requests", primaryKeys = ["type", "tidalId"])
+data class RequestEntity(
+    val tidalId: String,
+    val type: String,
+    val title: String,
+    val artist: String,
+    val coverUuid: String?,
+    /** Tracks only. */
+    val isrc: String?,
+    /** Tracks: the album it's on; albums: release year. Shown under the title. */
+    val albumTitle: String?,
+    /** Tracks only, seconds; helps pick the right song once it's on the server. */
+    val durationSec: Int?,
+    val requestedAt: Long,
+    val requestedBy: String,
+    val status: RequestStatus,
+    val errorMessage: String?,
+    /** Local ids it was matched to: song ids for a track, the album id for an album, artist id for an artist. */
+    val matchedIds: String?,
+    val updatedAt: Long,
+    /** True once the item has been seen in Tidarr's queue, so its disappearing means it finished (or was cleared). */
+    val seenInQueue: Boolean,
+    /** When Tidarr finished it (status became ADDING). */
+    val finishedAt: Long?,
+    /** How many times the server has been searched for it since it finished. */
+    val lookupAttempts: Int,
+)

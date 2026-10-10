@@ -1,0 +1,9 @@
+{
+  "total": 4,
+  "queue": [
+    {"id": "77646178", "artist": "Daft Punk", "title": "Get Lucky", "type": "track", "quality": "high", "status": "download", "url": "https://listen.tidal.com/track/77646178", "loading": true, "error": false},
+    {"id": "4140100", "artist": "Daft Punk", "title": "Discovery", "type": "album", "quality": "high", "status": "queue_download", "url": "https://listen.tidal.com/album/4140100", "loading": false, "error": false},
+    {"id": "3634161", "artist": "Daft Punk", "title": "Daft Punk", "type": "artist", "quality": "high", "status": "error", "url": "https://listen.tidal.com/artist/3634161", "loading": false, "error": true, "errorStage": "download"},
+    {"id": 1234, "artist": "Daft Punk", "title": "Harder", "type": "track", "status": "finished", "loading": false, "error": false}
+  ]
+}

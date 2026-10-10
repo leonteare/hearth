@@ -15,8 +15,13 @@ import javax.crypto.spec.GCMParameterSpec
  * The Navidrome password, only needed for playlist photos (Navidrome's own API has no token login).
  * Encrypted with an AES key that never leaves the Android Keystore; only ciphertext and IV are stored.
  */
-class PasswordVault(context: Context) {
-    private val prefs = context.getSharedPreferences("vault", Context.MODE_PRIVATE)
+class PasswordVault(
+    context: Context,
+    prefsName: String = "vault",
+    /** Keystore alias of the AES key; each vault has its own. */
+    private val alias: String = "hearth-navidrome-password",
+) {
+    private val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     val hasPassword: Boolean get() = prefs.contains(KEY_DATA)
 
@@ -40,15 +45,15 @@ class PasswordVault(context: Context) {
 
     fun clear() {
         prefs.edit { clear() }
-        runCatching { KeyStore.getInstance(STORE).apply { load(null) }.deleteEntry(ALIAS) }
+        runCatching { KeyStore.getInstance(STORE).apply { load(null) }.deleteEntry(alias) }
     }
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance(STORE).apply { load(null) }
-        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, STORE)
         gen.init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
@@ -59,7 +64,6 @@ class PasswordVault(context: Context) {
 
     private companion object {
         const val STORE = "AndroidKeyStore"
-        const val ALIAS = "hearth-navidrome-password"
         const val TRANSFORM = "AES/GCM/NoPadding"
         const val KEY_DATA = "password"
         const val KEY_IV = "iv"

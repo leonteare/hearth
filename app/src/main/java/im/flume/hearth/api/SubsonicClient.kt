@@ -122,6 +122,15 @@ class SubsonicClient(
             addQueryParameter("artistCount", "0")
         }.searchResult3?.song.orEmpty()
 
+    /** search3 across songs, albums and artists at once. */
+    suspend fun search(query: String, songCount: Int, albumCount: Int, artistCount: Int): SearchResult3 =
+        call("search3") {
+            addQueryParameter("query", query)
+            addQueryParameter("songCount", songCount.toString())
+            addQueryParameter("albumCount", albumCount.toString())
+            addQueryParameter("artistCount", artistCount.toString())
+        }.searchResult3 ?: SearchResult3()
+
     suspend fun albumList(type: String, size: Int, offset: Int = 0): List<AlbumDto> =
         call("getAlbumList2") {
             addQueryParameter("type", type)
