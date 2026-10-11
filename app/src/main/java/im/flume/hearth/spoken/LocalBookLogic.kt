@@ -40,6 +40,19 @@ object LocalBookScan {
     fun extension(name: String): String = name.substringAfterLast('.', "").lowercase()
     fun isAudio(name: String): Boolean = !name.startsWith(".") && extension(name) in AUDIO
     fun isImage(name: String): Boolean = !name.startsWith(".") && extension(name) in IMAGE
+    /**
+     * What Settings says after a scan when something's off: no audio at all (wrong folder, or files of
+     * a kind Hearth can't play, like Audible's), or files that couldn't be read. Null when all is well.
+     */
+    fun scanProblem(folder: String, audioFiles: Int, unreadable: List<String>): String? = when {
+        audioFiles == 0 -> "No audiobook files in \"$folder\". Hearth looks for ${AUDIO.sorted().joinToString(", ") { ".$it" }} files, in the folder and its sub-folders. Audible's own files (.aax) only play in the Audible app."
+        unreadable.isEmpty() -> null
+        unreadable.size == audioFiles -> "Found ${plural(audioFiles)} in \"$folder\" but couldn't read any of them (for example \"${unreadable.first()}\"). They may still be downloading, or be damaged."
+        else -> "Couldn't read ${unreadable.size} of ${plural(audioFiles)} in \"$folder\" (for example \"${unreadable.first()}\"). The rest are in your library."
+    }
+
+    private fun plural(n: Int) = if (n == 1) "1 audio file" else "$n audio files"
+
     fun withoutExtension(name: String): String = if ('.' in name) name.substringBeforeLast('.') else name
 
     /**

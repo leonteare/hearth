@@ -139,7 +139,8 @@ class LocalBooks(
         try {
             for (folder in _folders.value) {
                 try {
-                    scanFolder(folder.uri)
+                    val report = scanFolder(folder.uri)
+                    problem = problem ?: LocalBookScan.scanProblem(folder.name, report.audioFiles, report.unreadable)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -154,9 +155,14 @@ class LocalBooks(
         _folders.value.sumOf { dao.booksIn(it.uri).count { b -> !b.hidden && b.serverItemId == null } }
     }
 
-    private suspend fun scanFolder(treeUri: String) = withContext(Dispatchers.IO) {
+    /** What a folder scan saw, so Settings can say why nothing turned up. */
+    private class ScanReport(val audioFiles: Int, val unreadable: List<String>)
+
+    private suspend fun scanFolder(treeUri: String): ScanReport = withContext(Dispatchers.IO) {
         val tree = Uri.parse(treeUri)
-        val groups = LocalBookScan.group(listTree(tree))
+        val entries = listTree(tree)
+        val unreadable = ArrayList<String>()
+        val groups = LocalBookScan.group(entries)
         val oldBooks = dao.booksIn(treeUri).associateBy { it.id }
         val oldFiles = dao.filesIn(treeUri).groupBy { it.bookId }
         val now = System.currentTimeMillis()
@@ -172,7 +178,7 @@ class LocalBooks(
                 val read = if (same == null) readFile(Uri.parse(f.uri)) else null
                 if (f === g.files.first()) tags = read?.tags
                 val duration = same?.durationSec ?: read?.durationSec ?: 0.0
-                if (duration <= 0) return@mapNotNull null // not playable audio
+                if (duration <= 0) { unreadable += f.name; return@mapNotNull null } // not playable audio
                 LocalBookFileEntity(id, 0, f.uri, f.relPath, f.size, f.lastModified, duration, same?.mimeType ?: read?.mimeType, same?.title ?: read?.tags?.title)
             }.mapIndexed { i, r -> r.copy(fileIndex = i) }
             if (rows.isEmpty()) continue
@@ -194,6 +200,7 @@ class LocalBooks(
         // Covers of books that are gone.
         (oldBooks.keys - books.mapTo(HashSet()) { it.id }).forEach { gone -> oldBooks[gone]?.coverPath?.let { File(it).delete() } }
         dao.replaceFolder(treeUri, books, files)
+        ScanReport(entries.count { LocalBookScan.isAudio(it.name) }, unreadable)
     }
 
     /** Every audio and image file in the folder and its sub-folders (a few levels deep). */
@@ -226,7 +233,29 @@ class LocalBooks(
 
     private class FileInfo(val durationSec: Double, val mimeType: String?, val tags: LocalTags)
 
+    /**
+     * Length and tags. Android's own reader comes first (it also gives tags); when it can't read the
+     * file or reports no length (some large or unusual .m4b files), the player's reader measures it,
+     * since that's what will play it.
+     */
     private fun readFile(uri: Uri): FileInfo? {
+        val android = readWithAndroid(uri)
+        if (android != null && android.durationSec > 0) return android
+        val seconds = durationWithPlayer(uri) ?: return android
+        return FileInfo(seconds, android?.mimeType, android?.tags ?: LocalTags())
+    }
+
+    private fun durationWithPlayer(uri: Uri): Double? = try {
+        androidx.media3.exoplayer.MetadataRetriever.Builder(context, androidx.media3.common.MediaItem.fromUri(uri)).build().use { r ->
+            r.retrieveDurationUs().get(60, java.util.concurrent.TimeUnit.SECONDS)
+                .takeIf { it != androidx.media3.common.C.TIME_UNSET && it > 0 }?.let { it / 1_000_000.0 }
+        }
+    } catch (e: Exception) {
+        logHandledError(context, "local books: measure file", e)
+        null
+    }
+
+    private fun readWithAndroid(uri: Uri): FileInfo? {
         val r = MediaMetadataRetriever()
         return try {
             r.setDataSource(context, uri)

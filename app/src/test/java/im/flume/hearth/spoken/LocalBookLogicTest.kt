@@ -165,4 +165,18 @@ class LocalBookLogicTest {
         assertEquals(900.0, ProgressCarry.decide(p(950.0, 70), null, 900.0)?.currentTime)
         assertEquals(1000.0, ProgressCarry.decide(p(500.0, 70), null, 0.0)?.duration)
     }
+
+    @Test
+    fun `a scan explains why nothing turned up`() {
+        assertTrue(LocalBookScan.scanProblem("Books", 0, emptyList())!!.startsWith("No audiobook files in \"Books\""))
+        assertEquals(
+            "Found 2 audio files in \"Books\" but couldn't read any of them (for example \"a.m4b\"). They may still be downloading, or be damaged.",
+            LocalBookScan.scanProblem("Books", 2, listOf("a.m4b", "b.m4b")),
+        )
+        assertEquals(
+            "Couldn't read 1 of 3 audio files in \"Books\" (for example \"a.m4b\"). The rest are in your library.",
+            LocalBookScan.scanProblem("Books", 3, listOf("a.m4b")),
+        )
+        assertNull(LocalBookScan.scanProblem("Books", 3, emptyList()))
+    }
 }
