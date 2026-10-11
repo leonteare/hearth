@@ -186,44 +186,6 @@ class SpectrumAnalyzer(
 }
 
 /**
- * Finds beats in a stream of bass energy values: a beat is energy well above its recent running
- * average, at most once per [cooldownSec]. Time-based (not frame-based), so it behaves the same at
- * 60 or 120 fps.
- */
-class BeatDetector(
-    private val sensitivity: Float = 1.45f,
-    private val cooldownSec: Float = 0.28f,
-    private val averageSec: Float = 1.0f,
-    private val minEnergy: Float = 0.004f,
-) {
-    private var average = 0f
-    private var started = false
-    private var lastBeat = Double.NEGATIVE_INFINITY
-
-    /** The running average the next value is compared with. */
-    val runningAverage: Float get() = average
-
-    fun reset() {
-        started = false
-        average = 0f
-        lastBeat = Double.NEGATIVE_INFINITY
-    }
-
-    /** Feeds one value taken at [timeSec], [dt] seconds after the previous one; true if it's a beat. */
-    fun process(energy: Float, timeSec: Double, dt: Float): Boolean {
-        if (!started) {
-            started = true
-            average = energy
-            return false
-        }
-        val beat = energy > minEnergy && energy > average * sensitivity && timeSec - lastBeat >= cooldownSec
-        average += (energy - average) * (1f - exp(-dt / averageSec))
-        if (beat) lastBeat = timeSec
-        return beat
-    }
-}
-
-/**
  * Slow automatic gain for a 0..1 signal, so quietly mastered tracks move the visuals as much as loud
  * ones. Follows the signal's running peak (up within [riseSec], down over [fallSec]) and returns
  * the multiplier that lifts that peak to [target], clamped to 1..[maxGain] (never turns things down).
@@ -255,7 +217,7 @@ class AutoGain(
 
 /** What a visualiser draws from, refreshed every frame. All values 0..1 unless noted. */
 class AudioFrame(bandCount: Int = SpectrumAnalyzer.BAND_COUNT, waveSize: Int = WAVE_SIZE) {
-    /** Log-spaced spectrum, bass first; fast attack, slow decay. */
+    /** Log-spaced spectrum, bass first; fast attack (~25 ms), slower release (~200 ms). */
     val bands = FloatArray(bandCount)
     /** Recent waveform, about -1..1 (normalised to the block's peak, scaled down when quiet). */
     val waveform = FloatArray(waveSize)
@@ -263,10 +225,22 @@ class AudioFrame(bandCount: Int = SpectrumAnalyzer.BAND_COUNT, waveSize: Int = W
     var mid = 0f
     var treble = 0f
     var level = 0f
-    /** 1 on a beat, decaying towards 0. */
+    /** Like [bass], but slow (~0.5 s): for big, gentle movements. */
+    var bassSlow = 0f
+    /** Envelopes: 1 at a beat / kick / snare / hat onset, easing back to 0 (no hard edges). */
     var beat = 0f
-    /** Counts beats, so renderers can spot a new one by comparing with the last value they saw. */
+    var kick = 0f
+    var snare = 0f
+    var hat = 0f
+    /** Counters, so renderers can spot a new event by comparing with the last value they saw. */
     var beatCount = 0
+    var kickCount = 0
+    var snareCount = 0
+    /** Estimated tempo (0 while unknown) and where we are between beats (0 at a beat → 1). */
+    var bpm = 0f
+    var beatPhase = 0f
+    /** 0..1: how sure the tempo estimate is. */
+    var tempoConfidence = 0f
     /** True while live audio is coming in. */
     var live = false
 
@@ -276,35 +250,50 @@ class AudioFrame(bandCount: Int = SpectrumAnalyzer.BAND_COUNT, waveSize: Int = W
 }
 
 /**
- * Turns blocks of samples into a smoothed [AudioFrame]: spectrum bands, bass/mid/treble, level, beat
- * pulse and waveform. Passing null (paused, nothing playing) lets everything fall away smoothly.
+ * Turns synced audio into a smoothed [AudioFrame]. Two feeds:
+ *  - [hop]: every [BeatTracker.HOP_SEC] of media time, a window for onset/beat/tempo tracking;
+ *  - [update]: once per drawn frame, the block ending at the playhead, for spectrum, level and
+ *    waveform. Passing null (paused, nothing playing) lets everything fall away smoothly.
  */
 class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer()) {
     val frame = AudioFrame(spectrum.bandCount)
-    private val beats = BeatDetector()
-    private val bandGain = AutoGain(target = 0.8f)
+    val tracker = BeatTracker()
+    private val groupGains = Array(GAIN_GROUPS) { AutoGain(target = 0.8f, maxGain = 3f, riseSec = 0.3f, fallSec = 8f) }
+    private val groupGain = FloatArray(GAIN_GROUPS) { 1f }
     private val levelGain = AutoGain(target = 0.75f)
-    private var time = 0.0
     private var bassTo = 0
     private var midTo = 0
     private var rate = 0
 
     fun reset() {
-        beats.reset()
-        bandGain.reset()
+        tracker.reset()
+        groupGains.forEach { it.reset() }
+        groupGain.fill(1f)
         levelGain.reset()
-        frame.bands.fill(0f)
-        frame.waveform.fill(0f)
-        frame.bass = 0f; frame.mid = 0f; frame.treble = 0f; frame.level = 0f; frame.beat = 0f
-        frame.live = false
+        val f = frame
+        f.bands.fill(0f)
+        f.waveform.fill(0f)
+        f.bass = 0f; f.mid = 0f; f.treble = 0f; f.level = 0f; f.bassSlow = 0f
+        f.beat = 0f; f.kick = 0f; f.snare = 0f; f.hat = 0f
+        f.bpm = 0f; f.beatPhase = 0f; f.tempoConfidence = 0f
+        f.live = false
     }
 
-    fun update(samples: FloatArray?, sampleRate: Int, dt: Float) {
-        time += dt
+    /** The audio jumped (seek): onset history and tempo phase no longer apply. */
+    fun discontinuity() = tracker.reset()
+
+    fun hop(window: FloatArray, sampleRate: Int, timeSec: Double) = tracker.process(window, sampleRate, timeSec)
+
+    /**
+     * [samples]: the [SpectrumAnalyzer.fftSize] samples ending at the playhead, or null. [timeSec]:
+     * the playhead's media time, for the beat envelopes (NaN if unknown).
+     */
+    fun update(samples: FloatArray?, sampleRate: Int, dt: Float, timeSec: Double = Double.NaN) {
         val f = frame
-        val attack = 1f - exp(-dt / 0.03f)
-        val release = 1f - exp(-dt / 0.28f)
-        f.live = samples != null
+        val attack = 1f - exp(-dt / 0.025f)
+        val release = 1f - exp(-dt / 0.2f)
+        val live = samples != null
+        f.live = live
         if (samples != null) {
             spectrum.process(samples, sampleRate)
             if (sampleRate != rate) {
@@ -313,40 +302,65 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
                 midTo = spectrum.bandForHz(4000f, sampleRate)
             }
         }
-        var bass = 0f; var mid = 0f; var treble = 0f
         val n = f.bands.size
-        // Auto-gain only learns from live audio, so a pause doesn't wind it up.
-        var g = bandGain.gain
+        val per = n / GAIN_GROUPS
+        // Auto-gain per frequency region, learning only from live audio (so a pause doesn't wind it up).
         if (samples != null) {
-            var loudest = 0f
-            for (b in 0 until n) loudest = max(loudest, spectrum.bands[b])
-            g = bandGain.update(loudest, dt)
+            for (g in 0 until GAIN_GROUPS) {
+                var loudest = 0f
+                for (b in g * per until (g + 1) * per) loudest = max(loudest, spectrum.bands[b])
+                groupGain[g] = groupGains[g].update(loudest, dt)
+            }
         }
+        var bass = 0f; var mid = 0f; var treble = 0f
         for (b in 0 until n) {
-            val raw = if (samples != null) min(1f, spectrum.bands[b] * g) else 0f
-            f.bands[b] = smooth(f.bands[b], raw, attack, release)
+            // Gain blended between neighbouring regions, so there's no step at a region's edge.
+            val pos = ((b + 0.5f) / per - 0.5f).coerceIn(0f, GAIN_GROUPS - 1f)
+            val g0 = pos.toInt().coerceAtMost(GAIN_GROUPS - 2)
+            val g = groupGain[g0] + (groupGain[g0 + 1] - groupGain[g0]) * (pos - g0)
+            val v = if (live) min(1f, spectrum.bands[b] * g) else 0f
+            f.bands[b] = smooth(f.bands[b], v, attack, release)
             when {
-                b < bassTo -> bass += raw
-                b < midTo -> mid += raw
-                else -> treble += raw
+                b < bassTo -> bass += v
+                b < midTo -> mid += v
+                else -> treble += v
             }
         }
         bass /= max(1, bassTo)
         mid /= max(1, midTo - bassTo)
         treble /= max(1, n - midTo)
-        f.bass = smooth(f.bass, bass, attack, release)
-        f.mid = smooth(f.mid, mid, attack, release)
-        f.treble = smooth(f.treble, treble, attack, release)
-        val rmsDb = if (samples != null) 20f * log10(spectrum.rms + 1e-6f) else -100f
+        val bandAttack = 1f - exp(-dt / 0.03f)
+        val bandRelease = 1f - exp(-dt / 0.25f)
+        f.bass = smooth(f.bass, bass, bandAttack, bandRelease)
+        f.mid = smooth(f.mid, mid, bandAttack, bandRelease)
+        f.treble = smooth(f.treble, treble, bandAttack, bandRelease)
+        f.bassSlow = smooth(f.bassSlow, bass, 1f - exp(-dt / 0.3f), 1f - exp(-dt / 0.6f))
+        val rmsDb = if (live) 20f * log10(spectrum.rms + 1e-6f) else -100f
         val rawLevel = ((rmsDb + 50f) / 44f).coerceIn(0f, 1f)
-        val lg = if (samples != null) levelGain.update(rawLevel, dt) else levelGain.gain
-        f.level = smooth(f.level, min(1f, rawLevel * lg), attack, release)
+        val lg = if (live) levelGain.update(rawLevel, dt) else levelGain.gain
+        f.level = smooth(f.level, min(1f, rawLevel * lg), 1f - exp(-dt / 0.06f), 1f - exp(-dt / 0.4f))
 
-        f.beat *= exp(-dt * 5f)
-        if (beats.process(if (samples != null) spectrum.bassEnergy else 0f, time, dt)) {
-            f.beat = 1f
-            f.beatCount++
+        // Beat envelopes: as of the playhead when we know it, otherwise just falling away.
+        val tr = tracker
+        if (live && !timeSec.isNaN() && !tr.time.isNaN() && timeSec >= tr.time && timeSec - tr.time < 0.5) {
+            val age = (timeSec - tr.time).toFloat()
+            f.kick = tr.envAfter(BeatTracker.KICK, age)
+            f.snare = tr.envAfter(BeatTracker.SNARE, age)
+            f.hat = tr.envAfter(BeatTracker.HAT, age)
+            f.beat = tr.beatAfter(age)
+            f.beatPhase = tr.phaseAt(timeSec)
+        } else {
+            tr.decay(dt)
+            f.kick = tr.env[BeatTracker.KICK]
+            f.snare = tr.env[BeatTracker.SNARE]
+            f.hat = tr.env[BeatTracker.HAT]
+            f.beat = tr.beatEnv
         }
+        f.beatCount = tr.beatCount
+        f.kickCount = tr.counts[BeatTracker.KICK]
+        f.snareCount = tr.counts[BeatTracker.SNARE]
+        f.bpm = tr.bpm
+        f.tempoConfidence = tr.confidence
 
         if (samples != null) {
             fillWaveform(samples, f.waveform, min(1f, f.level * 1.4f + 0.1f))
@@ -380,5 +394,6 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
 
     private companion object {
         const val WAVE_STEP = 4
+        const val GAIN_GROUPS = 8
     }
 }

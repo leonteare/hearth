@@ -2,67 +2,59 @@ package im.flume.hearth.playback
 
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.audio.TeeAudioProcessor
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlin.math.min
 
 /**
- * Live audio for the visualiser, without the microphone permission: [tap] sits in the main player's
- * audio pipeline (see PlaybackService) and copies the PCM about to be played, mixed to mono, into a
- * ring buffer. Only while [active] (a visualiser is on screen); otherwise it returns at once.
+ * Live audio for the visualiser, without the microphone permission, in sync with what's heard.
  *
- * The audio thread only writes samples. The analysis runs on the UI thread in [analyze], once per
- * drawn frame, on the block that's leaving the speaker about now: PCM reaches the tap roughly one
- * AudioTrack buffer ([latencyMs]) before it's heard.
+ * [wrap] puts a thin layer around the player's audio sink (see PlaybackService). Every PCM buffer
+ * going in arrives with its presentation time; while [active] (a visualiser is on screen) it's mixed
+ * to mono into a [TimedRing] indexed by that time. The same layer notes the sink's own playback
+ * position whenever the player asks for it, which already accounts for the AudioTrack's buffer and
+ * the output's latency (Bluetooth included, via the track's timestamps).
+ *
+ * Each drawn frame [analyze] (UI thread) extrapolates that position to now and analyses the audio at
+ * exactly that media time: no latency guesses. Seeks flush the sink, which breaks the ring's history;
+ * gapless track changes keep one continuous timeline.
  */
 @OptIn(UnstableApi::class)
 object AudioAnalyzer {
-    private const val RING_SIZE = 1 shl 16
-    private const val RING_MASK = RING_SIZE - 1
-    private const val FFT = SpectrumAnalyzer.FFT_SIZE
+    private val ring = TimedRing()
 
-    private val ring = FloatArray(RING_SIZE)
-    @Volatile private var written = 0L
-    @Volatile private var lastWriteNanos = 0L
-    @Volatile private var sampleRate = 44_100
-    @Volatile private var channelCount = 2
-    @Volatile private var encoding = C.ENCODING_PCM_16BIT
-    /** Samples written before the visualiser opened are stale: analysis waits until it has fresh ones. */
-    @Volatile private var startedAt = 0L
-
-    /** True while a visualiser is open. Read by the audio thread for every buffer. */
+    /** True while a visualiser is open. Read by the playback thread for every buffer. */
     @Volatile var active = false
         private set
 
-    /**
-     * Time between PCM reaching the tap and coming out of the speaker: Media3's AudioTrack buffer
-     * (~250 ms for PCM) plus the device's output latency. Bluetooth adds more on top.
-     */
-    @Volatile var latencyMs = 270
+    /** Fine adjustment of the sync, if a device needs it (positive = visuals later). Not exposed yet. */
+    @Volatile var offsetMs = 0
 
-    private val block = FloatArray(FFT)
+    // The sink's last reported position and when it was reported; guarded by [clockLock].
+    private val clockLock = Any()
+    private var clockUs = C.TIME_UNSET
+    private var clockNanos = 0L
+
+    private val block = FloatArray(SpectrumAnalyzer.FFT_SIZE)
+    private val hopWindow = FloatArray(BeatTracker.WINDOW)
     private val pipeline = AudioPipeline()
     private var lastAnalyzeNanos = 0L
+    private var lastUs = C.TIME_UNSET
+    private var hopUs = 0L
 
-    val tap: TeeAudioProcessor.AudioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
-        override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
-            this@AudioAnalyzer.sampleRate = sampleRateHz
-            this@AudioAnalyzer.channelCount = channelCount.coerceAtLeast(1)
-            this@AudioAnalyzer.encoding = encoding
-        }
-
-        override fun handleBuffer(buffer: ByteBuffer) {
-            if (active) write(buffer)
-        }
-    }
+    /** The player's audio sink with the visualiser's tap around it. */
+    fun wrap(sink: AudioSink): AudioSink = TapSink(sink)
 
     /** Called by the visualiser when it opens (or comes back to the foreground). */
     fun start() {
         pipeline.reset()
         lastAnalyzeNanos = 0L
-        startedAt = written
+        lastUs = C.TIME_UNSET
+        ring.discontinuity()
         active = true
     }
 
@@ -70,69 +62,129 @@ object AudioAnalyzer {
         active = false
     }
 
-    private fun write(buffer: ByteBuffer) {
-        // The tee hands over a read-only duplicate, which is big-endian by default: PCM is native order.
-        val b = buffer.order(ByteOrder.nativeOrder())
-        val ch = channelCount
-        val enc = encoding
-        val bytes = when (enc) {
-            C.ENCODING_PCM_16BIT -> 2
-            C.ENCODING_PCM_FLOAT, C.ENCODING_PCM_32BIT -> 4
-            C.ENCODING_PCM_24BIT -> 3
-            else -> return
-        }
-        val frames = b.remaining() / (bytes * ch)
-        var p = b.position()
-        var w = written
-        val scale = 1f / ch
-        for (n in 0 until frames) {
-            var sum = 0f
-            for (c in 0 until ch) {
-                sum += when (enc) {
-                    C.ENCODING_PCM_16BIT -> b.getShort(p) / 32768f
-                    C.ENCODING_PCM_FLOAT -> b.getFloat(p)
-                    C.ENCODING_PCM_32BIT -> b.getInt(p) / 2147483648f
-                    else -> {
-                        val v = (b.get(p).toInt() and 0xFF) or ((b.get(p + 1).toInt() and 0xFF) shl 8) or (b.get(p + 2).toInt() shl 16)
-                        v / 8388608f
-                    }
-                }
-                p += bytes
-            }
-            ring[(w and RING_MASK.toLong()).toInt()] = sum * scale
-            w++
-        }
-        written = w
-        lastWriteNanos = System.nanoTime()
-    }
-
     /**
      * Analyses the audio playing now and returns the (reused) frame. UI thread only, once per frame.
-     * [playing]: the player says it's playing; when false, or no audio has arrived lately, the values
-     * fall away smoothly.
+     * [playing]: the player says it's playing; when false, or the sink's clock has gone quiet, the
+     * values fall away smoothly.
      */
     fun analyze(playing: Boolean): AudioFrame {
         val now = System.nanoTime()
         val dt = if (lastAnalyzeNanos == 0L) 1f / 60f else ((now - lastAnalyzeNanos) / 1e9f).coerceIn(0.001f, 0.1f)
         lastAnalyzeNanos = now
-        val rate = sampleRate
-        val w = written
-        val since = now - lastWriteNanos
-        var fresh = false
-        if (playing && since < 250_000_000L) {
-            // Between writes the speaker keeps going: move the read point on by the time since the last one.
-            val ahead = min(since, 60_000_000L) * rate / 1_000_000_000L
-            val end = min(w, w + ahead - latencyMs.toLong() * rate / 1000L)
-            if (end - FFT >= startedAt && w - end + FFT < RING_SIZE) {
-                var i = end - FFT
-                for (k in 0 until FFT) {
-                    block[k] = ring[(i and RING_MASK.toLong()).toInt()]
-                    i++
-                }
-                fresh = true
+        val posUs: Long
+        val posNanos: Long
+        synchronized(clockLock) { posUs = clockUs; posNanos = clockNanos }
+
+        var tUs = C.TIME_UNSET
+        if (playing && posUs != C.TIME_UNSET && now - posNanos < 300_000_000L) {
+            // Between reports the audio keeps going: move on by the time since the last one.
+            tUs = posUs + min(now - posNanos, 120_000_000L) / 1000L - offsetMs * 1000L
+            val last = lastUs
+            if (last != C.TIME_UNSET && tUs < last && last - tUs < 40_000L) tUs = last // tiny clock jitter: hold still
+            if (last == C.TIME_UNSET || tUs < last - 40_000L || tUs > last + 600_000L) {
+                // First frame, or a jump: start the onset analysis a little way back.
+                if (last != C.TIME_UNSET) pipeline.discontinuity()
+                hopUs = tUs - 300_000L
             }
+            lastUs = tUs
+        } else {
+            lastUs = C.TIME_UNSET
         }
-        pipeline.update(if (fresh) block else null, rate, dt)
+
+        var fresh = false
+        if (tUs != C.TIME_UNSET) {
+            if (tUs - hopUs > 600_000L) hopUs = tUs - 300_000L
+            while (hopUs + HOP_US <= tUs) {
+                hopUs += HOP_US
+                if (ring.read(hopUs, hopWindow)) pipeline.hop(hopWindow, ring.lastRate, hopUs / 1e6)
+            }
+            fresh = ring.read(tUs, block)
+        }
+        pipeline.update(if (fresh) block else null, ring.lastRate, dt, if (fresh) tUs / 1e6 else Double.NaN)
         return pipeline.frame
+    }
+
+    private val HOP_US = (BeatTracker.HOP_SEC * 1e6).toLong()
+
+    private class TapSink(sink: AudioSink) : ForwardingAudioSink(sink) {
+        private var rate = 44_100
+        private var channels = 2
+        private var encoding = C.ENCODING_INVALID
+        private var lastBuffer: ByteBuffer? = null
+        private var lastPts = Long.MIN_VALUE
+
+        override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
+            super.configure(inputFormat, specifiedBufferSize, outputChannels)
+            rate = inputFormat.sampleRate
+            channels = inputFormat.channelCount.coerceAtLeast(1)
+            encoding = if (inputFormat.sampleMimeType == MimeTypes.AUDIO_RAW) inputFormat.pcmEncoding else C.ENCODING_INVALID
+        }
+
+        override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+            // A buffer the sink couldn't take in full comes back again: only copy it the first time.
+            if (active && (buffer !== lastBuffer || presentationTimeUs != lastPts)) {
+                lastBuffer = buffer
+                lastPts = presentationTimeUs
+                copy(buffer, presentationTimeUs)
+            }
+            return super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
+        }
+
+        override fun getCurrentPositionUs(sourceEnded: Boolean): Long {
+            val p = super.getCurrentPositionUs(sourceEnded)
+            if (p != AudioSink.CURRENT_POSITION_NOT_SET) {
+                val t = System.nanoTime()
+                synchronized(clockLock) { clockUs = p; clockNanos = t }
+            }
+            return p
+        }
+
+        override fun flush() {
+            super.flush()
+            lastBuffer = null
+            ring.discontinuity()
+        }
+
+        override fun reset() {
+            super.reset()
+            lastBuffer = null
+            ring.discontinuity()
+        }
+
+        /** Mixes the buffer to mono into the ring. Reads by absolute index: the buffer isn't disturbed. */
+        private fun copy(b: ByteBuffer, ptsUs: Long) {
+            val enc = encoding
+            val bytes = when (enc) {
+                C.ENCODING_PCM_16BIT -> 2
+                C.ENCODING_PCM_FLOAT, C.ENCODING_PCM_32BIT -> 4
+                C.ENCODING_PCM_24BIT -> 3
+                else -> return
+            }
+            val ch = channels
+            val frames = b.remaining() / (bytes * ch)
+            if (frames <= 0) return
+            ring.beginChunk(ptsUs, rate)
+            var p = b.position()
+            val scale = 1f / ch
+            // PCM in the sink is little-endian (native order on Android).
+            for (n in 0 until frames) {
+                var sum = 0f
+                for (c in 0 until ch) {
+                    sum += when (enc) {
+                        C.ENCODING_PCM_16BIT -> ((b.get(p).toInt() and 0xFF) or (b.get(p + 1).toInt() shl 8)) / 32768f
+                        C.ENCODING_PCM_FLOAT -> Float.fromBits(int32(b, p))
+                        C.ENCODING_PCM_32BIT -> int32(b, p) / 2147483648f
+                        else -> ((b.get(p).toInt() and 0xFF) or ((b.get(p + 1).toInt() and 0xFF) shl 8) or (b.get(p + 2).toInt() shl 16)) / 8388608f
+                    }
+                    p += bytes
+                }
+                ring.put(sum * scale)
+            }
+            ring.commit()
+        }
+
+        private fun int32(b: ByteBuffer, p: Int): Int =
+            (b.get(p).toInt() and 0xFF) or ((b.get(p + 1).toInt() and 0xFF) shl 8) or
+                ((b.get(p + 2).toInt() and 0xFF) shl 16) or (b.get(p + 3).toInt() shl 24)
     }
 }

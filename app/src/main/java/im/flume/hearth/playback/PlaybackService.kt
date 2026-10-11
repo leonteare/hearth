@@ -20,7 +20,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import android.content.Context
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
@@ -125,15 +124,17 @@ class PlaybackService : MediaSessionService() {
                 else super.getRetryDelayMsFor(info)
         }
 
-        // Same audio sink as Media3's default, plus a tee that hands the PCM to the visualiser (only
-        // while one is open). Audio offload stays off (the default): offloaded audio skips the processors.
+        // Same audio sink as Media3's default, wrapped so the visualiser gets the PCM with its
+        // presentation times and the sink's playback clock (only copied while one is open). Audio
+        // offload stays off (the default): offloaded audio never passes through as PCM.
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(enableFloatOutput)
-                    .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(arrayOf(TeeAudioProcessor(AudioAnalyzer.tap)))
-                    .build()
+                AudioAnalyzer.wrap(
+                    DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
+                        .build()
+                )
         }
 
         player = ExoPlayer.Builder(this, renderers)

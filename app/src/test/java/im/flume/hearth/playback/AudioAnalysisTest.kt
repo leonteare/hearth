@@ -70,55 +70,6 @@ class AudioAnalysisTest {
     }
 
     @Test
-    fun steadyEnergyIsNotABeat() {
-        val d = BeatDetector()
-        var t = 0.0
-        var beats = 0
-        repeat(300) {
-            t += 1 / 60.0
-            if (d.process(0.1f + (it % 3) * 0.005f, t, 1 / 60f)) beats++
-        }
-        assertEquals(0, beats)
-    }
-
-    @Test
-    fun spikesAreBeatsWithCooldown() {
-        val d = BeatDetector(cooldownSec = 0.28f)
-        var t = 0.0
-        val beatTimes = mutableListOf<Double>()
-        // 2 s of quiet, then a kick every 0.5 s for 4 s.
-        repeat(120) { t += 1 / 60.0; d.process(0.05f, t, 1 / 60f) }
-        for (frame in 0 until 240) {
-            t += 1 / 60.0
-            val kick = frame % 30 == 0
-            if (d.process(if (kick) 0.4f else 0.05f, t, 1 / 60f)) beatTimes += t
-        }
-        assertEquals(8, beatTimes.size)
-        // Two spikes 0.1 s apart: only the first counts.
-        val d2 = BeatDetector(cooldownSec = 0.28f)
-        t = 0.0
-        repeat(120) { t += 1 / 60.0; d2.process(0.05f, t, 1 / 60f) }
-        var count = 0
-        for (frame in 0 until 20) {
-            t += 1 / 60.0
-            if (d2.process(if (frame == 0 || frame == 6) 0.4f else 0.05f, t, 1 / 60f)) count++
-        }
-        assertEquals(1, count)
-    }
-
-    @Test
-    fun quietSpikesAreIgnored() {
-        val d = BeatDetector(minEnergy = 0.01f)
-        var t = 0.0
-        var beats = 0
-        repeat(200) {
-            t += 1 / 60.0
-            if (d.process(if (it % 30 == 0) 0.008f else 0.0001f, t, 1 / 60f)) beats++
-        }
-        assertEquals(0, beats)
-    }
-
-    @Test
     fun autoGainLiftsQuietSignalsSlowlyAndNeverCuts() {
         val g = AutoGain(target = 0.8f, maxGain = 2.5f)
         // A loud signal: no boost, and never a cut.
