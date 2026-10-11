@@ -14,7 +14,8 @@ import kotlin.random.Random
 
 /**
  * Particles: a starfield of up to 400 glowing points flying at the viewer, streaking as they speed
- * up with the music. Beats blow the field outward; colours come from the cover.
+ * up with the music. Beats (tempo-tracked, so none are skipped) blow the field outward; colours come
+ * from the cover.
  */
 class ParticlesRenderer : VisualiserRenderer() {
     private val max = 400
@@ -66,10 +67,12 @@ class ParticlesRenderer : VisualiserRenderer() {
         }
         drawRect(background!!)
         // A soft core that throbs with the bass.
-        drawCircle(pal.color(0), min(w, h) * (0.12f + 0.12f * a.bass), Offset(cx, cy), alpha = 0.06f + 0.12f * a.beat, blendMode = BlendMode.Plus)
+        drawCircle(pal.color(0), min(w, h) * (0.12f + 0.12f * a.bass + 0.04f * a.kick), Offset(cx, cy), alpha = 0.06f + 0.12f * max(a.beat, a.kick), blendMode = BlendMode.Plus)
 
         val dt = f.dt
-        val speed = 0.08f + a.level * 0.45f + a.bass * 0.35f + a.beat * 1.6f
+        // a.beat is the beat envelope: real kicks, plus the ones the tempo tracker fills in when a beat
+        // is too soft to hear clearly, so every beat bursts the field.
+        val speed = 0.08f + a.level * 0.45f + a.bass * 0.35f + a.beat * 1.6f + a.snare * 0.3f
         val push = 1f + a.beat * dt * 1.8f
         spin += dt * (0.05f + a.treble * 0.3f)
         val cs = cos(spin)

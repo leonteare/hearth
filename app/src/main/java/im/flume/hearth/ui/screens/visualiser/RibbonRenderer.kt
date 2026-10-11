@@ -17,7 +17,8 @@ import kotlin.math.sin
 
 /**
  * Ribbon: four glowing silk ribbons woven from the waveform and the spectrum, each a little lazier
- * than the one in front, mirrored top to bottom like a reflection on water.
+ * than the one in front, mirrored top to bottom like a reflection on water. Kicks bow them apart,
+ * snares ripple them; with no music they lie almost still.
  */
 class RibbonRenderer : VisualiserRenderer() {
     private val ribbons = 4
@@ -63,20 +64,29 @@ class RibbonRenderer : VisualiserRenderer() {
         )
 
         val amp = h * 0.2f
+        val pi = PI.toFloat()
+        val t = f.time
         for (r in ribbons - 1 downTo 0) {
             val k = 1f - exp(-f.dt / (0.04f + r * 0.07f))
             val base = r * points
+            // Alternate ribbons bow opposite ways, so a kick opens them like a breath.
+            val side = if (r % 2 == 0) 1f else -1f
             for (i in 0 until points) {
                 val u = i / (points - 1f)
                 val wave = a.waveform[(u * (a.waveform.size - 1)).toInt()]
+                // The spectrum mirrored about the middle: bass at the centre, treble at the ends.
                 val band = a.bands[((kotlin.math.abs(u - 0.5f) * 2f) * 44f).toInt().coerceAtMost(a.bands.size - 1)]
-                val t = f.time
-                // Idle motion: each ribbon drifts on its own two slow waves, so they're alive in silence.
-                val idle = 0.34f * sin(u * PI.toFloat() * (1.2f + r * 0.55f) + t * (0.35f + r * 0.13f) + r * 1.7f) +
-                    0.13f * sin(u * PI.toFloat() * (3.1f + r * 0.9f) - t * (0.55f + r * 0.17f) + r * 0.6f)
-                val swell = sin(u * PI.toFloat() * (1.5f + r * 0.7f) + t * (0.5f + r * 0.23f) + r * 1.3f)
-                val audio = wave * 0.5f * (1f - r * 0.15f) + swell * (band * 0.55f + a.bass * 0.25f)
-                val target = (idle * (1f + a.level * 0.6f) + audio) * sin(u * PI.toFloat()).coerceAtLeast(0f).pow(1.3f) // sin(π) is a hair below 0 in floats, and a negative to a fractional power is NaN, which hides the whole path
+                // Only a faint breathing of their own (a fifth of what it was), so in silence they rest.
+                val idle = 0.07f * sin(u * pi * (1.2f + r * 0.55f) + t * (0.25f + r * 0.08f) + r * 1.7f)
+                // Everything else is the music: the synced waveform, the spectrum's shape, a bow on
+                // each kick and a ripple on each snare.
+                val bow = sin(u * pi)
+                val audio = wave * (0.42f + 0.25f * a.kick) * (1f - r * 0.15f) +
+                    side * band * (0.35f + 0.2f * a.bassSlow) +
+                    side * bow * a.kick * 0.45f +
+                    a.snare * 0.22f * sin(u * pi * (5f + r) + r * 1.1f)
+                // sin(π) is a hair below 0 in floats, and a negative to a fractional power is NaN, which hides the whole path.
+                val target = (idle + audio) * sin(u * pi).coerceAtLeast(0f).pow(1.3f)
                 ys[base + i] += (target - ys[base + i]) * k
             }
             path.rewind()

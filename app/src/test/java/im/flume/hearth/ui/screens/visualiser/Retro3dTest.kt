@@ -94,4 +94,51 @@ class Retro3dTest {
         val table = Bayer.table(levels)
         assertEquals(Bayer.quantize(123, 7, levels), table[7 * 256 + 123])
     }
+
+    @Test
+    fun segmentAheadMatchesPointProjection() {
+        val cam = camera()
+        val seg = FloatArray(4)
+        val p = FloatArray(3)
+        assertTrue(cam.projectSegment(-1f, 0.5f, 2f, 2f, -1f, 6f, seg, snap = false))
+        cam.project(-1f, 0.5f, 2f, p, 0, snap = false)
+        assertEquals(p[0], seg[0], 1e-4f); assertEquals(p[1], seg[1], 1e-4f)
+        cam.project(2f, -1f, 6f, p, 0, snap = false)
+        assertEquals(p[0], seg[2], 1e-4f); assertEquals(p[1], seg[3], 1e-4f)
+    }
+
+    @Test
+    fun segmentCrossingTheNearPlaneIsCutWhereItCrosses() {
+        val cam = camera().apply { near = 0.5f }
+        val seg = FloatArray(4)
+        // From 1 behind the camera to 3 ahead, rising from y = -1 to y = 1 (x fixed at 2).
+        assertTrue(cam.projectSegment(2f, -1f, -1f, 2f, 1f, 3f, seg, snap = false))
+        // At depth 0.5 the line is at y = -1 + 2 * (1.5 / 4) = -0.25: the clipped end is that point.
+        assertEquals(160f + 2f / 0.5f * 100f, seg[0], 1e-3f)
+        assertEquals(120f + 0.25f / 0.5f * 100f, seg[1], 1e-3f)
+        // The far end is untouched.
+        assertEquals(160f + 2f / 3f * 100f, seg[2], 1e-3f)
+        assertEquals(120f - 1f / 3f * 100f, seg[3], 1e-3f)
+        // Either way round.
+        val back = FloatArray(4)
+        assertTrue(cam.projectSegment(2f, 1f, 3f, 2f, -1f, -1f, back, snap = false))
+        assertEquals(seg[0], back[2], 1e-3f); assertEquals(seg[1], back[3], 1e-3f)
+        // Wholly behind: nothing.
+        assertFalse(cam.projectSegment(0f, 0f, -2f, 1f, 1f, 0.2f, seg))
+    }
+
+    @Test
+    fun clippedPointsStayFinite() {
+        val cam = camera().apply { near = 0.1f }
+        val seg = FloatArray(4)
+        // Ends at or just behind the camera plane would project ~infinitely far away without clipping.
+        for (z in listOf(-3f, -0.01f, 0f, 0.05f, 0.1f, 0.2f)) {
+            if (cam.projectSegment(3f, 2f, z, -3f, 2f, 8f, seg)) {
+                for (v in seg) assertTrue("z=$z → $v", v.isFinite() && kotlin.math.abs(v) < 1e5f)
+            }
+        }
+        assertEquals(0f, smoothstep(1f, 2f, 0.5f))
+        assertEquals(0.5f, smoothstep(1f, 2f, 1.5f), 1e-6f)
+        assertEquals(1f, smoothstep(1f, 2f, 3f))
+    }
 }

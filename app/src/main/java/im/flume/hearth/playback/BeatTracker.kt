@@ -124,6 +124,9 @@ class BeatTracker {
      */
     fun process(window: FloatArray, sampleRate: Int, t: Double) {
         if (sampleRate != rate) setRate(sampleRate)
+        // A jump in the audio (seek, or a long pause then a seek): the history no longer applies.
+        // (Envelopes carry on falling away; reset leaves them alone.)
+        if (!time.isNaN() && (t < time - 0.05 || t > time + 1.0)) reset()
         val dtHop = if (time.isNaN()) HOP_SEC.toFloat() else (t - time).toFloat().coerceIn(0.001f, 0.1f)
         time = t
         decay(dtHop)

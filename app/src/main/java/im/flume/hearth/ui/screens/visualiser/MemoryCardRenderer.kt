@@ -106,9 +106,9 @@ class MemoryCardRenderer : RetroRenderer() {
             }
         }
 
-        // Towers follow the spectrum: up quickly, down slowly.
-        val up = 1f - exp(-dt / 0.05f)
-        val down = 1f - exp(-dt / 0.4f)
+        // Towers follow the spectrum: up quickly, down slowly (on top of the bands' own smoothing).
+        val up = 1f - exp(-dt / 0.06f)
+        val down = 1f - exp(-dt / 0.35f)
         for (i in 0 until count) {
             val target = 0.12f + a.bands[bandOf[i]].pow(1.3f) * 4.6f
             heights[i] += (target - heights[i]) * (if (target > heights[i]) up else down)
@@ -125,10 +125,10 @@ class MemoryCardRenderer : RetroRenderer() {
         }
         for (n in 0 until count) drawTower(c, order[n], a.bands[bandOf[order[n]]], pal, fogColor)
 
-        // Orbs rise on beats.
+        // Orbs rise on the beat: each kick, plus the beats the tempo tracker fills in.
         if (a.beatCount != lastBeat) {
             if (lastBeat >= 0) {
-                val spawn = if (a.beat > 0.9f && rnd.nextFloat() < 0.4f) 2 else 1
+                val spawn = if (a.kick > 0.85f && rnd.nextFloat() < 0.4f) 2 else 1
                 repeat(spawn) {
                     val k = nextOrb
                     nextOrb = (nextOrb + 1) % orbs

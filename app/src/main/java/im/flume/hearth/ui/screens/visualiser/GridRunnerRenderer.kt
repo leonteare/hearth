@@ -30,7 +30,10 @@ class GridRunnerRenderer : RetroRenderer() {
     private val py = FloatArray(rows * cols)
     private val pz = FloatArray(rows)
     private val valid = BooleanArray(rows)
+    private val wh = FloatArray(rows * cols)
     private val tmp = FloatArray(3)
+    private val seg = FloatArray(4)
+    private var speed = 5f
     private val cam = RetroCamera()
     private val rnd = Random(9)
 
@@ -69,14 +72,17 @@ class GridRunnerRenderer : RetroRenderer() {
         val pal = f.palette
         val dt = f.dt
 
-        scroll += dt * (5f + a.bass * 7f + a.beat * 3f)
+        // Speed eases towards the music's drive; beats add a gentle surge, never a jump.
+        val target = 5f + a.bassSlow * 6f + a.beat * 2.5f
+        speed += (target - speed) * (1f - kotlin.math.exp(-dt / 0.25f))
+        scroll += dt * speed
         while (scroll >= spacing) {
             scroll -= spacing
             newest = (newest + 1) % rows
             fillRow(newest, a.bands)
         }
 
-        cam.x = 0f; cam.y = 1.5f + a.bass * 0.15f; cam.z = 0f
+        cam.x = 0f; cam.y = 1.5f + a.bassSlow * 0.12f; cam.z = 0f
         cam.yaw = 0f; cam.pitch = -0.09f; cam.update()
         cam.focal = w * 0.9f
         cam.cx = w / 2f
@@ -105,19 +111,28 @@ class GridRunnerRenderer : RetroRenderer() {
 
         drawSun(c, w, f, haze)
 
-        // Project the terrain: row 0 is nearest.
+        // Project the terrain: row 0 is nearest. Hills sink as they come close (and can never reach
+        // the camera's height there), so nothing ever crosses the near plane or blows up on screen;
+        // the lines that run past the camera are clipped to the near plane instead of being dropped.
         for (k in 0 until rows) {
             val buf = (newest - (rows - 1 - k) + rows * 2) % rows
             val z = 0.6f + k * spacing - scroll
             pz[k] = z
-            valid[k] = z > cam.near + 0.05f
-            if (!valid[k]) continue
+            val ramp = smoothstep(NEAR_FLAT, FULL_HEIGHT_AT, z)
+            val cap = cam.y * 0.6f + z * 0.8f
+            var ok = z > cam.near + 0.3f
             for (col in 0 until cols) {
-                val x = (col - (cols - 1) / 2f) * spacing * 1.1f
-                cam.project(x, heights[buf * cols + col], z, tmp, 0)
-                px[k * cols + col] = tmp[0]
-                py[k * cols + col] = tmp[1]
+                val i = k * cols + col
+                val hgt = kotlin.math.min(heights[buf * cols + col], cap) * ramp
+                wh[i] = hgt
+                if (ok && cam.project(colX(col), hgt, z, tmp, 0)) {
+                    px[i] = tmp[0]
+                    py[i] = tmp[1]
+                } else {
+                    ok = false
+                }
             }
+            valid[k] = ok
         }
 
         val neon = lerpArgb(pal.argb[0], 0xFFFFFFFF.toInt(), 0.15f)
@@ -127,16 +142,20 @@ class GridRunnerRenderer : RetroRenderer() {
         val roadL = (cols - 1) / 2 - 2
         val roadR = (cols - 1) / 2 + 2
         for (k in rows - 1 downTo 0) {
-            if (!valid[k]) continue
             val fog = fogAmount(pz[k], farZ * 0.35f, farZ)
-            // Lines running back to the next row out, then this row's "curtain" hides what's behind it.
+            // Lines running back to the next row out (clipped if this row is already past the near
+            // plane), then this row's "curtain" hides what's behind it.
             if (k + 1 < rows && valid[k + 1]) {
                 val fog2 = fogAmount((pz[k] + pz[k + 1]) / 2f, farZ * 0.35f, farZ)
                 for (col in 0 until cols) {
                     val colColor = if (col == roadL || col == roadR) road else neon
-                    line(c, px[(k + 1) * cols + col], py[(k + 1) * cols + col], px[k * cols + col], py[k * cols + col], lerpArgb(colColor, haze, fog2))
+                    val x = colX(col)
+                    if (cam.projectSegment(x, wh[(k + 1) * cols + col], pz[k + 1], x, wh[k * cols + col], pz[k], seg)) {
+                        line(c, seg[0], seg[1], seg[2], seg[3], lerpArgb(colColor, haze, fog2))
+                    }
                 }
             }
+            if (!valid[k]) continue
             path.rewind()
             path.moveTo(px[k * cols], py[k * cols])
             for (col in 1 until cols) path.lineTo(px[k * cols + col], py[k * cols + col])
@@ -152,6 +171,14 @@ class GridRunnerRenderer : RetroRenderer() {
         }
         // A thin glow where the land meets the sky.
         line(c, 0f, horizon, w.toFloat(), horizon, withAlpha(haze, 0.35f + 0.4f * a.beat))
+    }
+
+    private fun colX(col: Int) = (col - (cols - 1) / 2f) * spacing * 1.1f
+
+    private companion object {
+        /** Terrain is flat nearer than this, full height from [FULL_HEIGHT_AT] on. */
+        const val NEAR_FLAT = 1.6f
+        const val FULL_HEIGHT_AT = 7f
     }
 
     private fun drawSun(c: Canvas, w: Int, f: VisFrame, haze: Int) {

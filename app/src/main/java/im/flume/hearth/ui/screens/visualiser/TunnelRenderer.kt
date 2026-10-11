@@ -3,13 +3,14 @@ package im.flume.hearth.ui.screens.visualiser
 import android.graphics.Canvas
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.tanh
 
 /**
  * Tunnel '98: a low-poly tube of chequered quads rushing at the camera. It bends and twists with the
- * music, speeds up on the bass and flashes on beats. Vertices snap to the low-res pixel grid (the
+ * music, glides faster with the bass and surges gently forward (and a little brighter) on beats. Vertices snap to the low-res pixel grid (the
  * wobble) and each quad's two triangles are shaded apart, like the seams of affine texturing.
  */
 class TunnelRenderer : RetroRenderer() {
@@ -25,19 +26,26 @@ class TunnelRenderer : RetroRenderer() {
     private val depth = FloatArray(rings + 1)
     private val wx = FloatArray((rings + 1) * segs)
     private val wy = FloatArray((rings + 1) * segs)
+    private val ringBand = FloatArray(rings + 1)
     private var travel = 0f
     private var twist = 0f
-    private var flash = 0f
-    private var lastBeat = -1
+    private var speed = 1.3f
+    private var twistRate = 0.25f
+    private var surge = 0f
+    private var drive = 0f
 
     override fun render(c: Canvas, w: Int, h: Int, f: VisFrame) {
         val a = f.audio
         val pal = f.palette
         val dt = f.dt
-        travel += dt * (1.3f + a.bass * 4.5f + a.beat * 4f)
-        twist += dt * (0.25f + a.bass * 1.2f + a.mid * 0.4f)
-        if (a.beatCount != lastBeat) { if (lastBeat >= 0) flash = 1f; lastBeat = a.beatCount }
-        flash *= kotlin.math.exp(-dt * 6f)
+        // Everything that moves the camera is eased, so it glides: speed and twist follow the music's
+        // slow drive; a beat adds a forward surge that swells in (~60 ms) and ebbs away (~0.3 s).
+        drive += (a.bassSlow * 0.7f + a.level * 0.3f - drive) * (1f - exp(-dt / 0.4f))
+        surge += (a.beat - surge) * (1f - exp(-dt / (if (a.beat > surge) 0.06f else 0.3f)))
+        speed += (1.3f + drive * 3.2f - speed) * (1f - exp(-dt / 0.35f))
+        twistRate += (0.22f + drive * 0.6f + a.mid * 0.1f - twistRate) * (1f - exp(-dt / 0.6f))
+        travel += dt * (speed + surge * 1.6f)
+        twist += dt * twistRate
 
         // Only ever seen through a seam: the walls cover the whole screen.
         c.drawColor(scaleArgb(pal.argb[1], 0.12f))
@@ -60,9 +68,11 @@ class TunnelRenderer : RetroRenderer() {
             // sight: the camera always stays inside, and the walls always fill the screen.
             val ox = MAX_SWAY * tanh((bendX(along, f.time) - camBendX) / MAX_SWAY)
             val oy = MAX_SWAY * tanh((bendY(along, f.time) - camBendY) / MAX_SWAY)
+            // The rings breathe with the spectrum, eased, and only a little: the walls never lurch.
             val band = a.bands[(i * 48 / rings).coerceAtMost(a.bands.size - 1)]
-            val r = radius * (1f + band * 0.22f + (if (i < 4) a.beat * 0.12f else 0f))
-            val rot = twist + z * (0.1f + a.bass * 0.15f)
+            ringBand[i] += (band - ringBand[i]) * (1f - exp(-dt / 0.12f))
+            val r = radius * (1f + ringBand[i] * 0.12f + surge * 0.05f * (1f - i / rings.toFloat()))
+            val rot = twist + z * (0.1f + drive * 0.08f)
             for (j in 0 until segs) {
                 val ang = rot + j * (2f * PI.toFloat() / segs)
                 wx[i * segs + j] = ox + cos(ang) * r
@@ -103,8 +113,8 @@ class TunnelRenderer : RetroRenderer() {
                     chequer -> pal.argb[0]
                     else -> scaleArgb(pal.argb[1], 0.55f)
                 }
-                if (flash > 0.01f) col = lerpArgb(col, 0xFFFFFFFF.toInt(), flash * 0.5f * (1f - fog))
-                col = scaleArgb(col, dim)
+                // Beats brighten the walls a touch (strongest close by), easing out: no white flash.
+                col = scaleArgb(col, dim * (1f + surge * 0.3f * (1f - fog)))
                 val j2 = (j + 1) % segs
                 val a0 = i * segs + j
                 val a1 = i * segs + j2
@@ -115,8 +125,8 @@ class TunnelRenderer : RetroRenderer() {
             }
         }
         // The light at the end of the tunnel.
-        fill.color = withAlpha(pal.argb[3], 0.25f + 0.3f * a.level)
-        c.drawCircle(ringCentre(sx, rings), ringCentre(sy, rings), w * 0.02f * (1f + a.bass), fill)
+        fill.color = withAlpha(pal.argb[3], 0.25f + 0.3f * drive + 0.15f * surge)
+        c.drawCircle(ringCentre(sx, rings), ringCentre(sy, rings), w * 0.02f * (1f + drive * 0.8f), fill)
     }
 
     private fun ringCentre(coords: FloatArray, i: Int): Float {

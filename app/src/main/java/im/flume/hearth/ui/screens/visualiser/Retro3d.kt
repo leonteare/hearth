@@ -75,22 +75,86 @@ class RetroCamera {
      * written) when it's behind the near plane. With [snap], screen coordinates are whole pixels.
      */
     fun project(wx: Float, wy: Float, wz: Float, out: FloatArray, o: Int, snap: Boolean = true): Boolean {
+        toView(wx, wy, wz, view, 0)
+        val depth = view[2]
+        if (depth < near) return false
+        out[o] = screenX(view[0], depth, snap)
+        out[o + 1] = screenY(view[1], depth, snap)
+        out[o + 2] = depth
+        return true
+    }
+
+    /** Camera-space coordinates of a world point into [out] at [o]: x right, y up, then depth. */
+    fun toView(wx: Float, wy: Float, wz: Float, out: FloatArray, o: Int) {
         val dx = wx - x
         val dy = wy - y
         val dz = wz - z
         val rx = dx * cosYaw - dz * sinYaw
         val rz = dx * sinYaw + dz * cosYaw
-        val ry = dy * cosPitch - rz * sinPitch
-        val depth = dy * sinPitch + rz * cosPitch
-        if (depth < near) return false
-        var sx = cx + rx / depth * focal
-        var sy = cy - ry / depth * focal
-        if (snap) { sx = snapToGrid(sx); sy = snapToGrid(sy) }
-        out[o] = sx
-        out[o + 1] = sy
-        out[o + 2] = depth
+        out[o] = rx
+        out[o + 1] = dy * cosPitch - rz * sinPitch
+        out[o + 2] = dy * sinPitch + rz * cosPitch
+    }
+
+    /**
+     * Projects the segment from A to B, clipped against the near plane: the part behind it is cut
+     * off where it crosses, so a line running past the camera stays a finite, correct line instead of
+     * flipping or shooting off to infinity. Writes x0, y0, x1, y1 into [out]; false when the whole
+     * segment is behind the near plane.
+     */
+    fun projectSegment(
+        ax: Float, ay: Float, az: Float, bx: Float, by: Float, bz: Float,
+        out: FloatArray, snap: Boolean = true,
+    ): Boolean {
+        toView(ax, ay, az, view, 0)
+        toView(bx, by, bz, view, 3)
+        if (!clipToNear(view, near)) return false
+        out[0] = screenX(view[0], view[2], snap)
+        out[1] = screenY(view[1], view[2], snap)
+        out[2] = screenX(view[3], view[5], snap)
+        out[3] = screenY(view[4], view[5], snap)
         return true
     }
+
+    private val view = FloatArray(6)
+
+    private fun screenX(vx: Float, depth: Float, snap: Boolean): Float {
+        val s = cx + vx / depth * focal
+        return if (snap) snapToGrid(s) else s
+    }
+
+    private fun screenY(vy: Float, depth: Float, snap: Boolean): Float {
+        val s = cy - vy / depth * focal
+        return if (snap) snapToGrid(s) else s
+    }
+}
+
+/**
+ * Clips a camera-space segment (x, y, depth for each end, in [seg][0..5]) to depth >= [near], in
+ * place. False if it lies wholly behind the plane.
+ */
+fun clipToNear(seg: FloatArray, near: Float): Boolean {
+    val za = seg[2]
+    val zb = seg[5]
+    if (za < near && zb < near) return false
+    if (za < near) {
+        val t = (near - za) / (zb - za)
+        seg[0] += (seg[3] - seg[0]) * t
+        seg[1] += (seg[4] - seg[1]) * t
+        seg[2] = near
+    } else if (zb < near) {
+        val t = (near - zb) / (za - zb)
+        seg[3] += (seg[0] - seg[3]) * t
+        seg[4] += (seg[1] - seg[4]) * t
+        seg[5] = near
+    }
+    return true
+}
+
+/** 0 below [edge0], 1 above [edge1], smooth (Hermite) between. */
+fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
+    val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
 }
 
 /** Ordered (Bayer 4×4) dithering down to a few levels per channel, as a lookup table. */
