@@ -13,7 +13,8 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
     RIBBON("ribbon", "Ribbon", false),
     SPHERE("sphere", "Sphere", false),
     MEMORY_CARD("memory-card", "Memory Card", true),
-    GRID_RUNNER("grid-runner", "Grid Runner", true);
+    GRID_RUNNER("grid-runner", "Grid Runner", true),
+    PIPES("pipes", "Pipes", true);
 
     fun create(): VisualiserRenderer = when (this) {
         PARTICLES -> ParticlesRenderer()
@@ -21,6 +22,7 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
         MEMORY_CARD -> MemoryCardRenderer()
         SPHERE -> SphereRenderer()
         GRID_RUNNER -> GridRunnerRenderer()
+        PIPES -> PipesRenderer()
     }
 
     companion object {
