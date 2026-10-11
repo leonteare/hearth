@@ -1015,8 +1015,18 @@ class PlaybackService : MediaSessionService() {
             if (playbackState == Player.STATE_READY) recoveryAttempts = 0
             // Played to the very end: record the end (marks it finished) and send it.
             if (playbackState == Player.STATE_ENDED && spokenNow != null) {
-                val end = spokenNow?.timeline?.durationSec ?: 0.0
-                scope.launch { tracker.pause(end) }
+                val now = spokenNow
+                val end = now?.timeline?.durationSec ?: 0.0
+                scope.launch {
+                    tracker.pause(end)
+                    // A finished episode leaves this phone straight away rather than when the next thing
+                    // plays: it's no longer held by the player, so deleting it is safe. Playing it again
+                    // just streams it from the server.
+                    if (now != null && !now.isBook) {
+                        c.spoken.downloads.current = null
+                        runCatching { c.spoken.downloads.autoDeleteFinished() }
+                    }
+                }
             }
         }
 

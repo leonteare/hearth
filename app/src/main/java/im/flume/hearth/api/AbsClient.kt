@@ -124,8 +124,15 @@ class AbsClient(
     }
 
     /** Cover image. Audiobookshelf serves covers without a login, so this URL is safe to hand to Coil. */
-    fun coverUrl(libraryItemId: String, width: Int = 600): String? =
-        runCatching { url("api/items/$libraryItemId/cover", mapOf("width" to width.toString(), "format" to "jpeg")).toString() }.getOrNull()
+    fun coverUrl(libraryItemId: String, width: Int = 600, version: Long? = null): String? = runCatching {
+        // [version] (the item's updatedAt) changes the URL when the artwork does, so a cover cached before
+        // the server had fetched it (or an old one) is never shown again.
+        val q = buildMap {
+            put("width", width.toString()); put("format", "jpeg")
+            version?.let { put("ts", it.toString()) }
+        }
+        url("api/items/$libraryItemId/cover", q).toString()
+    }.getOrNull()
 
     /** An audio file of an item. Needs the Authorization header: fetch it with [http]. */
     fun fileUrl(libraryItemId: String, ino: String): String = url("api/items/$libraryItemId/file/$ino").toString()

@@ -204,8 +204,16 @@ class SpokenRepository(
 
     fun progress(libraryItemId: String, episodeId: String? = null): Flow<SpokenProgressEntity?> = progress.progressFlow(libraryItemId, episodeId)
 
+    /** When each podcast's / book's details last changed on the server, to version its cover URL. */
+    private val coverVersions = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    init {
+        scope.launch { dao.podcasts().collect { list -> list.forEach { coverVersions[it.id] = it.updatedAt } } }
+        scope.launch { dao.books().collect { list -> list.forEach { coverVersions[it.book.id] = it.book.updatedAt } } }
+    }
+
     /** Cover image URL (needs no login), for Coil. */
-    fun coverUrl(libraryItemId: String, width: Int = 600): String? = api.coverUrl(libraryItemId, width)
+    fun coverUrl(libraryItemId: String, width: Int = 600): String? = api.coverUrl(libraryItemId, width, coverVersions[libraryItemId])
 
     fun isFollowing(podcast: PodcastEntity): Boolean = username?.let { FollowTags.isFollowing(podcast.tagList, it) } == true
 
