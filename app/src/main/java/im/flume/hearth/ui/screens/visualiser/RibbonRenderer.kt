@@ -76,7 +76,7 @@ class RibbonRenderer : VisualiserRenderer() {
                     0.13f * sin(u * PI.toFloat() * (3.1f + r * 0.9f) - t * (0.55f + r * 0.17f) + r * 0.6f)
                 val swell = sin(u * PI.toFloat() * (1.5f + r * 0.7f) + t * (0.5f + r * 0.23f) + r * 1.3f)
                 val audio = wave * 0.5f * (1f - r * 0.15f) + swell * (band * 0.55f + a.bass * 0.25f)
-                val target = (idle * (1f + a.level * 0.6f) + audio) * sin(u * PI.toFloat()).pow(1.3f)
+                val target = (idle * (1f + a.level * 0.6f) + audio) * sin(u * PI.toFloat()).coerceAtLeast(0f).pow(1.3f) // sin(π) is a hair below 0 in floats, and a negative to a fractional power is NaN, which hides the whole path
                 ys[base + i] += (target - ys[base + i]) * k
             }
             path.rewind()

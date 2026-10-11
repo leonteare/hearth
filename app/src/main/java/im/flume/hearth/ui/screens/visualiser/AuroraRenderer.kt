@@ -123,19 +123,19 @@ half4 main(float2 fragCoord) {
     col = mix(col, k2, clamp(length(q) * 0.9 - 0.3, 0.0, 1.0));
     col = mix(col, k3, smoothstep(0.5, 0.9, r.y));
 
-    // Clouds: clearly lit even in silence (about half brightness at their cores); audio swells them.
-    float cloud = smoothstep(0.3, 0.8, f + 0.35 * length(r) - 0.1);
+    // Clouds: glowing even in silence (bright cores, softly lit gaps); audio swells them.
+    float cloud = smoothstep(0.18, 0.68, f + 0.35 * length(r) - 0.1);
     float shimmer = noise(p * 10.0 + float2(iTime * 1.9, -iTime * 1.4));
-    float rest = mix(0.10, 0.62, cloud) + 0.18 * cloud * cloud;
+    float rest = mix(0.16, 0.95, cloud) + 0.25 * cloud * cloud;
     float swell = 1.0 + uBass * 0.55 + uBeat * 0.3 + uMid * 0.15;
     float3 lit = col * rest * swell + col * (uTreble * 0.35 * shimmer * cloud);
     // A soft tint of the first colour in the gaps, so it's never just black between clouds.
-    lit += k0 * 0.05 * (1.0 - cloud);
+    lit += k0 * 0.08 * (1.0 - cloud);
     // Gentle tone curve: keeps colour in the highlights instead of clipping to white.
     lit = lit / (1.0 + lit * 0.35) * 1.2;
 
     float2 v = fragCoord / iResolution - 0.5;
-    lit *= 1.0 - dot(v, v) * 0.9;
+    lit *= 1.0 - dot(v, v) * 0.6;
     return half4(half3(clamp(lit, 0.0, 1.0)), 1.0);
 }
 """
