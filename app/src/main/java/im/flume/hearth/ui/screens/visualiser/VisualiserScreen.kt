@@ -67,7 +67,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -215,7 +214,7 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
         }
     }
 
-    // Cover art: for Halo and Disc Player, and the colours of every style.
+    // Cover art: the colours of every style.
     val coverArt = state.current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
     var paletteSet by remember { mutableStateOf(false) }
     LaunchedEffect(coverArt) {
@@ -224,9 +223,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
             val request = ImageRequest.Builder(context).data(it).size(600).allowHardware(false).build()
             (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap()
         }
-        frame.coverBitmap = bitmap
-        frame.cover = bitmap?.asImageBitmap()
-        frame.coverVersion++
         val swatches = if (bitmap != null && coverArt != null) withContext(Dispatchers.Default) { coverPalette(coverArt, bitmap) } else emptyList()
         val colours = VisPalette.vivid(swatches, accent)
         if (paletteSet) frame.palette.setTarget(colours) else frame.palette.snap(colours)

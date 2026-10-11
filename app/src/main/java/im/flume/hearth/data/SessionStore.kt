@@ -34,7 +34,7 @@ data class Settings(
     /** Show music that isn't on the server (dimmed) in Search and on artist and album pages. */
     val tidalInSearch: Boolean = true,
     /** Last visualiser style picked (see VisualiserStyle ids). */
-    val visualiserStyle: String = "aurora",
+    val visualiserStyle: String = "memory-card",
 ) {
     /** Music not on the server is shown when switched on and Tidarr has an address. */
     val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank()
@@ -150,7 +150,7 @@ class SessionStore(context: Context) {
         smartShuffle = prefs.getBoolean("smartShuffle", true),
         tidarrUrl = prefs.getString("tidarrUrl", Settings.DEFAULT_TIDARR_URL).orEmpty(),
         tidalInSearch = prefs.getBoolean("tidalInSearch", true),
-        visualiserStyle = prefs.getString("visualiserStyle", "aurora").orEmpty(),
+        visualiserStyle = prefs.getString("visualiserStyle", "memory-card").orEmpty(),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {

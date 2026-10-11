@@ -1,8 +1,6 @@
 package im.flume.hearth.ui.screens.visualiser
 
-import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.toArgb
 import im.flume.hearth.playback.AudioFrame
@@ -12,34 +10,31 @@ import kotlin.math.floor
 /** The looks on offer. [id] is what Settings remembers. */
 enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean) {
     AURORA("aurora", "Aurora", false),
-    HALO("halo", "Halo", false),
     PARTICLES("particles", "Particles", false),
     RIBBON("ribbon", "Ribbon", false),
     MEMORY_CARD("memory-card", "Memory Card", true),
     TUNNEL("tunnel", "Tunnel '98", true),
-    GRID_RUNNER("grid-runner", "Grid Runner", true),
-    DISC_PLAYER("disc-player", "Disc Player", true);
+    GRID_RUNNER("grid-runner", "Grid Runner", true);
 
     fun create(): VisualiserRenderer = when (this) {
         AURORA -> AuroraRenderer()
-        HALO -> HaloRenderer()
         PARTICLES -> ParticlesRenderer()
         RIBBON -> RibbonRenderer()
         MEMORY_CARD -> MemoryCardRenderer()
         TUNNEL -> TunnelRenderer()
         GRID_RUNNER -> GridRunnerRenderer()
-        DISC_PLAYER -> DiscPlayerRenderer()
     }
 
     companion object {
-        const val DEFAULT_ID = "aurora"
-        fun byId(id: String?): VisualiserStyle = entries.firstOrNull { it.id == id } ?: AURORA
+        const val DEFAULT_ID = "memory-card"
+        /** Unknown or retired ids (Halo, Disc Player) fall back to the default, Memory Card. */
+        fun byId(id: String?): VisualiserStyle = entries.firstOrNull { it.id == id } ?: MEMORY_CARD
     }
 }
 
 /**
  * Everything a style draws from, updated in place once per frame (no allocation): clock, audio,
- * colours, cover and a little track info.
+ * colours (from the cover) and a little track info.
  */
 class VisFrame {
     /** Seconds since the visualiser opened; [dt] since the last frame. */
@@ -47,11 +42,6 @@ class VisFrame {
     var dt = 1f / 60f
     var audio = AudioFrame()
     val palette = VisPalette()
-    /** The current cover, both as a software bitmap (for low-res drawing) and for Compose; null until loaded. */
-    var coverBitmap: Bitmap? = null
-    var cover: ImageBitmap? = null
-    /** Bumped when the cover changes, so styles can rebuild what they made from it. */
-    var coverVersion = 0
     var positionMs = 0L
     var durationMs = 0L
     var isPlaying = false
