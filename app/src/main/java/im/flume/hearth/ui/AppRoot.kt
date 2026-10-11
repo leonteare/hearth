@@ -7,6 +7,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -302,7 +304,9 @@ fun AppRoot() {
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     // The queue lives inside the player: back from the queue returns to Now Playing.
     var queueOpen by rememberSaveable { mutableStateOf(false) }
-    actions.closeOverlays = { queueOpen = false; nowPlayingOpen = false }
+    // The visualiser also opens from the player, full screen above it.
+    var visualiserOpen by rememberSaveable { mutableStateOf(false) }
+    actions.closeOverlays = { visualiserOpen = false; queueOpen = false; nowPlayingOpen = false }
 
     val playerState by c.player.state.collectAsStateWithLifecycle()
     val online by c.network.isOnline.collectAsStateWithLifecycle()
@@ -428,11 +432,12 @@ fun AppRoot() {
                 enter = slideInVertically(tween(SLIDE_MS, easing = ease)) { it },
                 exit = slideOutVertically(tween(SLIDE_MS, easing = ease)) { it },
             ) {
-                BackHandler(enabled = nowPlayingOpen && !queueOpen) { nowPlayingOpen = false }
+                BackHandler(enabled = nowPlayingOpen && !queueOpen && !visualiserOpen) { nowPlayingOpen = false }
                 NowPlayingScreen(
                     state = playerState,
                     onClose = { nowPlayingOpen = false },
                     onOpenQueue = { c.usage.track(im.flume.hearth.data.Usage.QUEUE); queueOpen = true },
+                    onOpenVisualiser = { c.usage.track(im.flume.hearth.data.Usage.VISUALISER); visualiserOpen = true },
                 )
             }
 
@@ -443,6 +448,15 @@ fun AppRoot() {
             ) {
                 BackHandler(enabled = queueOpen) { queueOpen = false }
                 QueueScreen(onBack = { queueOpen = false })
+            }
+
+            AnimatedVisibility(
+                visible = visualiserOpen && nowPlayingOpen && playerState.current != null,
+                enter = fadeIn(tween(SLIDE_MS)) + scaleIn(tween(SLIDE_MS, easing = ease), initialScale = 0.94f),
+                exit = fadeOut(tween(SLIDE_MS)) + scaleOut(tween(SLIDE_MS, easing = ease), targetScale = 0.94f),
+            ) {
+                BackHandler(enabled = visualiserOpen) { visualiserOpen = false }
+                im.flume.hearth.ui.screens.visualiser.VisualiserScreen(playerState, onClose = { visualiserOpen = false })
             }
         }
     }

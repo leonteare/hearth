@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Pause
@@ -245,7 +246,7 @@ private fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
 }
 
 @Composable
-fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () -> Unit) {
+fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () -> Unit, onOpenVisualiser: () -> Unit) {
     val c = LocalContext.current.container
     val current = state.current ?: return
     val songId = current.mediaId
@@ -345,12 +346,12 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
                     artOrLyrics(Modifier.weight(1f).fillMaxHeight())
                     Spacer(Modifier.width(32.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue)
+                        PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
                     }
                 }
             } else {
                 artOrLyrics(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
-                PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue)
+                PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -365,6 +366,7 @@ private fun PlayerControls(
     showLyrics: Boolean,
     onToggleLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenVisualiser: () -> Unit,
 ) {
     val actions = LocalActions.current
     val accent = MaterialTheme.colorScheme.primary
@@ -443,8 +445,11 @@ private fun PlayerControls(
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         val usage = LocalContext.current.container.usage
-        IconButton(onClick = { if (!showLyrics) usage.track(im.flume.hearth.data.Usage.LYRICS); onToggleLyrics() }) {
-            Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, if (showLyrics) "Hide lyrics" else "Show lyrics",tint = if (showLyrics) accent else Color.White)
+        Row {
+            IconButton(onClick = { if (!showLyrics) usage.track(im.flume.hearth.data.Usage.LYRICS); onToggleLyrics() }) {
+                Icon(if (showLyrics) Icons.Filled.Mic else Icons.Outlined.Mic, if (showLyrics) "Hide lyrics" else "Show lyrics",tint = if (showLyrics) accent else Color.White)
+            }
+            IconButton(onClick = onOpenVisualiser) { Icon(Icons.Default.GraphicEq, "Visualiser") }
         }
         IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Queue") }
     }

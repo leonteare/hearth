@@ -39,6 +39,7 @@ class Usage(context: Context) {
         const val MULTI_SELECT = "Selecting several songs"
         const val SWIPE_SKIP = "Swipe to skip"
         const val SHUFFLE = "Shuffle"
-        val FEATURES = listOf(RADIO, MIX, LYRICS, SLEEP, QUEUE, SEARCH, STATS, DOWNLOAD, PLAYLIST_ADD, MULTI_SELECT, SWIPE_SKIP, SHUFFLE)
+        const val VISUALISER = "Visualiser"
+        val FEATURES = listOf(RADIO, MIX, LYRICS, SLEEP, QUEUE, SEARCH, STATS, DOWNLOAD, PLAYLIST_ADD, MULTI_SELECT, SWIPE_SKIP, SHUFFLE, VISUALISER)
     }
 }
