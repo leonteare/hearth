@@ -670,7 +670,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     private suspend fun fetch(c: AppContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {
-            val url = c.api.streamUrl(songId, bitrate) ?: error("Not logged in")
+            val url = c.api.streamUrl(songId, bitrate, estimateLength = false) ?: error("Not logged in")
             val tmp = File(dir, DownloadPolicy.partName(songId, System.nanoTime()))
             val call = http.newCall(Request.Builder().url(url).build())
             c.downloads.active[songId] = call

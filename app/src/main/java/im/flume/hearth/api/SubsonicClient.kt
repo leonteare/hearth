@@ -70,14 +70,19 @@ class SubsonicClient(
             .addQueryParameter("f", "json")
 
     /** Stream URL. [maxBitRate] 0 means original file, no transcoding. */
-    fun streamUrl(songId: String, maxBitRate: Int, creds: Credentials? = credentialsProvider()): String? {
+    /**
+     * [estimateLength] asks Navidrome to announce a guessed size for converted streams, which the player
+     * needs to seek before a song has fully loaded. Downloads must not use it: the real file often ends a
+     * few KB short of the guess, and the connection then looks broken ("unexpected end of stream").
+     */
+    fun streamUrl(songId: String, maxBitRate: Int, creds: Credentials? = credentialsProvider(), estimateLength: Boolean = true): String? {
         creds ?: return null
         return endpoint("stream", creds).apply {
             addQueryParameter("id", songId)
             if (maxBitRate > 0) {
                 addQueryParameter("maxBitRate", maxBitRate.toString())
                 addQueryParameter("format", "mp3")
-                addQueryParameter("estimateContentLength", "true")
+                if (estimateLength) addQueryParameter("estimateContentLength", "true")
             } else {
                 addQueryParameter("format", "raw")
             }
