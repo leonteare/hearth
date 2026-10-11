@@ -166,7 +166,7 @@ fun PhoneAudiobooks(sort: Int) {
             1 -> books.sortedByDescending { it.book.addedAt }
             2 -> books.sortedWith(compareBy({ it.book.author.orEmpty().lowercase() }, { it.book.title.lowercase() }))
             3 -> books.sortedByDescending { it.progressUpdatedAt ?: 0L }
-            else -> books
+            else -> im.flume.hearth.data.LibraryOrder.alphabetical(books) { it.book.title }
         }
     }
     Column { sorted.forEach { PhoneBookRow(it) } }

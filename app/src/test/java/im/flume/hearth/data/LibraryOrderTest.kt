@@ -47,4 +47,13 @@ class LibraryOrderTest {
         // An unknown saved choice falls back to titles.
         assertEquals(SongOrder.TITLE, SongOrder.liked(7))
     }
+
+    @Test
+    fun `playlists, shows and books sort a to z the same way`() {
+        val names = listOf("the Weekend Mix", "abba Hits", "Zebra", "The High Performance Podcast", "Help I Sexted My Boss")
+        assertEquals(
+            listOf("abba Hits", "Help I Sexted My Boss", "The High Performance Podcast", "the Weekend Mix", "Zebra"),
+            LibraryOrder.alphabetical(names) { it },
+        )
+    }
 }

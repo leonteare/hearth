@@ -571,7 +571,7 @@ fun LibraryScreen() {
         if (tab == LibraryTab.PODCASTS && sort == 1) {
             val newest = latestEpisodes.groupBy { it.episode.libraryItemId }.mapValues { (_, eps) -> eps.maxOf { it.episode.publishedAt } }
             followed.sortedByDescending { newest[it.id] ?: 0L }
-        } else followed
+        } else im.flume.hearth.data.LibraryOrder.alphabetical(followed) { it.title }
     }
     val phoneBooks by remember { c.spoken.local.books() }.collectAsStateWithLifecycle(emptyList())
     val sortedBooks = remember(books, sort, tab) {
@@ -579,7 +579,7 @@ fun LibraryScreen() {
             1 -> books.sortedByDescending { it.book.addedAt }
             2 -> books.sortedWith(compareBy({ it.book.author.orEmpty().lowercase() }, { it.book.title.lowercase() }))
             3 -> books.sortedByDescending { it.progressUpdatedAt ?: 0L }
-            else -> books
+            else -> im.flume.hearth.data.LibraryOrder.alphabetical(books) { it.book.title }
         }
     }
     val importOpml = rememberOpmlImport()
@@ -587,18 +587,13 @@ fun LibraryScreen() {
     val sortedPlaylists = when (sort) {
         1 -> playlists.sortedByDescending { it.playlist.changed }
         2 -> playlists.sortedByDescending { it.playlist.songCount }
-        else -> playlists
+        else -> im.flume.hearth.data.LibraryOrder.alphabetical(playlists) { it.playlist.name }
     }
     val sortedArtists = remember(artists, sort, tab) { if (tab == LibraryTab.ARTISTS) sortArtists(artists, sort) else artists }
     val sortedAlbums = remember(albums, sort, tab) { if (tab == LibraryTab.ALBUMS) sortAlbums(albums, sort) else albums }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Your Library") {
-            // Same as Home's tile: your library. Browse → All songs shuffles the whole server.
-            IconButton(onClick = { actions.play(PlaySource.MyLibrary, shuffle = true) }) {
-                Icon(Icons.Default.Shuffle, "Shuffle your library", tint = MaterialTheme.colorScheme.primary)
-            }
-        }
+        PageHeader("Your Library")
         EqualWidthChips(LibrarySection.entries, place.section, { it.label }, MaterialTheme.typography.labelLarge, minHeight = 36.dp) {
             goTo(place.copy(section = it))
         }
@@ -626,6 +621,12 @@ fun LibraryScreen() {
                 }
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                // Shuffle sits with Music only: it plays your music (liked songs and saved albums), never shows or books.
+                if (place.section == LibrarySection.MUSIC) {
+                    IconButton(onClick = { actions.play(PlaySource.MyLibrary, shuffle = true) }) {
+                        Icon(Icons.Default.Shuffle, "Shuffle your music", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
                 if (tab == LibraryTab.PODCASTS && spokenAccount != null) {
                     IconButton(onClick = { addPodcastsOpen = true }) {
                         Icon(Icons.Default.Add, "Add podcasts", tint = MaterialTheme.colorScheme.primary)

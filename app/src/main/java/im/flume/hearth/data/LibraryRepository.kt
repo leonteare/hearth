@@ -386,6 +386,9 @@ object LibraryOrder {
 
     private fun <T> byName(name: (T) -> String): Comparator<T> = compareBy<T> { nameKey(name(it)) }.thenBy { name(it) }
 
+    /** A–Z by name, ignoring case, accents and a leading "The": playlists, shows, books. */
+    fun <T> alphabetical(items: List<T>, name: (T) -> String): List<T> = items.sortedWith(byName(name))
+
     /** Menu: A–Z, Most albums. */
     fun artists(artists: List<ArtistEntity>, sort: Int): List<ArtistEntity> =
         if (sort == 1) artists.sortedByDescending { it.albumCount } else artists.sortedWith(byName { it.name })
