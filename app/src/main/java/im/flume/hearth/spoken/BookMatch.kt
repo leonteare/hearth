@@ -74,7 +74,8 @@ object BookMatch {
 
     private const val LONG_BOOK_SEC = 3 * 3600.0
     private val ARTICLES = setOf("the", "a", "an")
-    private val BRACKETS = Regex("""\[[^\]]*]|\([^)]*\)|\{[^}]*}""")
+    // Closing brackets escaped: Android's regex engine (ICU) rejects a bare "]" or "}" that Java accepts.
+    private val BRACKETS = Regex("""\[[^\]]*\]|\([^)]*\)|\{[^}]*\}""")
     private val SPACES = Regex("""\s+""")
     private val BITRATE = Regex("""\d{2,3}k(bps)?""", RegexOption.IGNORE_CASE)
     /** Release and format words that end scene-style names: "Goldfinch_MP3", "Dune Unabridged". */
@@ -221,10 +222,13 @@ object BookMatch {
         return BookMatchResult(ranked.take(KEEP), confidence)
     }
 
-    /** The same edition from both Audible stores counts once. */
+    /**
+     * The same edition from both Audible stores counts once. The stores give it different ids, so it's
+     * matched on title, author and length instead.
+     */
     fun dedupe(candidates: List<BookCandidate>): List<BookCandidate> =
         candidates.filter { it.title.isNotBlank() }
-            .distinctBy { c -> c.asin?.uppercase() ?: "${norm(c.title)}|${norm(c.author)}|${(c.durationSec / 60).toLong()}" }
+            .distinctBy { c -> "${norm(c.title)}|${norm(c.author)}|${(c.durationSec / 60).toLong()}" }
 
     // ------------------------------------------------------------------ applying
 

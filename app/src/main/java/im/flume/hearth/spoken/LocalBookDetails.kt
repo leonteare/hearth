@@ -55,6 +55,11 @@ class LocalBookDetails(
                     tried += book.id
                     if (!lookUp(book)) break
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Looking up details is a nicety: whatever goes wrong, the app carries on.
+                logHandledError(context, "local books: look up details", e)
             } finally {
                 lookUpLock.unlock()
             }

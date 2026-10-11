@@ -542,6 +542,7 @@ fun LibraryScreen() {
             followed.sortedByDescending { newest[it.id] ?: 0L }
         } else followed
     }
+    val phoneBooks by remember { c.spoken.local.books() }.collectAsStateWithLifecycle(emptyList())
     val sortedBooks = remember(books, sort, tab) {
         if (tab != LibraryTab.AUDIOBOOKS) books else when (sort) {
             1 -> books.sortedByDescending { it.book.addedAt }
@@ -672,7 +673,7 @@ fun LibraryScreen() {
                         item(key = "phone-books") { PhoneAudiobooks(sort) }
                         when {
                             spokenAccount == null -> item { SpokenSignInPrompt("audiobooks") }
-                            sortedBooks.isEmpty() -> item {
+                            sortedBooks.isEmpty() && phoneBooks.isEmpty() -> item {
                                 LibraryEmpty(
                                     "No audiobooks yet",
                                     if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on your server show up here. You can also add a folder of audiobooks on this phone in Settings → Storage.",

@@ -213,4 +213,12 @@ class BookMatchTest {
         // Not removed or uploaded meanwhile, so those stay as they were.
         assertFalse(kept.hidden)
     }
+
+    @Test
+    fun `the same edition from the UK and US stores is listed once`() {
+        val uk = BookCandidate("The Goldfinch", author = "Donna Tartt", durationSec = 1945 * 60.0, asin = "UK1", provider = "audible.uk")
+        val us = uk.copy(asin = "US1", provider = "audible")
+        val other = BookCandidate("Goldfinch", author = "Raven Kennedy", durationSec = 1302 * 60.0, asin = "A3", provider = "audible.uk")
+        assertEquals(listOf(uk, other), BookMatch.dedupe(listOf(uk, us, other)))
+    }
 }
