@@ -66,8 +66,6 @@ class ParticlesRenderer : VisualiserRenderer() {
             )
         }
         drawRect(background!!)
-        // A soft core that throbs with the bass.
-        drawCircle(pal.color(0), min(w, h) * (0.12f + 0.12f * a.bass + 0.04f * a.kick), Offset(cx, cy), alpha = 0.06f + 0.12f * max(a.beat, a.kick), blendMode = BlendMode.Plus)
 
         val dt = f.dt
         // a.beat is the beat envelope: real kicks, plus the ones the tempo tracker fills in when a beat

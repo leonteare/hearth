@@ -9,7 +9,6 @@ import kotlin.math.floor
 
 /** The looks on offer. [id] is what Settings remembers. */
 enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean) {
-    AURORA("aurora", "Aurora", false),
     PARTICLES("particles", "Particles", false),
     RIBBON("ribbon", "Ribbon", false),
     MEMORY_CARD("memory-card", "Memory Card", true),
@@ -17,7 +16,6 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
     GRID_RUNNER("grid-runner", "Grid Runner", true);
 
     fun create(): VisualiserRenderer = when (this) {
-        AURORA -> AuroraRenderer()
         PARTICLES -> ParticlesRenderer()
         RIBBON -> RibbonRenderer()
         MEMORY_CARD -> MemoryCardRenderer()
@@ -27,7 +25,7 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
 
     companion object {
         const val DEFAULT_ID = "memory-card"
-        /** Unknown or retired ids (Halo, Disc Player) fall back to the default, Memory Card. */
+        /** Unknown or retired ids (Halo, Disc Player, Aurora) fall back to the default, Memory Card. */
         fun byId(id: String?): VisualiserStyle = entries.firstOrNull { it.id == id } ?: MEMORY_CARD
     }
 }
@@ -54,12 +52,6 @@ class VisFrame {
  * keep Paths, arrays and bitmaps as fields.
  */
 abstract class VisualiserRenderer {
-    /**
-     * Fraction of the screen resolution this style renders at; the result is scaled up. Soft styles
-     * (Aurora) look the same at half resolution for a quarter of the work.
-     */
-    open val renderScale: Float get() = 1f
-
     /** 1 = full detail; lowered (to 0.5) when frames keep running late. */
     var quality = 1f
 

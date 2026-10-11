@@ -12,8 +12,8 @@ import kotlin.random.Random
 
 /**
  * Memory Card: a slow camera orbit over a grid of glowing, translucent towers in a blue-black fog,
- * like a late-90s console's system menu. Each tower is a spectrum band (bass in the middle); light
- * orbs rise on beats and blur into a soft bloom.
+ * like a late-90s console's system menu. Each tower is a spectrum band (bass in the middle), softened
+ * by a bloom, with fine dust drifting up through the light.
  */
 class MemoryCardRenderer : RetroRenderer() {
     override val bloom: Float get() = 0.65f
@@ -34,14 +34,6 @@ class MemoryCardRenderer : RetroRenderer() {
     private val pts = FloatArray(8 * 3)
     private val seg = FloatArray(6)
 
-    private val orbs = 14
-    private val ox = FloatArray(orbs)
-    private val oy = FloatArray(orbs)
-    private val oz = FloatArray(orbs)
-    private val life = FloatArray(orbs)
-    private var nextOrb = 0
-    private var lastBeat = -1
-
     private val motes = 50
     private val mx = FloatArray(motes)
     private val my = FloatArray(motes)
@@ -50,7 +42,6 @@ class MemoryCardRenderer : RetroRenderer() {
 
     private val sky = Paint()
     private var skyKey = 0L
-    private val glow = Paint().apply { isAntiAlias = false }
 
     init {
         for (i in 0 until count) {
@@ -124,36 +115,6 @@ class MemoryCardRenderer : RetroRenderer() {
             order[j + 1] = v
         }
         for (n in 0 until count) drawTower(c, order[n], a.bands[bandOf[order[n]]], pal, fogColor)
-
-        // Orbs rise on the beat: each kick, plus the beats the tempo tracker fills in.
-        if (a.beatCount != lastBeat) {
-            if (lastBeat >= 0) {
-                val spawn = if (a.kick > 0.85f && rnd.nextFloat() < 0.4f) 2 else 1
-                repeat(spawn) {
-                    val k = nextOrb
-                    nextOrb = (nextOrb + 1) % orbs
-                    ox[k] = rnd.nextFloat() * 10f - 5f
-                    oy[k] = 0.6f + rnd.nextFloat() * 2.5f
-                    oz[k] = rnd.nextFloat() * 10f - 5f
-                    life[k] = 1f
-                }
-            }
-            lastBeat = a.beatCount
-        }
-        val orbColor = lerpArgb(pal.argb[3], 0xFFFFFFFF.toInt(), 0.45f)
-        for (k in 0 until orbs) {
-            if (life[k] <= 0f) continue
-            life[k] -= dt / 4.5f
-            oy[k] += dt * 0.35f
-            if (!cam.project(ox[k], oy[k], oz[k], pts, 0)) continue
-            val fog = fogAmount(pts[2], 10f, 24f)
-            val r = 0.24f * cam.focal / pts[2] * (0.6f + 0.4f * life[k])
-            val alpha = life[k].coerceIn(0f, 1f) * (1f - fog * 0.8f)
-            glow.color = withAlpha(orbColor, alpha * 0.25f)
-            c.drawCircle(pts[0], pts[1], r * 2.4f, glow)
-            glow.color = withAlpha(orbColor, alpha)
-            c.drawCircle(pts[0], pts[1], r, glow)
-        }
 
         // Dust motes drifting up through the light.
         val moteColor = lerpArgb(0xFF8FB8FF.toInt(), pal.argb[1], 0.3f)

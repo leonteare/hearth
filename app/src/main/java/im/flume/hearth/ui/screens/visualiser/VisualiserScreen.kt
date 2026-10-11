@@ -65,11 +65,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -77,7 +75,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -105,7 +102,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 /**
  * Full-screen music visualiser over Now Playing. Tap for controls (they hide after 3 s), swipe
@@ -136,9 +132,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
             renderers.clear()
         }
     }
-    // Bumped when a style drops its quality, so its render size is measured again.
-    var qualityDrops by remember { mutableIntStateOf(0) }
-
     var toast by remember { mutableStateOf("") }
     var toastKey by remember { mutableIntStateOf(0) }
     var toastVisible by remember { mutableStateOf(false) }
@@ -200,10 +193,7 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                         if (slowFor > 2f) {
                             slowFor = 0f
                             val r = renderer(style)
-                            if (r.quality > 0.5f) {
-                                r.quality = max(0.5f, r.quality - 0.25f)
-                                qualityDrops++
-                            }
+                            if (r.quality > 0.5f) r.quality = max(0.5f, r.quality - 0.25f)
                         }
                         tick = now
                     }
@@ -262,8 +252,8 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                 ) { change, drag -> change.consume(); dx += drag }
             }
     ) {
-        outgoing?.let { RenderLayer(renderer(it), frame, { tick }, { 1f }, qualityDrops) }
-        RenderLayer(renderer(style), frame, { tick }, { if (outgoing != null) fade.value else 1f }, qualityDrops)
+        outgoing?.let { RenderLayer(renderer(it), frame, { tick }, { 1f }) }
+        RenderLayer(renderer(style), frame, { tick }, { if (outgoing != null) fade.value else 1f })
 
         AnimatedVisibility(
             visible = toastVisible,
@@ -386,34 +376,13 @@ private fun Controls(
     }
 }
 
-/**
- * One style's drawing surface. Styles with a [VisualiserRenderer.renderScale] below 1 draw into a
- * smaller offscreen layer that's scaled up to fill the screen (less GPU work for soft looks).
- */
+/** One style's drawing surface, faded by [alpha] during a crossfade. */
 @Composable
-private fun RenderLayer(renderer: VisualiserRenderer, frame: VisFrame, tick: () -> Long, alpha: () -> Float, @Suppress("UNUSED_PARAMETER") qualityKey: Int) {
-    val scale = renderer.renderScale
+private fun RenderLayer(renderer: VisualiserRenderer, frame: VisFrame, tick: () -> Long, alpha: () -> Float) {
     Canvas(
         Modifier
             .fillMaxSize()
-            .layout { measurable, constraints ->
-                val w = constraints.maxWidth
-                val h = constraints.maxHeight
-                val sw = max(1, (w * scale).roundToInt())
-                val sh = max(1, (h * scale).roundToInt())
-                val placeable = measurable.measure(Constraints.fixed(sw, sh))
-                layout(w, h) {
-                    placeable.placeWithLayer(0, 0) {
-                        this.alpha = alpha()
-                        if (scale < 1f) {
-                            scaleX = w / sw.toFloat()
-                            scaleY = h / sh.toFloat()
-                            transformOrigin = TransformOrigin(0f, 0f)
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                    }
-                }
-            }
+            .graphicsLayer { this.alpha = alpha() }
     ) {
         if (tick() >= 0L) renderer.draw(this, frame)
     }
