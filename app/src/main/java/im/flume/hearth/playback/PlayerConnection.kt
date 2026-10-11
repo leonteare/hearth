@@ -36,7 +36,25 @@ data class PlayerUiState(
     /** Epoch ms when the sleep timer pauses playback, -1 for end of song, 0 for none. */
     val sleepAt: Long = 0,
     val error: String? = null,
+    /** Set while a podcast episode or audiobook is loaded instead of music. */
+    val spoken: SpokenNowPlaying? = null,
 )
+
+/**
+ * The episode or book in the player. Positions are on its whole timeline (a book's files back to back):
+ * use [PlayerConnection.spokenPositionMs] and [PlayerConnection.seekSpoken], not the per-file ones.
+ */
+data class SpokenNowPlaying(
+    val libraryItemId: String,
+    /** Null for an audiobook. */
+    val episodeId: String?,
+    val durationMs: Long,
+    val speed: Float,
+    /** The music queue from before can be brought back with [PlayerConnection.backToMusic]. */
+    val canGoBackToMusic: Boolean,
+) {
+    val isBook: Boolean get() = episodeId == null
+}
 
 /**
  * The UI's handle on the playback service. All heavy queue work happens in the service. Queue edits
@@ -94,7 +112,16 @@ class PlayerConnection(private val context: Context) {
             queue = List(count) { QueueEntry(it, c.getMediaItemAt(it)) },
             pendingCount = extras.getInt(PlaybackService.EXTRA_PENDING_COUNT),
             sleepAt = extras.getLong(PlaybackService.EXTRA_SLEEP_AT),
-            error = c.playerError?.let { "Couldn't play this song (${it.errorCodeName})" },
+            error = c.playerError?.let { "Couldn't play this (${it.errorCodeName})" },
+            spoken = extras.getString(PlaybackService.EXTRA_SPOKEN_ITEM)?.let { id ->
+                SpokenNowPlaying(
+                    libraryItemId = id,
+                    episodeId = extras.getString(PlaybackService.EXTRA_SPOKEN_EPISODE),
+                    durationMs = extras.getLong(PlaybackService.EXTRA_SPOKEN_TOTAL_MS),
+                    speed = extras.getFloat(PlaybackService.EXTRA_SPEED, 1f),
+                    canGoBackToMusic = extras.getBoolean(PlaybackService.EXTRA_HAS_MUSIC_QUEUE),
+                )
+            },
         )
     }
 
@@ -174,6 +201,46 @@ class PlayerConnection(private val context: Context) {
             send(PlaybackService.CMD_REMOVE_QUEUED, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })
         }
     }
+
+    // ------------------------------------------------------------ podcasts and audiobooks
+
+    /**
+     * Plays a podcast episode, replacing the queue (a music queue is set aside for [backToMusic]).
+     * Starts where this user left off, on this phone or another; [startSec] overrides that.
+     */
+    fun playEpisode(libraryItemId: String, episodeId: String, startSec: Double? = null) = playSpoken(libraryItemId, episodeId, startSec)
+
+    /** Plays an audiobook (all its files as one timeline); [startSec] e.g. a chapter's start. */
+    fun playBook(libraryItemId: String, startSec: Double? = null) = playSpoken(libraryItemId, null, startSec)
+
+    private fun playSpoken(libraryItemId: String, episodeId: String?, startSec: Double?) = send(PlaybackService.CMD_PLAY_SPOKEN, Bundle().apply {
+        putString(PlaybackService.ARG_ITEM_ID, libraryItemId)
+        putString(PlaybackService.ARG_EPISODE_ID, episodeId)
+        startSec?.let { putDouble(PlaybackService.ARG_START_SEC, it) }
+    })
+
+    fun skipBack() = send(PlaybackService.CMD_SKIP_BACK, Bundle.EMPTY)
+
+    fun skipForward() = send(PlaybackService.CMD_SKIP_FORWARD, Bundle.EMPTY)
+
+    /** Seeks on the whole episode/book timeline. */
+    fun seekSpoken(positionMs: Long) = send(PlaybackService.CMD_SEEK_SPOKEN, Bundle().apply { putLong(PlaybackService.ARG_POSITION_MS, positionMs) })
+
+    /** 0.8–2.0; remembered per show / book. */
+    fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })
+
+    /** Leaves spoken word and brings back the music queue that was playing before. */
+    fun backToMusic() = send(PlaybackService.CMD_BACK_TO_MUSIC, Bundle.EMPTY)
+
+    /** Sleep timer that pauses at the end of the current chapter (spoken word). */
+    fun sleepAtEndOfChapter() = setSleepTimer(PlaybackService.SLEEP_END_OF_CHAPTER)
+
+    /** Position on the whole episode/book timeline (the current file's start plus the position in it). */
+    val spokenPositionMs: Long
+        get() {
+            val c = controller ?: return 0
+            return (c.currentMediaItem?.spokenTrackStartMs ?: 0) + c.currentPosition
+        }
 
     fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })
 

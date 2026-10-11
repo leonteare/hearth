@@ -38,6 +38,9 @@ class Scrobbler(
         scope.launch { runCatching { api.scrobble(id, submission = false) } }
     }
 
+    /** Nothing to scrobble (spoken word is playing). */
+    fun reset() { songId = null }
+
     /** Called periodically while audio is actually playing. */
     fun onListened(deltaMs: Long) {
         val id = songId ?: return

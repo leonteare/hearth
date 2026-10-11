@@ -36,6 +36,8 @@ import com.google.common.util.concurrent.SettableFuture
 import im.flume.hearth.R
 import im.flume.hearth.container
 import im.flume.hearth.data.PlaySource
+import im.flume.hearth.spoken.SpokenTimeline
+import im.flume.hearth.spoken.TimelineTrack
 import im.flume.hearth.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,6 +96,12 @@ class PlaybackService : MediaSessionService() {
     /** Bitrate each song's stream was first opened at, so reconnects resume the same encoding. */
     private val pinnedBitrates = ConcurrentHashMap<String, Int>()
 
+    /** Set while the queue is a podcast episode or audiobook (a queue is either music or spoken word). */
+    private var spokenNow: SpokenNow? = null
+    private lateinit var tracker: ListeningTracker
+    /** A spoken queue restored at start: check the server's position the first time it plays. */
+    private var spokenNeedsServerCheck = false
+
     override fun onCreate() {
         super.onCreate()
         store = QueueStore(filesDir)
@@ -117,6 +125,17 @@ class PlaybackService : MediaSessionService() {
             cachedTarget = { id -> cachedBitrate(id)?.let { SongDataSource.StreamTarget("hearth-cache://$id", "$id@$it") } },
             cannotStream = { c.network.cannotStream },
         )
+        // Podcast episodes and audiobooks: downloaded file, or the server with the token in a header.
+        // Not cached: a long book would push every song out of the streaming cache.
+        val spokenFactory = SpokenDataSource.Factory(
+            fileFactory = FileDataSource.Factory(),
+            httpFactory = OkHttpDataSource.Factory(c.spoken.api.http),
+            localFile = c.spoken.downloads::localFile,
+            remoteUrl = { item, ino -> runCatching { c.spoken.api.fileUrl(item, ino) }.getOrNull() },
+            cannotStream = { c.network.cannotStream },
+        )
+        val routedFactory = SchemeRoutingDataSourceFactory(songFactory, mapOf(SpokenMedia.SCHEME to spokenFactory))
+        tracker = ListeningTracker(c.spoken.progress)
         // An offline failure is final for that song: don't retry it, so playback moves on at once.
         val loadErrors = object : DefaultLoadErrorHandlingPolicy() {
             override fun getRetryDelayMsFor(info: LoadErrorHandlingPolicy.LoadErrorInfo): Long =
@@ -138,7 +157,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         player = ExoPlayer.Builder(this, renderers)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(songFactory).setLoadErrorHandlingPolicy(loadErrors))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(routedFactory).setLoadErrorHandlingPolicy(loadErrors))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 /* handleAudioFocus = */ true,
@@ -153,11 +172,11 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player)
+        session = MediaSession.Builder(this, SpokenAwarePlayer(player))
             .setCallback(SessionCallback())
             .setSessionActivity(openApp)
-            // Artwork URIs are token-free hearth-cover:// links; this resolves them with the login.
-            .setBitmapLoader(CoverBitmapLoader(this, c.api, scope))
+            // Artwork URIs are token-free hearth-cover:// / abs-cover:// links; this resolves them in the app.
+            .setBitmapLoader(CoverBitmapLoader(this, c.api, scope) { id -> c.spoken.api.coverUrl(id, 1000) })
             .build()
 
         setMediaNotificationProvider(
@@ -188,6 +207,12 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         cancelPrefetch()
+        if (spokenNow != null) {
+            // Keep where we got to on the phone; the outbox worker sends it once there's a connection.
+            val pos = spokenPositionSec()
+            kotlinx.coroutines.runBlocking { withTimeoutOrNull(2_000) { tracker.pause(pos, send = false) } }
+            c.spoken.progress.scheduleFlush()
+        }
         saveQueueBlocking()
         session.release()
         player.release()
@@ -197,8 +222,132 @@ class PlaybackService : MediaSessionService() {
 
     // ---------------------------------------------------------------- queue operations
 
+    // ---------------------------------------------------------------- spoken word (podcasts, audiobooks)
+
+    /** The episode's or book's audio files as player items, with its timeline. Null if it can't be played. */
+    private suspend fun loadSpoken(itemId: String, episodeId: String?): Pair<SpokenNow, List<MediaItem>>? {
+        val dao = c.db.spoken()
+        if (episodeId != null) {
+            val row = dao.episodeOnce(episodeId) ?: run { runCatching { c.spoken.fetchItem(itemId) }; dao.episodeOnce(episodeId) } ?: return null
+            val items = SpokenMedia.episodeItems(row).takeIf { it.isNotEmpty() } ?: return null
+            val ino = row.episode.ino ?: return null
+            val podcast = dao.podcastOnce(itemId)
+            val timeline = SpokenTimeline(listOf(TimelineTrack(ino, row.episode.durationSec)), SpokenNow.chaptersOf(dao.chapters(itemId, episodeId)))
+            return SpokenNow(itemId, episodeId, podcast?.libraryId.orEmpty(), row.episode.title, row.podcastAuthor ?: row.podcastTitle, timeline) to items
+        }
+        var book = dao.bookOnce(itemId)
+        if (book == null || dao.tracks(itemId).isEmpty()) {
+            runCatching { c.spoken.fetchItem(itemId) }
+            book = dao.bookOnce(itemId) ?: return null
+        }
+        val tracks = dao.tracks(itemId).takeIf { it.isNotEmpty() } ?: return null
+        val timeline = SpokenTimeline(tracks.map { TimelineTrack(it.ino, it.durationSec) }, SpokenNow.chaptersOf(dao.chapters(itemId, "")))
+        return SpokenNow(itemId, null, book.libraryId, book.title, book.author.orEmpty(), timeline) to SpokenMedia.bookItems(book, tracks)
+    }
+
+    /**
+     * Plays an episode ([episodeId]) or audiobook from where this user left off (newest of this phone
+     * and the server), or from [startSec]. Replaces the queue; a music queue is kept for "Back to music".
+     */
+    private suspend fun playSpoken(itemId: String, episodeId: String?, startSec: Double?) = queueOps.withLock {
+        restoring?.cancel()
+        val (now, items) = loadSpoken(itemId, episodeId) ?: return@withLock
+        if (spokenNow != null) exitSpoken()
+        else if (player.mediaItemCount > 0) snapshot()?.let { store.saveMusic(it) }
+        val start = c.spoken.progress.resolveStart(itemId, episodeId, now.title, online = !c.network.cannotStream)
+        enterSpoken(now, items, startSec ?: start.positionSec, start.finished, playWhenReady = true)
+    }
+
+    private suspend fun enterSpoken(now: SpokenNow, items: List<MediaItem>, startSec: Double, finished: Boolean, playWhenReady: Boolean) {
+        spokenNow = now
+        c.spoken.downloads.current = im.flume.hearth.spoken.SpokenKey(now.libraryItemId, now.episodeId.orEmpty())
+        context = emptyList()
+        pending = ArrayDeque()
+        shuffled = false
+        trimmed = 0
+        sourceLabel = if (now.isBook) now.title else c.db.spoken().podcastOnce(now.libraryItemId)?.title ?: now.author
+        scrobbler.reset()
+        val (index, offsetMs) = now.timeline.locate(startSec)
+        player.repeatMode = Player.REPEAT_MODE_OFF
+        player.pauseAtEndOfMediaItems = false
+        player.setMediaItems(items, index, offsetMs)
+        player.setPlaybackSpeed(c.db.spoken().speed(now.libraryItemId) ?: 1f)
+        player.prepare()
+        player.playWhenReady = playWhenReady
+        tracker.begin(now, startSec, finished)
+        publishExtras()
+        saveQueue()
+    }
+
+    /** Leaves spoken-word mode, saving where we got to. The player's items are left for the caller to replace. */
+    private suspend fun exitSpoken() {
+        if (spokenNow == null) return
+        tracker.pause(spokenPositionSec())
+        tracker.end()
+        spokenNow = null
+        spokenNeedsServerCheck = false
+        c.spoken.downloads.current = null
+        player.setPlaybackSpeed(1f)
+        if (sleepAt == SLEEP_END_OF_CHAPTER) setSleepTimer(0)
+        c.appScope.launch { runCatching { c.spoken.downloads.autoDeleteFinished() } }
+    }
+
+    /** "Back to music": the music queue that was playing before the episode or book started. */
+    private suspend fun backToMusic() = queueOps.withLock {
+        val saved = store.loadMusic() ?: return@withLock
+        exitSpoken()
+        val byId = c.library.songsByIds(saved.window).associateBy { it.id }
+        val items = saved.window.mapIndexedNotNull { i, id -> byId[id]?.toMediaItem(manual = saved.manual.getOrElse(i) { false }) }
+        store.clearMusic()
+        if (items.isEmpty()) { publishExtras(); return@withLock }
+        applySavedState(saved)
+        player.setMediaItems(items, saved.index.coerceIn(0, items.lastIndex), saved.positionMs)
+        player.prepare()
+        player.play()
+        publishExtras()
+        saveQueue()
+    }
+
+    /** Position on the whole episode/book timeline. */
+    private fun spokenPositionSec(): Double =
+        spokenNow?.timeline?.globalSec(player.currentMediaItemIndex, player.currentPosition.coerceAtLeast(0)) ?: 0.0
+
+    private fun seekSpokenTo(sec: Double) {
+        val now = spokenNow ?: return
+        val (index, ms) = now.timeline.locate(sec.coerceIn(0.0, now.timeline.durationSec))
+        player.seekTo(index, ms)
+    }
+
+    private fun skipSpokenBy(deltaSec: Double) = seekSpokenTo(spokenPositionSec() + deltaSec)
+
+    private fun setSpeed(speed: Float) {
+        val now = spokenNow ?: return
+        val s = speed.coerceIn(MIN_SPEED, MAX_SPEED)
+        player.setPlaybackSpeed(s)
+        publishExtras()
+        c.appScope.launch { c.db.spoken().setSpeed(im.flume.hearth.spoken.SpokenPlayPrefEntity(now.libraryItemId, s)) }
+    }
+
+    /** Session player: in spoken mode, next/previous (headphones, Bluetooth, car) skip +30 s / −15 s. */
+    private inner class SpokenAwarePlayer(p: Player) : androidx.media3.common.ForwardingPlayer(p) {
+        override fun seekToNext() = if (spokenNow != null) skipSpokenBy(SKIP_FORWARD_SEC) else super.seekToNext()
+        override fun seekToNextMediaItem() = if (spokenNow != null) skipSpokenBy(SKIP_FORWARD_SEC) else super.seekToNextMediaItem()
+        override fun seekToPrevious() = if (spokenNow != null) skipSpokenBy(-SKIP_BACK_SEC) else super.seekToPrevious()
+        override fun seekToPreviousMediaItem() = if (spokenNow != null) skipSpokenBy(-SKIP_BACK_SEC) else super.seekToPreviousMediaItem()
+        override fun getAvailableCommands(): Player.Commands {
+            val base = super.getAvailableCommands()
+            if (spokenNow == null) return base
+            return base.buildUpon().addAll(
+                Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            ).build()
+        }
+        override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+    }
+
     private suspend fun playSource(source: PlaySource, startId: String?, shuffle: Boolean) {
         restoring?.cancel()
+        if (spokenNow != null) { exitSpoken(); store.clearMusic() }
         // Right after start the server's state isn't known yet: ask first rather than shuffle songs that can't stream.
         val offline = !c.network.awaitServerKnown()
         val songs = c.library.resolve(source, offlineOnly = offline)
@@ -227,6 +376,18 @@ class PlaybackService : MediaSessionService() {
         val songs = c.library.songsByIds(songIds)
         if (songs.isEmpty()) return@withLock
         val items = songs.map { it.toMediaItem(manual = true) }
+        if (spokenNow != null) {
+            // Songs can't join a spoken-word queue: they start a music queue (the old one is dropped).
+            exitSpoken()
+            store.clearMusic()
+            context = emptyList(); pending = ArrayDeque(); sourceLabel = ""
+            player.setMediaItems(items)
+            player.prepare()
+            player.play()
+            publishExtras()
+            saveQueue()
+            return@withLock
+        }
         if (player.mediaItemCount == 0) {
             player.setMediaItems(items)
             player.prepare()
@@ -345,7 +506,13 @@ class PlaybackService : MediaSessionService() {
     }.getOrDefault(false)
 
     /** Can play with no connection: downloaded, or completely in the streaming cache. */
-    private fun isOnPhone(id: String): Boolean = c.downloads.isDownloaded(id) || cachedBitrate(id) != null
+    private fun isOnPhone(id: String): Boolean {
+        if (id.startsWith("abs:")) {
+            val item = (0 until player.mediaItemCount).map(player::getMediaItemAt).firstOrNull { it.mediaId == id } ?: return false
+            return item.localConfiguration?.uri?.let(SpokenMedia::parse)?.let { (itemId, ino) -> c.spoken.downloads.localFile(itemId, ino) } != null
+        }
+        return c.downloads.isDownloaded(id) || cachedBitrate(id) != null
+    }
 
     private fun cancelPrefetch() {
         prefetchJob?.cancel()
@@ -381,6 +548,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun onTrackStarted(item: MediaItem) {
+        if (item.isSpoken) return // not a song: nothing to prefetch from Navidrome or scrobble
         prefetchUpcoming()
         scrobbler.onTrackStarted(
             item.mediaId,
@@ -396,10 +564,32 @@ class PlaybackService : MediaSessionService() {
         pinnedBitrates.keys.retainAll(keep)
     }
 
-    /** [ms] > 0: pause after that long; [SLEEP_END_OF_SONG]: pause when this song ends; 0: cancel. */
+    /**
+     * [ms] > 0: pause after that long; [SLEEP_END_OF_SONG]: pause when this song ends;
+     * [SLEEP_END_OF_CHAPTER]: pause at the end of the chapter playing (spoken word; the end of the
+     * episode or file when there are no chapters); 0: cancel.
+     */
     private fun setSleepTimer(ms: Long) {
         sleepJob?.cancel()
         player.pauseAtEndOfMediaItems = false
+        val spoken = spokenNow
+        if (ms == SLEEP_END_OF_CHAPTER && spoken != null) {
+            val end = spoken.timeline.chapterEndSec(spokenPositionSec())
+            sleepAt = SLEEP_END_OF_CHAPTER
+            sleepJob = scope.launch {
+                while (isActive) {
+                    val left = end - spokenPositionSec()
+                    if (left <= 0.05) break
+                    // Wake often enough to stop within a fraction of a second, at any speed.
+                    delay(((left / player.playbackParameters.speed.coerceAtLeast(0.1f)) * 1000).toLong().coerceIn(20, 500))
+                }
+                player.pause()
+                sleepAt = 0
+                publishExtras()
+            }
+            publishExtras()
+            return
+        }
         sleepAt = when {
             ms == SLEEP_END_OF_SONG -> SLEEP_END_OF_SONG.also { player.pauseAtEndOfMediaItems = true }
             ms > 0 -> (System.currentTimeMillis() + ms).also {
@@ -432,6 +622,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun toggleShuffle() {
+        if (spokenNow != null) return // episodes and books play in order
         shuffled = !shuffled
         val current = player.currentMediaItem?.mediaId
         val cur = player.currentMediaItemIndex
@@ -493,6 +684,21 @@ class PlaybackService : MediaSessionService() {
 
     /** Two extra buttons next to play/skip on the lock screen and notification: Like and Shuffle. */
     private fun updateMediaButtons() {
+        if (spokenNow != null) {
+            // Spoken word: back 15 s / forward 30 s in place of previous / next.
+            val back = CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15)
+                .setDisplayName("Back 15 seconds")
+                .setSessionCommand(SessionCommand(CMD_SKIP_BACK, Bundle.EMPTY))
+                .setSlots(CommandButton.SLOT_BACK)
+                .build()
+            val forward = CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_30)
+                .setDisplayName("Forward 30 seconds")
+                .setSessionCommand(SessionCommand(CMD_SKIP_FORWARD, Bundle.EMPTY))
+                .setSlots(CommandButton.SLOT_FORWARD)
+                .build()
+            session.setMediaButtonPreferences(listOf(back, forward))
+            return
+        }
         val like = CommandButton.Builder(if (currentLiked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(if (currentLiked) "Unlike" else "Like")
             .setSessionCommand(SessionCommand(CMD_LIKE, Bundle.EMPTY))
@@ -519,6 +725,13 @@ class PlaybackService : MediaSessionService() {
             putString(EXTRA_SOURCE_LABEL, sourceLabel)
             putInt(EXTRA_PENDING_COUNT, pending.size)
             putLong(EXTRA_SLEEP_AT, sleepAt)
+            spokenNow?.let { s ->
+                putString(EXTRA_SPOKEN_ITEM, s.libraryItemId)
+                putString(EXTRA_SPOKEN_EPISODE, s.episodeId)
+                putLong(EXTRA_SPOKEN_TOTAL_MS, (s.timeline.durationSec * 1000).toLong())
+                putFloat(EXTRA_SPEED, player.playbackParameters.speed)
+            }
+            putBoolean(EXTRA_HAS_MUSIC_QUEUE, spokenNow != null && store.hasMusic())
         })
         c.queueInfo.value = QueueInfo(pending.toList(), trimmed)
     }
@@ -538,7 +751,22 @@ class PlaybackService : MediaSessionService() {
             shuffled = shuffled,
             label = sourceLabel,
             repeatMode = player.repeatMode,
+            spokenItemId = spokenNow?.libraryItemId,
+            spokenEpisodeId = spokenNow?.episodeId,
+            spokenPositionSec = spokenNow?.let { spokenPositionSec() },
         )
+    }
+
+    /**
+     * A spoken-word queue saved at shutdown: rebuilt from the catalogue (works offline), at this
+     * phone's latest recorded position. The server's position is checked when it first plays.
+     */
+    private suspend fun loadSavedSpoken(saved: SavedQueue): Triple<SpokenNow, List<MediaItem>, Pair<Double, Boolean>>? {
+        val itemId = saved.spokenItemId ?: return null
+        val (now, items) = loadSpoken(itemId, saved.spokenEpisodeId) ?: return null
+        val local = c.spoken.progress.local(itemId, saved.spokenEpisodeId)
+        val pos = local?.takeIf { !it.isFinished }?.currentTime ?: saved.spokenPositionSec ?: 0.0
+        return Triple(now, items, pos to (local?.isFinished == true))
     }
 
     private fun saveQueue() {
@@ -563,6 +791,13 @@ class PlaybackService : MediaSessionService() {
 
     private suspend fun restoreQueue(playWhenReady: Boolean) {
         if (player.mediaItemCount > 0) return
+        store.load()?.takeIf { it.spokenItemId != null }?.let { saved ->
+            val (now, items, start) = loadSavedSpoken(saved) ?: return
+            if (player.mediaItemCount > 0) return
+            enterSpoken(now, items, start.first, start.second, playWhenReady)
+            spokenNeedsServerCheck = true
+            return
+        }
         val (saved, items) = loadSavedItems() ?: return
         if (player.mediaItemCount > 0) return
         applySavedState(saved)
@@ -591,6 +826,8 @@ class PlaybackService : MediaSessionService() {
                 val buttons = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                     .add(SessionCommand(CMD_LIKE, Bundle.EMPTY))
                     .add(SessionCommand(CMD_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_SKIP_BACK, Bundle.EMPTY))
+                    .add(SessionCommand(CMD_SKIP_FORWARD, Bundle.EMPTY))
                     .build()
                 return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(buttons).build()
             }
@@ -634,6 +871,16 @@ class PlaybackService : MediaSessionService() {
                 }
                 CMD_REMOVE_QUEUED -> scope.launch { removeQueued(args.getStringArrayList(ARG_SONG_IDS).orEmpty()) }
                 CMD_SLEEP -> setSleepTimer(args.getLong(ARG_SLEEP_MS))
+                CMD_PLAY_SPOKEN -> args.getString(ARG_ITEM_ID)?.let { itemId ->
+                    scope.launch {
+                        playSpoken(itemId, args.getString(ARG_EPISODE_ID), args.getDouble(ARG_START_SEC, Double.NaN).takeUnless { it.isNaN() })
+                    }
+                }
+                CMD_SKIP_BACK -> skipSpokenBy(-SKIP_BACK_SEC)
+                CMD_SKIP_FORWARD -> skipSpokenBy(SKIP_FORWARD_SEC)
+                CMD_SEEK_SPOKEN -> seekSpokenTo(args.getLong(ARG_POSITION_MS) / 1000.0)
+                CMD_SET_SPEED -> setSpeed(args.getFloat(ARG_SPEED, 1f))
+                CMD_BACK_TO_MUSIC -> scope.launch { backToMusic() }
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -662,6 +909,24 @@ class PlaybackService : MediaSessionService() {
             val future = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
             scope.launch {
                 restoring?.cancel()
+                store.load()?.takeIf { it.spokenItemId != null }?.let { saved ->
+                    val spoken = loadSavedSpoken(saved)
+                    if (spoken == null) {
+                        future.setException(UnsupportedOperationException("Nothing to resume"))
+                        return@launch
+                    }
+                    val (now, items, start) = spoken
+                    spokenNow = now
+                    c.spoken.downloads.current = im.flume.hearth.spoken.SpokenKey(now.libraryItemId, now.episodeId.orEmpty())
+                    context = emptyList(); pending = ArrayDeque(); shuffled = false; sourceLabel = saved.label
+                    tracker.begin(now, start.first, start.second)
+                    spokenNeedsServerCheck = true
+                    player.setPlaybackSpeed(c.db.spoken().speed(now.libraryItemId) ?: 1f)
+                    publishExtras()
+                    val (index, ms) = now.timeline.locate(start.first)
+                    future.set(MediaSession.MediaItemsWithStartPosition(items, index, ms))
+                    return@launch
+                }
                 val loaded = loadSavedItems()
                 if (loaded == null) {
                     future.setException(UnsupportedOperationException("Nothing to resume"))
@@ -682,7 +947,8 @@ class PlaybackService : MediaSessionService() {
             mediaItem ?: return
             // Offline and the next song isn't on the phone: go straight to one that is, rather than
             // waiting for it to fail (only for automatic advances; a song picked by hand gets its try).
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && !c.network.isOnline.value && !isOnPhone(mediaItem.mediaId)) {
+            // Not for audiobooks: their files must play in order.
+            if (!mediaItem.isSpoken && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && !c.network.isOnline.value && !isOnPhone(mediaItem.mediaId)) {
                 scope.launch { jumpToPlayable() }
             }
             applyVolumeLevelling()
@@ -708,11 +974,15 @@ class PlaybackService : MediaSessionService() {
                     startPending = null
                     if (pending.mediaId == player.currentMediaItem?.mediaId) onTrackStarted(pending)
                 }
+                if (spokenNow != null && spokenNeedsServerCheck) {
+                    spokenNeedsServerCheck = false
+                    scope.launch { checkServerPosition() }
+                }
                 ticker = scope.launch {
                     var lastSave = System.currentTimeMillis()
                     while (isActive) {
                         delay(TICK_MS)
-                        scrobbler.onListened(TICK_MS)
+                        if (spokenNow != null) tracker.tick(spokenPositionSec(), TICK_MS) else scrobbler.onListened(TICK_MS)
                         if (System.currentTimeMillis() - lastSave > 15_000) {
                             saveQueue()
                             lastSave = System.currentTimeMillis()
@@ -721,6 +991,18 @@ class PlaybackService : MediaSessionService() {
                 }
             } else {
                 saveQueue()
+                if (spokenNow != null) {
+                    val pos = spokenPositionSec()
+                    scope.launch { tracker.pause(pos) }
+                }
+            }
+        }
+
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            // A seek while paused (e.g. scrubbing a chapter) is remembered too.
+            if (spokenNow != null && reason == Player.DISCONTINUITY_REASON_SEEK && !player.isPlaying) {
+                val pos = spokenPositionSec()
+                scope.launch { tracker.seeked(pos) }
             }
         }
 
@@ -734,6 +1016,11 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) recoveryAttempts = 0
+            // Played to the very end: record the end (marks it finished) and send it.
+            if (playbackState == Player.STATE_ENDED && spokenNow != null) {
+                val end = spokenNow?.timeline?.durationSec ?: 0.0
+                scope.launch { tracker.pause(end) }
+            }
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -743,9 +1030,21 @@ class PlaybackService : MediaSessionService() {
         override fun onPlayerError(error: PlaybackException) {
             val action = PlaybackErrors.classify(error.errorCode, httpStatus(error))
             // Offline mode / no network fail on purpose; only a real failure says anything about the server.
-            if (action == ErrorAction.WAIT_FOR_CONNECTION && !c.network.cannotStream) c.network.reportServerFailure()
+            // (Audiobookshelf failing says nothing about Navidrome.)
+            if (action == ErrorAction.WAIT_FOR_CONNECTION && !c.network.cannotStream && spokenNow == null) c.network.reportServerFailure()
             scope.launch { recover(action) }
         }
+    }
+
+    /**
+     * A spoken queue restored from the last run started playing: if the server has a newer position
+     * (another device), jump there; the UI hears about it through SpokenProgress.resumeNotices.
+     */
+    private suspend fun checkServerPosition() {
+        val now = spokenNow ?: return
+        val start = c.spoken.progress.resolveStart(now.libraryItemId, now.episodeId, now.title, online = !c.network.cannotStream)
+        if (spokenNow !== now || start.finished) return
+        if (start.notice != null || kotlin.math.abs(start.positionSec - spokenPositionSec()) > 2 && start.serverWon) seekSpokenTo(start.positionSec)
     }
 
     private suspend fun recover(action: ErrorAction) {
@@ -820,7 +1119,8 @@ class PlaybackService : MediaSessionService() {
         recoveryJob = scope.launch {
             // Back off if retrying keeps failing, so a half-working server isn't hammered.
             if (attempt > 0 || !waitForConnection) delay(minOf(60_000L, 3_000L shl attempt))
-            while (!c.network.isOnline.value) {
+            // Spoken word comes from Audiobookshelf, not Navidrome: just retry after the backoff.
+            while (spokenNow == null && !c.network.isOnline.value) {
                 if (c.network.offlineMode) {
                     // Offline mode is the user's choice: no pinging, just wait for it to be switched off.
                     c.network.isOnline.first { it }
@@ -842,8 +1142,14 @@ class PlaybackService : MediaSessionService() {
         const val CMD_ADD_TO_QUEUE = "hearth.ADD_TO_QUEUE"
         const val CMD_TOGGLE_SHUFFLE = "hearth.TOGGLE_SHUFFLE"
         const val CMD_LIKE = "hearth.LIKE"
+        const val CMD_PLAY_SPOKEN = "hearth.PLAY_SPOKEN"
+        const val CMD_SKIP_BACK = "hearth.SKIP_BACK"
+        const val CMD_SKIP_FORWARD = "hearth.SKIP_FORWARD"
+        const val CMD_SEEK_SPOKEN = "hearth.SEEK_SPOKEN"
+        const val CMD_SET_SPEED = "hearth.SET_SPEED"
+        const val CMD_BACK_TO_MUSIC = "hearth.BACK_TO_MUSIC"
         /** Commands any controller may send: the lock-screen / notification buttons. */
-        val BUTTON_COMMANDS = setOf(CMD_LIKE, CMD_TOGGLE_SHUFFLE)
+        val BUTTON_COMMANDS = setOf(CMD_LIKE, CMD_TOGGLE_SHUFFLE, CMD_SKIP_BACK, CMD_SKIP_FORWARD)
         const val CMD_MOVE_NEXT = "hearth.MOVE_NEXT"
         const val CMD_SLEEP = "hearth.SLEEP"
         const val CMD_SKIP_TO = "hearth.SKIP_TO"
@@ -855,7 +1161,26 @@ class PlaybackService : MediaSessionService() {
         private val CUSTOM_COMMANDS = listOf(
             CMD_PLAY_SOURCE, CMD_PLAY_NEXT, CMD_ADD_TO_QUEUE, CMD_TOGGLE_SHUFFLE, CMD_LIKE, CMD_MOVE_NEXT, CMD_SLEEP,
             CMD_SKIP_TO, CMD_REMOVE, CMD_MOVE_AFTER, CMD_RESTORE, CMD_REMOVE_QUEUED,
+            CMD_PLAY_SPOKEN, CMD_SKIP_BACK, CMD_SKIP_FORWARD, CMD_SEEK_SPOKEN, CMD_SET_SPEED, CMD_BACK_TO_MUSIC,
         )
+        const val ARG_ITEM_ID = "absItemId"
+        const val ARG_EPISODE_ID = "absEpisodeId"
+        /** Seconds on the whole episode/book; absent = resume where this user left off. */
+        const val ARG_START_SEC = "startSec"
+        /** Milliseconds on the whole episode/book timeline. */
+        const val ARG_POSITION_MS = "positionMs"
+        const val ARG_SPEED = "speed"
+        const val EXTRA_SPOKEN_ITEM = "spokenItemId"
+        const val EXTRA_SPOKEN_EPISODE = "spokenEpisodeId"
+        const val EXTRA_SPOKEN_TOTAL_MS = "spokenTotalMs"
+        const val EXTRA_SPEED = "speed"
+        /** True while spoken word plays and the music queue from before can be brought back. */
+        const val EXTRA_HAS_MUSIC_QUEUE = "hasMusicQueue"
+        const val SLEEP_END_OF_CHAPTER = -2L
+        const val SKIP_BACK_SEC = 15.0
+        const val SKIP_FORWARD_SEC = 30.0
+        const val MIN_SPEED = 0.8f
+        const val MAX_SPEED = 2.0f
         const val ARG_SLEEP_MS = "sleepMs"
         const val EXTRA_SLEEP_AT = "sleepAt"
         const val SLEEP_END_OF_SONG = -1L

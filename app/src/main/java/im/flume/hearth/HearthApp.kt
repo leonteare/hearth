@@ -122,6 +122,8 @@ class AppContainer(context: Context) {
     val usage = im.flume.hearth.data.Usage(context)
     val sync = LibrarySync(api, db, session, onSynced = { removed, complete -> downloads.afterSync(removed, complete) })
     val player = PlayerConnection(context)
+    /** Podcasts and audiobooks from Audiobookshelf (separate login, own catalogue, progress and downloads). */
+    val spoken = im.flume.hearth.spoken.SpokenRepository(context, db, http, session, network, appScope)
     val queueInfo = kotlinx.coroutines.flow.MutableStateFlow(im.flume.hearth.playback.QueueInfo())
     val updater = Updater(context, http, appScope)
     val requests = im.flume.hearth.requests.RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
@@ -137,6 +139,7 @@ class AppContainer(context: Context) {
         }
         saveDownloadedAlbumsOnce()
         requests.start()
+        spoken.start()
     }
 
     /**

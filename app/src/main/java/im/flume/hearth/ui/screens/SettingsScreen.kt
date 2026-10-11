@@ -251,6 +251,8 @@ fun StorageSettings() {
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
 
+        PodcastsAndAudiobooksSettings()
+
         GetMusicSettings()
     }
 
@@ -374,6 +376,108 @@ private fun Choice(title: String, value: Int, options: List<Pair<Int, String>>, 
         Text(options.firstOrNull { it.first == value }?.second ?: "$value", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
     }
     ChoiceSheet(open, title, options, value, onDismiss = { open = false }, onPick = onChange)
+}
+
+/**
+ * The Audiobookshelf login for podcasts and audiobooks: server, username and password (the password is
+ * only sent to sign in, never stored), a connection test, sign out, and the auto-download switch.
+ */
+@Composable
+private fun PodcastsAndAudiobooksSettings() {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val scope = rememberCoroutineScope()
+    val account by c.spoken.account.collectAsStateWithLifecycle()
+    val spokenSettings by c.spoken.settings.collectAsStateWithLifecycle()
+    val syncError by c.spoken.lastError.collectAsStateWithLifecycle()
+    var url by remember { mutableStateOf(c.spoken.store.lastServerUrl) }
+    var username by remember { mutableStateOf(c.spoken.store.lastUsername) }
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<String?>(null) }
+    var confirmSignOut by remember { mutableStateOf(false) }
+
+    Section("Podcasts & audiobooks")
+    val a = account
+    if (a != null && !a.needsSignIn) {
+        Info("Signed in to Audiobookshelf", "${a.username} · ${a.serverUrl}")
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(
+                enabled = !busy,
+                onClick = {
+                    busy = true; result = null
+                    scope.launch {
+                        val error = c.spoken.testConnection()
+                        result = if (error == null) "Connected" else "Failed: $error"
+                        busy = false
+                    }
+                },
+            ) { Text(if (busy) "Testing…" else "Test connection") }
+            TextButton(onClick = { confirmSignOut = true }) { Text("Sign out", color = Destructive) }
+        }
+    } else {
+        Text(
+            if (a?.needsSignIn == true) "Your Audiobookshelf login expired. Sign in again; nothing on this phone is lost."
+            else "Sign in to your Audiobookshelf server to listen to podcasts and audiobooks. Each person uses their own account, so progress and followed shows are yours.",
+            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = url, onValueChange = { url = it; result = null },
+            label = { Text("Server address") }, singleLine = true,
+            placeholder = { Text(im.flume.hearth.spoken.AbsAccountStore.DEFAULT_SERVER_URL) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = username, onValueChange = { username = it; result = null },
+            label = { Text("Username") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = password, onValueChange = { password = it; result = null },
+            label = { Text("Password") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        TextButton(
+            enabled = !busy && username.isNotBlank() && password.isNotEmpty(),
+            modifier = Modifier.padding(horizontal = 8.dp),
+            onClick = {
+                busy = true; result = null
+                scope.launch {
+                    val error = c.spoken.signIn(url, username, password)
+                    busy = false
+                    if (error == null) { password = ""; actions.showMessage("Signed in to Audiobookshelf") } else result = "Failed: $error"
+                }
+            },
+        ) { Text(if (busy) "Signing in…" else "Sign in") }
+    }
+    (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed: last sync: $it" })?.let {
+        Text(
+            it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+    Toggle("Auto-download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Finished episodes are removed from this phone.") { v ->
+        c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
+        if (v) scope.launch { c.spoken.refresh(force = true) }
+    }
+
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            title = { Text("Sign out of Audiobookshelf?") },
+            text = { Text("Downloaded episodes and books stay on this phone. Your progress is kept on the server.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmSignOut = false
+                    scope.launch { c.spoken.signOut(); result = null }
+                }) { Text("Sign out", color = Destructive) }
+            },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancel") } },
+        )
+    }
 }
 
 /**

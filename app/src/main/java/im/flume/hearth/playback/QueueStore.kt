@@ -87,6 +87,11 @@ data class SavedQueue(
     val shuffled: Boolean,
     val label: String,
     val repeatMode: Int,
+    /** Set when the queue is a podcast episode or audiobook (then [window] holds its files). */
+    val spokenItemId: String? = null,
+    val spokenEpisodeId: String? = null,
+    /** Position on the whole episode/book, seconds. */
+    val spokenPositionSec: Double? = null,
 )
 
 /**
@@ -133,7 +138,21 @@ class QueueStore(dir: File) {
         latest.set(null)
         file.delete()
         backup.delete()
+        musicFile.delete()
     }
+
+    // The music queue set aside while spoken word plays ("Back to music").
+    private val musicFile = File(dir, "music-queue.json")
+
+    suspend fun saveMusic(q: SavedQueue) = withContext(Dispatchers.IO) {
+        runCatching { musicFile.writeText(json.encodeToString(SavedQueue.serializer(), q)) }
+    }
+
+    suspend fun loadMusic(): SavedQueue? = withContext(Dispatchers.IO) { read(musicFile) }
+
+    fun clearMusic() { musicFile.delete() }
+
+    fun hasMusic(): Boolean = musicFile.exists()
 
     private companion object {
         // Process-wide: the service and Settings each make their own QueueStore for the same file.

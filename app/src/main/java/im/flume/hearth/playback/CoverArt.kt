@@ -77,6 +77,8 @@ class CoverBitmapLoader(
     private val context: Context,
     private val api: SubsonicClient,
     private val scope: CoroutineScope,
+    /** Cover URL for an Audiobookshelf item (`abs-cover://item/{id}`). */
+    private val absCoverUrl: (String) -> String? = { null },
 ) : BitmapLoader {
     private val decoder = DataSourceBitmapLoader(context)
 
@@ -86,9 +88,11 @@ class CoverBitmapLoader(
 
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
         // Only our own artwork: never fetch arbitrary URIs a controller might hand us.
-        val id = CoverArt.idFrom(uri) ?: return Futures.immediateFailedFuture(IOException("Unsupported artwork URI"))
-        // Large enough to stay sharp on the lock screen and car displays.
-        val url = api.coverArtUrl(id, 1000) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
+        val url = SpokenMedia.coverItemId(uri)?.let { absCoverUrl(it) ?: return Futures.immediateFailedFuture(IOException("Not signed in")) } ?: run {
+            val id = CoverArt.idFrom(uri) ?: return Futures.immediateFailedFuture(IOException("Unsupported artwork URI"))
+            // Large enough to stay sharp on the lock screen and car displays.
+            api.coverArtUrl(id, 1000) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
+        }
         val future = SettableFuture.create<Bitmap>()
         scope.launch {
             val result = runCatching {
