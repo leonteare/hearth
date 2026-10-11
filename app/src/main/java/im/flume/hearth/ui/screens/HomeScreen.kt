@@ -84,6 +84,7 @@ fun HomeScreen() {
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
+    val serverMixes = remember(playlistItems) { im.flume.hearth.data.ServerMixes.mine(playlistItems) }
     // Podcasts and audiobooks, once signed in: what you're part-way through, and new episodes of shows you follow.
     val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
     val continueListening by remember { c.spoken.continueListening(12) }.collectAsStateWithLifecycle(emptyList())
@@ -138,7 +139,19 @@ fun HomeScreen() {
 
         items(StatsPeriod.current(), key = { "stats:${it.key}" }) { StatsCard(it) }
 
-        if (mixes.isNotEmpty()) {
+        if (serverMixes.isNotEmpty()) {
+            // The Daily Mix and Discover Weekly the server builds overnight, with music you don't have yet.
+            item {
+                SectionHeader("Your mixes")
+                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                    items(serverMixes, key = { it.playlist.id }) { item ->
+                        val p = item.playlist
+                        MediaCard(p.name, im.flume.hearth.data.ServerMixes.description(p), onClick = { actions.openPlaylist(p.id) }, subtitleLines = 2, coverArt = p.coverArt)
+                    }
+                }
+            }
+        } else if (mixes.isNotEmpty()) {
+            // Until the server has made any (or while offline): mixes built on the phone from your own library.
             item {
                 SectionHeader("Your mixes")
                 LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {

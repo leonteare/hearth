@@ -117,6 +117,7 @@ class AppContainer(context: Context) {
     val downloads = DownloadRepository(context, db, session, appScope)
     val nativeApi = im.flume.hearth.api.NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
     val library = LibraryRepository(db, api, downloads, session, nativeApi)
+    init { downloads.onUserDownload = { ids -> library.keepMixSongs(ids) } }
     val lyrics = LyricsRepository(api, db.lyrics())
     val mixes = im.flume.hearth.data.MixRepository(context, db, api, session)
     val usage = im.flume.hearth.data.Usage(context)

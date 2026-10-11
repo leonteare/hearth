@@ -249,8 +249,16 @@ class DownloadRepository(
         loadDone()
     }
 
+    /** Told about every download the user asks for (mix songs they download are kept on the server). */
+    var onUserDownload: (suspend (List<String>) -> Unit)? = null
+
+    private suspend fun tellUserDownload(songIds: List<String>) {
+        try { onUserDownload?.invoke(songIds) } catch (e: Exception) { im.flume.hearth.logHandledError(context, "keep mix songs", e) }
+    }
+
     /** The user downloaded these songs themselves: that wins over any album or playlist being removed. */
     fun download(songs: List<SongEntity>) = scope.launch {
+        tellUserDownload(songs.map { it.id })
         setPrefs(songs.map { it.id }, wanted = true)
         _storageFull.value = false
         enqueue(songs)
@@ -290,6 +298,7 @@ class DownloadRepository(
 
     /** Downloading an album or playlist (again) brings back songs of it the user had removed one by one. */
     fun pinAndDownload(kind: String, id: String, songs: List<SongEntity>) = scope.launch {
+        tellUserDownload(songs.map { it.id })
         dao.pin(PinnedEntity(kind, id))
         songs.map { it.id }.chunked(500).forEach { dao.clearRemoved(it) }
         _storageFull.value = false

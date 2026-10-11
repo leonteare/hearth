@@ -196,6 +196,8 @@ interface LibraryDao {
     suspend fun playlistOnce(id: String): PlaylistEntity?
 
     @Query("SELECT * FROM playlists") suspend fun playlistsOnce(): List<PlaylistEntity>
+    @Query("SELECT songId FROM playlist_songs WHERE playlistId IN (:ids)") suspend fun songIdsInPlaylists(ids: List<String>): List<String>
+    @Query("SELECT id FROM songs WHERE starred = 1") suspend fun starredSongIds(): List<String>
 
     /** Brings the playlist list in line with the server: [changed] rows get their songs replaced, missing ones go. */
     @Transaction

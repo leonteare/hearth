@@ -7,6 +7,7 @@ import im.flume.hearth.api.SubsonicClient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
 import im.flume.hearth.download.DownloadRepository
 
 /**
@@ -65,6 +66,32 @@ class LibraryRepository(
         combine(dao.playlists(), session.credentials, session.playlistDecisions) { all, creds, decisions ->
             PlaylistRules.items(all, creds?.username, decisions)
         }
+
+    private val keepLock = kotlinx.coroutines.sync.Mutex()
+    /** The kept playlist once made here, so a second download before the next sync doesn't make another. */
+    private var keptPlaylistId: String? = null
+
+    /**
+     * Mix songs you download stay on the server after the mix ends: they go in a hidden playlist the
+     * server's nightly cleanup reads as saved. Liked songs are kept anyway, so they're left out.
+     */
+    suspend fun keepMixSongs(songIds: List<String>) = keepLock.withLock {
+        val me = session.credentials.value?.username ?: return@withLock
+        val items = PlaylistRules.items(dao.playlistsOnce(), me, emptyMap())
+        val mixes = ServerMixes.mine(items).map { it.playlist.id }
+        if (mixes.isEmpty()) return@withLock
+        val kept = keptPlaylistId ?: items.firstOrNull { it.access.isOwner && ServerMixes.isKept(it.playlist) }?.playlist?.id
+        val alreadyKept = kept?.let { dao.songIdsInPlaylists(listOf(it)).toSet() }.orEmpty()
+        val keep = ServerMixes.toKeep(songIds, dao.songIdsInPlaylists(mixes).toSet(), alreadyKept, dao.starredSongIds().toSet())
+        if (keep.isEmpty()) return@withLock
+        if (kept == null) {
+            val id = api.createPlaylist(ServerMixes.KEPT_NAME, keep) ?: return@withLock
+            api.setPlaylistComment(id, ServerMixes.KEPT_COMMENT, public = false)
+            keptPlaylistId = id
+        } else {
+            api.addToPlaylist(kept, keep)
+        }
+    }
 
     fun playlistItem(id: String): Flow<PlaylistItem?> =
         combine(dao.playlist(id), session.credentials, session.playlistDecisions) { p, creds, decisions ->

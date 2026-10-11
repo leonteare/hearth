@@ -149,15 +149,15 @@ object PlaylistRules {
         all.map { PlaylistItem(it, access(it, me, decisions)) }
 
     /** Your Library's Playlists tab: yours, joined, and pending invites. */
-    fun visible(all: List<PlaylistItem>) = all.filter { it.access.visible }
+    fun visible(all: List<PlaylistItem>) = all.filter { it.access.visible && !ServerMixes.isHidden(it.playlist) }
 
     /** Home's row: yours and joined only; invites wait in Your Library. */
-    fun joined(all: List<PlaylistItem>) = all.filter { it.access.isOwner || it.access.role != null }
+    fun joined(all: List<PlaylistItem>) = all.filter { (it.access.isOwner || it.access.role != null) && !ServerMixes.isHidden(it.playlist) }
 
     fun pendingInvites(all: List<PlaylistItem>) = all.filter { it.access.invite != null }
 
     /** The "Add to playlist" picker. */
-    fun editable(all: List<PlaylistItem>) = all.filter { it.access.canEdit }
+    fun editable(all: List<PlaylistItem>) = all.filter { it.access.canEdit && !ServerMixes.isHidden(it.playlist) }
 
     /** Whether the server's [sharing] (read back after writing) shows [me]'s answer to an invite. */
     fun answerSaved(sharing: Sharing?, me: String, accept: Boolean): Boolean {

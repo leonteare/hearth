@@ -567,8 +567,12 @@ fun PlaylistScreen(id: String) {
     }
     CollectionScreen(
         title = playlist?.name.orEmpty(),
-        // Only name the owner when it's someone else's playlist.
-        subtitle = if (access == null || access.isOwner) "" else "by ${PlaylistRules.displayName(access.owner)}",
+        // Only name the owner when it's someone else's playlist. A server mix says when it leaves instead.
+        subtitle = when {
+            playlist != null && im.flume.hearth.data.ServerMixes.isMix(playlist!!) -> im.flume.hearth.data.ServerMixes.description(playlist!!)
+            access == null || access.isOwner -> ""
+            else -> "by ${PlaylistRules.displayName(access.owner)}"
+        },
         onRemoveSong = if (access?.canEdit == true) { index ->
             // Identify the song by id and occurrence, not list position: the server re-finds it.
             val all = entries.orEmpty().map { it.songId }
