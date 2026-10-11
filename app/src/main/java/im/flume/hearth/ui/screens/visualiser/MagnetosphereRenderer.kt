@@ -80,7 +80,7 @@ class MagnetosphereRenderer : VisualiserRenderer() {
         field.step(dt, energy, active)
 
         // ---- trails: fade what's there towards black (time-based, so frame rate doesn't matter)
-        val fadeAlpha = ((1f - exp(-dt / 0.13f)) * 255f).roundToInt().coerceIn(12, 255)
+        val fadeAlpha = ((1f - exp(-dt / 0.24f)) * 255f).roundToInt().coerceIn(12, 255)
         fade.color = fadeAlpha shl 24
         c.drawPaint(fade)
 
@@ -113,9 +113,9 @@ class MagnetosphereRenderer : VisualiserRenderer() {
             for (fast in 0..1) {
                 val g = m * 2 + fast
                 if (fill[g] == 0) continue
-                val alpha = (0.22f + 0.5f * e + 0.18f * fast).coerceAtMost(1f)
+                val alpha = (0.5f + 0.45f * e + 0.2f * fast).coerceAtMost(1f)
                 dot.color = withAlpha(lerpArgb(col, 0xFFFFFFFF.toInt(), 0.12f * fast + 0.2f * e * e), alpha)
-                dot.strokeWidth = 1.2f + 0.9f * e + 0.3f * fast
+                dot.strokeWidth = 1.7f + 1.1f * e + 0.4f * fast
                 c.drawPoints(pts[g], 0, fill[g], dot)
             }
         }
