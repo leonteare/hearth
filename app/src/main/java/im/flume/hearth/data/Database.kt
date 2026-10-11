@@ -329,6 +329,9 @@ class Converters {
     @TypeConverter fun fromRequestStatus(s: RequestStatus): String = s.name
     @TypeConverter fun toRequestStatus(s: String): RequestStatus =
         RequestStatus.entries.firstOrNull { it.name == s } ?: RequestStatus.FAILED
+    @TypeConverter fun fromSpokenState(s: im.flume.hearth.spoken.SpokenDownloadState): String = s.name
+    @TypeConverter fun toSpokenState(s: String): im.flume.hearth.spoken.SpokenDownloadState =
+        im.flume.hearth.spoken.SpokenDownloadState.entries.firstOrNull { it.name == s } ?: im.flume.hearth.spoken.SpokenDownloadState.FAILED
 }
 
 @Database(
@@ -337,8 +340,13 @@ class Converters {
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
         SongDownloadPrefEntity::class, RequestEntity::class,
+        im.flume.hearth.spoken.PodcastEntity::class, im.flume.hearth.spoken.EpisodeEntity::class,
+        im.flume.hearth.spoken.BookEntity::class, im.flume.hearth.spoken.TrackEntity::class,
+        im.flume.hearth.spoken.ChapterEntity::class, im.flume.hearth.spoken.SpokenProgressEntity::class,
+        im.flume.hearth.spoken.OutboxEntity::class, im.flume.hearth.spoken.SpokenDownloadEntity::class,
+        im.flume.hearth.spoken.SpokenPlayPrefEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -347,6 +355,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun downloads(): DownloadDao
     abstract fun lyrics(): LyricsDao
     abstract fun requests(): RequestDao
+    abstract fun spoken(): im.flume.hearth.spoken.SpokenDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -411,10 +420,31 @@ abstract class AppDatabase : RoomDatabase() {
             "ALTER TABLE requests ADD COLUMN `toPhone` INTEGER NOT NULL DEFAULT 1",
         )
 
+        /** Podcasts and audiobooks from Audiobookshelf (new tables only). Must match the spoken entities exactly. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_7_8_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_7_8_SQL = listOf(
+            "CREATE TABLE IF NOT EXISTS `abs_podcasts` (`id` TEXT NOT NULL, `libraryId` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `description` TEXT, `feedUrl` TEXT, `imageUrl` TEXT, `language` TEXT, `explicit` INTEGER NOT NULL, `tags` TEXT NOT NULL, `autoDownloadEpisodes` INTEGER NOT NULL, `numEpisodes` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `episodesFetchedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+            "CREATE TABLE IF NOT EXISTS `abs_episodes` (`id` TEXT NOT NULL, `libraryItemId` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT, `description` TEXT, `publishedAt` INTEGER NOT NULL, `durationSec` REAL NOT NULL, `sizeBytes` INTEGER NOT NULL, `ino` TEXT, `mimeType` TEXT, `season` TEXT, `episode` TEXT, `episodeType` TEXT, `addedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+            "CREATE INDEX IF NOT EXISTS `index_abs_episodes_libraryItemId` ON `abs_episodes` (`libraryItemId`)",
+            "CREATE INDEX IF NOT EXISTS `index_abs_episodes_publishedAt` ON `abs_episodes` (`publishedAt`)",
+            "CREATE TABLE IF NOT EXISTS `abs_books` (`id` TEXT NOT NULL, `libraryId` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT, `author` TEXT, `narrator` TEXT, `series` TEXT, `description` TEXT, `publishedYear` TEXT, `durationSec` REAL NOT NULL, `sizeBytes` INTEGER NOT NULL, `numTracks` INTEGER NOT NULL, `numChapters` INTEGER NOT NULL, `tags` TEXT NOT NULL, `addedAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `detailsFetchedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+            "CREATE TABLE IF NOT EXISTS `abs_tracks` (`libraryItemId` TEXT NOT NULL, `trackIndex` INTEGER NOT NULL, `ino` TEXT NOT NULL, `startOffsetSec` REAL NOT NULL, `durationSec` REAL NOT NULL, `mimeType` TEXT, `sizeBytes` INTEGER NOT NULL, PRIMARY KEY(`libraryItemId`, `trackIndex`))",
+            "CREATE TABLE IF NOT EXISTS `abs_chapters` (`libraryItemId` TEXT NOT NULL, `episodeId` TEXT NOT NULL, `chapterIndex` INTEGER NOT NULL, `startSec` REAL NOT NULL, `endSec` REAL NOT NULL, `title` TEXT NOT NULL, PRIMARY KEY(`libraryItemId`, `episodeId`, `chapterIndex`))",
+            "CREATE TABLE IF NOT EXISTS `abs_progress` (`libraryItemId` TEXT NOT NULL, `episodeId` TEXT NOT NULL, `currentTime` REAL NOT NULL, `duration` REAL NOT NULL, `isFinished` INTEGER NOT NULL, `lastUpdate` INTEGER NOT NULL, `finishedAt` INTEGER, `dirty` INTEGER NOT NULL, `markedUnplayed` INTEGER NOT NULL, PRIMARY KEY(`libraryItemId`, `episodeId`))",
+            "CREATE TABLE IF NOT EXISTS `abs_outbox` (`key` TEXT NOT NULL, `seq` INTEGER NOT NULL, `userId` TEXT NOT NULL, `kind` TEXT NOT NULL, `libraryItemId` TEXT NOT NULL, `episodeId` TEXT NOT NULL, `payload` TEXT NOT NULL, `attempts` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+            "CREATE TABLE IF NOT EXISTS `abs_downloads` (`libraryItemId` TEXT NOT NULL, `episodeId` TEXT NOT NULL, `state` TEXT NOT NULL, `bytes` INTEGER NOT NULL, `totalBytes` INTEGER NOT NULL, `auto` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `completedAt` INTEGER NOT NULL, `error` TEXT, PRIMARY KEY(`libraryItemId`, `episodeId`))",
+            "CREATE TABLE IF NOT EXISTS `abs_play_prefs` (`libraryItemId` TEXT NOT NULL, `speed` REAL NOT NULL, PRIMARY KEY(`libraryItemId`))",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build()
     }
 }

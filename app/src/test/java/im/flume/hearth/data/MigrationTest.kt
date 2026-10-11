@@ -90,4 +90,25 @@ class MigrationTest {
         val tables = listOf("songs", "albums", "artists", "playlists", "playlist_songs", "downloads", "pinned", "play_history", "pending_scrobbles", "lyrics", "song_download_prefs")
         tables.forEach { assertEquals(it, createSql(6, it), createSql(7, it)) }
     }
+
+    private fun entities(version: Int) =
+        Json.parseToJsonElement(File("schemas/im.flume.hearth.data.AppDatabase/$version.json").readText()).jsonObject["database"]!!
+            .jsonObject["entities"]!!.jsonArray.map { it.jsonObject }
+
+    @Test
+    fun `migration 7 to 8 creates exactly the spoken word tables and their indices`() {
+        val v7 = entities(7).map { it["tableName"]!!.jsonPrimitive.content }.toSet()
+        val added = entities(8).filter { it["tableName"]!!.jsonPrimitive.content !in v7 }
+        // Room's createSql names the table through a placeholder; the migration uses the real name.
+        val expected = added.flatMap { e ->
+            val table = e["tableName"]!!.jsonPrimitive.content
+            val index = e["indices"]?.jsonArray.orEmpty().map { it.jsonObject["createSql"]!!.jsonPrimitive.content }
+            (listOf(e["createSql"]!!.jsonPrimitive.content) + index).map { it.replace("`\${TABLE_NAME}`", "`$table`") }
+        }
+        assertEquals(expected.sorted(), AppDatabase.MIGRATION_7_8_SQL.sorted())
+        assertEquals(9, added.size)
+        assertTrue(added.all { it["tableName"]!!.jsonPrimitive.content.startsWith("abs_") })
+        // Every existing table is unchanged.
+        v7.forEach { assertEquals(it, createSql(7, it), createSql(8, it)) }
+    }
 }
