@@ -17,14 +17,15 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Aurora: big soft clouds of the cover's colours folding through each other (domain-warped fbm
- * noise). The slow bass swells and brightens them, beats add a soft bloom, treble a shimmer, and the
+ * Aurora: big soft clouds of the cover's colours drifting through a faint haze (five gaussian glows
+ * on slow paths, lightly warped by two octaves of noise: cheap enough for mid-range phones, and with
+ * no folds or creases). The slow bass swells and brightens them, beats add a soft bloom, treble a shimmer, and the
  * music's level speeds the flow. An AGSL shader on Android 13+ (rotated octaves and quintic easing so
  * no lattice shows, dithered so dark gradients don't band), at 3/4 resolution scaled up smoothly;
  * older phones get dithered gradient blobs.
  */
 class AuroraRenderer : VisualiserRenderer() {
-    override val renderScale: Float get() = if (quality >= 1f) 0.75f else 0.6f
+    override val renderScale: Float get() = if (quality >= 1f) 0.5f else 0.4f // soft by nature, so a smaller layer scaled up looks the same
 
     // A shader that fails to compile (or to take its uniforms) falls back to the blobs for good.
     private var agsl: AuroraShader? = if (Build.VERSION.SDK_INT >= 33) runCatching { AuroraShader() }.getOrNull() else null
@@ -121,50 +122,51 @@ float noise(float2 p) {
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-float fbm(float2 p) {
-    float v = 0.0;
-    float amp = 0.5;
-    // Each octave turned ~37 degrees, so the lattices never line up into blocks.
-    for (int i = 0; i < 4; i++) {
-        v += amp * noise(p);
-        p = float2(0.8 * p.x - 0.6 * p.y, 0.6 * p.x + 0.8 * p.y) * 2.03 + float2(3.1, 1.7);
-        amp *= 0.5;
-    }
-    return v;
+float fbm2(float2 p) {
+    // Two gentle octaves only: a faint veil of texture, not structure.
+    float v = 0.6 * noise(p);
+    p = float2(0.8 * p.x - 0.6 * p.y, 0.6 * p.x + 0.8 * p.y) * 2.03 + float2(3.1, 1.7);
+    return v + 0.4 * noise(p);
+}
+
+// One soft cloud: a wide gaussian glow that drifts on a slow Lissajous path.
+float cloud(float2 p, float t, float i, float size) {
+    float2 c = float2(sin(t * (0.31 + i * 0.07) + i * 1.7), cos(t * (0.23 + i * 0.05) + i * 2.3)) * float2(0.55, 0.75);
+    float2 d = p - c;
+    return exp(-dot(d, d) / (size * size));
 }
 
 half4 main(float2 fragCoord) {
-    float2 uv = fragCoord / iResolution.y;
     float aspect = iResolution.x / iResolution.y;
-    float t = iTime * 0.07;
-    float zoom = 1.5 - uBass * 0.3;
-    float2 p = (uv - float2(0.5 * aspect, 0.5)) * zoom;
-    float2 q = float2(fbm(p + float2(0.0, t)), fbm(p + float2(5.2, 1.3 - t)));
-    float2 r = float2(fbm(p + 2.4 * q + float2(1.7, 9.2) + t * 1.3), fbm(p + 2.4 * q + float2(8.3, 2.8) - t * 0.9));
-    float f = fbm(p + 2.2 * r + float2(uMid * 0.25, 0.0));
+    float2 p = (fragCoord / iResolution - 0.5) * float2(aspect, 1.0) * 2.0;
+    float t = iTime * 0.35;
+    float size = 0.4 + uBass * 0.2 + uBeat * 0.07;
+    // A slow, soft warp so the clouds feel like light through haze rather than perfect circles.
+    float2 w = p + 0.25 * (float2(fbm2(p * 0.9 + t * 0.2), fbm2(p * 0.9 + float2(4.1, 2.7) - t * 0.17)) - 0.5);
 
     float3 k0 = float3(c0.rgb);
     float3 k1 = float3(c1.rgb);
     float3 k2 = float3(c2.rgb);
     float3 k3 = float3(c3.rgb);
-    float3 col = mix(k0, k1, smoothstep(0.25, 0.75, f));
-    col = mix(col, k2, clamp(length(q) * 0.9 - 0.3, 0.0, 1.0));
-    col = mix(col, k3, smoothstep(0.5, 0.9, r.y));
+    float a0 = cloud(w, t, 0.0, size);
+    float a1 = cloud(w, t, 1.0, size * 0.9);
+    float a2 = cloud(w, t, 2.0, size * 1.1);
+    float a3 = cloud(w, t, 3.0, size * 0.8);
+    float a4 = cloud(w, t, 4.0, size);
+    float3 lit = k0 * (a0 + a4 * 0.6) + k1 * a1 + k2 * a2 + k3 * (a3 + a4 * 0.4);
+    float glow = a0 + a1 + a2 + a3 + a4;
 
-    // Clouds: glowing even in silence (bright cores, softly lit gaps); audio swells them.
-    float cloud = smoothstep(0.18, 0.68, f + 0.35 * length(r) - 0.1);
-    float shimmer = noise(p * 6.0 + float2(iTime * 0.9, -iTime * 0.7));
-    float rest = mix(0.16, 0.95, cloud) + 0.25 * cloud * cloud;
-    float swell = 1.0 + uBass * 0.55 + uBeat * 0.25 + uMid * 0.15;
-    float3 lit = col * rest * swell + col * (uTreble * 0.3 * shimmer * cloud);
-    // A soft tint of the first colour in the gaps, so it's never just black between clouds.
-    lit += k0 * 0.08 * (1.0 - cloud);
-    // Gentle tone curve: keeps colour in the highlights instead of clipping to white.
-    lit = lit / (1.0 + lit * 0.35) * 1.2;
+    // Rest brightness with the music swelling it; treble adds a faint shimmer in the veil.
+    float swell = 0.75 + uBass * 0.45 + uBeat * 0.25 + uMid * 0.1;
+    lit *= swell;
+    lit += k0 * 0.04;
+    lit += (k1 + k2) * 0.06 * uTreble * (fbm2(p * 3.0 + float2(iTime * 0.5, 0.0)) - 0.3) * min(glow, 1.0);
+    // Gentle tone curve: colour stays in the highlights instead of clipping to white.
+    lit = lit / (1.0 + lit * 0.45) * 1.25;
 
     float2 v = fragCoord / iResolution - 0.5;
     lit *= 1.0 - dot(v, v) * 0.6;
-    // Triangular dither of about 1.5 levels: breaks up 8-bit banding in the dark gradients.
+    // Triangular dither of about 1.5 levels: breaks up 8-bit banding in the soft gradients.
     float dz = hash(fragCoord) + hash(fragCoord + float2(17.3, 41.9)) - 1.0;
     lit += dz * (1.5 / 255.0);
     return half4(half3(clamp(lit, 0.0, 1.0)), 1.0);
