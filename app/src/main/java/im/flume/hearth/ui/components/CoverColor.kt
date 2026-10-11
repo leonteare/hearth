@@ -73,6 +73,23 @@ fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback, 
     return color
 }
 
+private val coverPaletteCache = LruCache<String, List<Color>>(40)
+
+/**
+ * Several distinct colours from a cover (vibrant ones first), as they are: not darkened like
+ * [rememberCoverColor]. Cached per [key]. Call off the main thread.
+ */
+fun coverPalette(key: String, bitmap: android.graphics.Bitmap): List<Color> {
+    coverPaletteCache.get(key)?.let { return it }
+    val p = Palette.from(bitmap).maximumColorCount(24).generate()
+    val colours = listOfNotNull(
+        p.vibrantSwatch, p.lightVibrantSwatch, p.darkVibrantSwatch, p.mutedSwatch, p.lightMutedSwatch, p.dominantSwatch,
+    ).map { Color(it.rgb) } + p.swatches.sortedByDescending { it.population }.take(6).map { Color(it.rgb) }
+    val result = colours.distinct()
+    coverPaletteCache.put(key, result)
+    return result
+}
+
 /** Download toggle for albums / playlists: outlined arrow, progress ring while downloading, solid when done. */
 @Composable
 fun DownloadToggle(downloaded: Boolean, progress: Float?, onClick: () -> Unit) {
