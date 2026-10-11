@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -451,7 +452,8 @@ internal fun SpokenHeader(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BackButton()
                 Spacer(Modifier.weight(1f))
-                if (onMenu != null) IconButton(onClick = onMenu) { Icon(Icons.Default.MoreVert, "More") }
+                // Same status-bar inset as the back button, so the two line up.
+                if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.statusBarsPadding()) { Icon(Icons.Default.MoreVert, "More") }
             }
             CoverArt(null, artSize, requestSize = 600, fallback = title, url = coverUrl)
             Spacer(Modifier.height(16.dp))

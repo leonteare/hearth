@@ -121,6 +121,8 @@ class LocalBookDetails(
     /** What the last search for this book found, or null if it was never looked up. */
     suspend fun saved(id: String): SavedBookSearch? = withContext(Dispatchers.IO) {
         runCatching { File(savedDir, "$id.json").takeIf { it.isFile }?.readText()?.let { json.decodeFromString(SavedBookSearch.serializer(), it) } }.getOrNull()
+            // Searches saved by older versions can list the UK and US store's copy of a book separately.
+            ?.let { it.copy(candidates = BookMatch.dedupe(it.candidates)) }
     }
 
     private suspend fun save(id: String, search: SavedBookSearch) = withContext(Dispatchers.IO) {
