@@ -323,6 +323,7 @@ fun AppRoot() {
     val preview by c.preview.current.collectAsStateWithLifecycle()
     val getMusic = im.flume.hearth.ui.components.rememberGetMusic(c, actions)
     LaunchedEffect(Unit) { c.preview.messages.collect { actions.showMessage(it) } }
+    LaunchedEffect(Unit) { c.spoken.feeds.messages.collect { actions.showMessage(it) } }
     // An episode or book picked up from where another phone (or the web) left it: say so, and offer
     // to go back to where this phone was.
     LaunchedEffect(Unit) {
@@ -425,6 +426,7 @@ fun AppRoot() {
                         screen("stats/{key}") { StatsScreen(it.arguments!!.getString("key")!!) }
                         screen("playlist-edit/{id}") { PlaylistEditScreen(it.arguments!!.getString("id")!!) }
                         screen("podcast/{id}") { im.flume.hearth.ui.screens.PodcastScreen(it.arguments!!.getString("id")!!) }
+                        screen("podcast-feed/{url}") { im.flume.hearth.ui.screens.PodcastScreen(null, feedUrl = it.arguments!!.getString("url")!!) }
                         screen("book/{id}") { im.flume.hearth.ui.screens.BookScreen(it.arguments!!.getString("id")!!) }
                     }
                 }

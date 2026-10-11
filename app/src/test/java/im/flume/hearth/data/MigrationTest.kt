@@ -111,4 +111,24 @@ class MigrationTest {
         // Every existing table is unchanged.
         v7.forEach { assertEquals(it, createSql(7, it), createSql(8, it)) }
     }
+
+    @Test
+    fun `migration 8 to 9 adds the episode feed link and guid`() {
+        val before = columns(createSql(8, "abs_episodes"))
+        val after = columns(createSql(9, "abs_episodes"))
+        val prefix = "ALTER TABLE abs_episodes ADD COLUMN "
+        val added = AppDatabase.MIGRATION_8_9_SQL.filter { it.startsWith(prefix) }.associate { stmt ->
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ").trim('`') to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        // Episodes are fetched again so the new columns fill in.
+        assertTrue(AppDatabase.MIGRATION_8_9_SQL.contains("UPDATE abs_podcasts SET episodesFetchedAt = 0"))
+        val tables = entities(8).map { it["tableName"]!!.jsonPrimitive.content }
+        assertEquals(tables.toSet(), entities(9).map { it["tableName"]!!.jsonPrimitive.content }.toSet())
+        tables.filter { it != "abs_episodes" }.forEach { assertEquals(it, createSql(8, it), createSql(9, it)) }
+        // The indices stay as they were.
+        val idx = { v: Int -> entities(v).first { it["tableName"]!!.jsonPrimitive.content == "abs_episodes" }["indices"].toString() }
+        assertEquals(idx(8), idx(9))
+    }
 }

@@ -181,6 +181,16 @@ class SpokenDownloads(
             val key = SpokenKey(row.libraryItemId, row.episodeId)
             if (SpokenDownloadPolicy.shouldAutoDelete(key in finished, key == current, row.state)) deleteLocal(key, keepRemovedMarker = true)
         }
+        // Episodes of shows unfollowed while they were playing.
+        val later = removeLater()
+        if (later.isNotEmpty()) {
+            val keep = later.filterTo(HashSet()) { it == current?.toString() }
+            (later - keep).forEach { s ->
+                val (item, ep) = s.split('/', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                if (ep.isNotEmpty()) deleteLocal(SpokenKey(item, ep), keepRemovedMarker = true)
+            }
+            setRemoveLater(keep)
+        }
     }
 
     /** Queues the newest unplayed episodes of each followed show, and drops auto-downloads that fell out of that window. */
@@ -198,11 +208,30 @@ class SpokenDownloads(
         }
     }
 
-    /** Removes not-yet-started auto-downloads of a show this user stopped following. */
+    private val prefs = context.getSharedPreferences("spoken-downloads", Context.MODE_PRIVATE)
+
+    /** Episodes of unfollowed shows still loaded in the player: removed as soon as playback moves on. */
+    private fun removeLater(): Set<String> = prefs.getStringSet("removeLater", emptySet()).orEmpty()
+    private fun setRemoveLater(keys: Set<String>) = prefs.edit().putStringSet("removeLater", keys).apply()
+
+    /**
+     * This user stopped following a show: every episode of it goes from this phone (marked REMOVED, so
+     * auto-download won't bring it back unless the show is followed again), except the one in the
+     * player, which goes when playback moves on.
+     */
     suspend fun onUnfollowed(podcastId: String) {
-        val started = dao.allProgress().filter { it.libraryItemId == podcastId && it.currentTime > 0 }.mapTo(HashSet()) { it.episodeId }
-        dao.downloadsOnce().filter { it.libraryItemId == podcastId && it.auto && it.episodeId !in started && it.state != SpokenDownloadState.REMOVED }
-            .forEach { deleteLocal(SpokenKey(it.libraryItemId, it.episodeId), keepRemovedMarker = false) }
+        val rows = dao.downloadsOnce().filter { it.libraryItemId == podcastId }
+        val currentEp = current?.takeIf { it.libraryItemId == podcastId }?.episodeId
+        val plan = SpokenDownloadPolicy.unfollowPlan(rows.map { DownloadRowInfo(it.episodeId, it.state) }, currentEp)
+        plan.removeNow.forEach { deleteLocal(SpokenKey(podcastId, it), keepRemovedMarker = true) }
+        if (plan.removeLater.isNotEmpty()) setRemoveLater(removeLater() + plan.removeLater.map { SpokenKey(podcastId, it).toString() })
+    }
+
+    /** Followed again: REMOVED markers left by unfollowing no longer block auto-download. */
+    suspend fun onFollowed(podcastId: String) {
+        setRemoveLater(removeLater().filterNot { it.startsWith("$podcastId/") }.toSet())
+        dao.downloadsOnce().filter { it.libraryItemId == podcastId && it.state == SpokenDownloadState.REMOVED }
+            .forEach { dao.deleteDownload(it.libraryItemId, it.episodeId) }
     }
 
     /** Whether a queued download may run on the current connection. Auto-downloads are Wi-Fi only. */

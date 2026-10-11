@@ -153,6 +153,26 @@ data class AbsEpisode(
     val audioTrack: AbsAudioTrack? = null,
     val duration: Double? = null,
     val size: Long? = null,
+    val enclosure: AbsEnclosure? = null,
+    val guid: String? = null,
+)
+
+/** A feed episode's audio link. [length] is a string of bytes in Audiobookshelf's JSON. */
+@Serializable
+data class AbsEnclosure(val url: String? = null, val type: String? = null, val length: String? = null)
+
+/** GET /api/podcasts/:id/downloads: episodes waiting in the server's download queue (not the one downloading now). */
+@Serializable
+data class AbsEpisodeDownloads(val downloads: List<AbsEpisodeDownload> = emptyList())
+
+@Serializable
+data class AbsEpisodeDownload(
+    val id: String? = null,
+    val url: String? = null,
+    val libraryItemId: String? = null,
+    val episodeDisplayTitle: String? = null,
+    val guid: String? = null,
+    val publishedAt: Long? = null,
 )
 
 @Serializable

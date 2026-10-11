@@ -347,6 +347,10 @@ class AbsClient(
         send<Unit>("POST", "api/podcasts/$libraryItemId/download-episodes", episodes, null)
     }
 
+    /** Episodes waiting in the server's download queue for this podcast (the one downloading right now isn't listed). */
+    suspend fun episodeDownloadQueue(libraryItemId: String): List<AbsEpisodeDownload> =
+        get("api/podcasts/$libraryItemId/downloads", AbsEpisodeDownloads.serializer()).downloads
+
     /** Asks the server to look for new episodes of a podcast now (admins only). */
     suspend fun checkNewEpisodes(libraryItemId: String) {
         call<Unit>(Request.Builder().url(url("api/podcasts/$libraryItemId/checknew")).build(), null)

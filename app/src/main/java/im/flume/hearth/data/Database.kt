@@ -346,7 +346,7 @@ class Converters {
         im.flume.hearth.spoken.OutboxEntity::class, im.flume.hearth.spoken.SpokenDownloadEntity::class,
         im.flume.hearth.spoken.SpokenPlayPrefEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -441,10 +441,26 @@ abstract class AppDatabase : RoomDatabase() {
             "CREATE TABLE IF NOT EXISTS `abs_play_prefs` (`libraryItemId` TEXT NOT NULL, `speed` REAL NOT NULL, PRIMARY KEY(`libraryItemId`))",
         )
 
+        /**
+         * Episodes remember their feed audio URL and guid, to line them up with the show's full feed.
+         * Every podcast is marked "episodes never fetched" so the next sync fills the new columns in.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_8_9_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_8_9_SQL = listOf(
+            "ALTER TABLE abs_episodes ADD COLUMN `enclosureUrl` TEXT",
+            "ALTER TABLE abs_episodes ADD COLUMN `guid` TEXT",
+            "UPDATE abs_podcasts SET episodesFetchedAt = 0",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .build()
     }
 }

@@ -60,6 +60,9 @@ data class EpisodeEntity(
     val episode: String?,
     val episodeType: String?,
     val addedAt: Long,
+    /** The feed's audio URL and guid, to line the episode up with the show's full feed. */
+    val enclosureUrl: String? = null,
+    val guid: String? = null,
 )
 
 @Entity(tableName = "abs_books")

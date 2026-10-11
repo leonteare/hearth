@@ -82,6 +82,8 @@ class SpokenRepository(
     val api = AbsClient(http.newBuilder().readTimeout(60, TimeUnit.SECONDS).build(), store, ServerClock(store.clockOffsetMs))
     val progress = SpokenProgress(context, db, store, api, scope)
     val downloads = SpokenDownloads(context, db, api, session, { store.settings.value }, network, scope)
+    /** Each show's full feed, and episodes being fetched onto the server from it. */
+    val feeds = ShowFeeds(context, this, scope)
     private val dao = db.spoken()
     private val syncLock = Mutex()
 
@@ -236,15 +238,19 @@ class SpokenRepository(
     suspend fun setFollowing(podcastId: String, follow: Boolean): String? {
         val user = username ?: return "Not signed in to podcasts & audiobooks"
         val before = dao.podcastOnce(podcastId)
-        before?.let { dao.setPodcastTags(podcastId, FollowTags.withFollower(it.tagList, user, follow).joinToString("\n")) } // instant UI
+        before?.let { dao.setPodcastTags(podcastId, FollowTags.nextTags(it.tagList, user, follow, api.clock.serverNow()).joinToString("\n")) } // instant UI
+        rememberIntent(podcastId, user, follow)
         try {
             repeat(3) {
                 val item = api.item(podcastId) ?: run {
-                    dao.deletePodcasts(listOf(podcastId))
+                    removeItems(listOf(podcastId), podcast = true)
+                    forgetIntent(podcastId)
                     return "This podcast is no longer on the server"
                 }
                 val tags = item.media.tags
-                val next = FollowTags.withFollower(tags, user, follow)
+                // Already unfollowed and marked: leave the marker's time alone.
+                val alreadyDone = !follow && !FollowTags.isFollowing(tags, user) && (FollowTags.followers(tags).isNotEmpty() || tags.any(FollowTags::isUnfollowedMarker))
+                val next = if (alreadyDone) tags else FollowTags.nextTags(tags, user, follow, api.clock.serverNow())
                 if (next != tags) api.setTags(podcastId, next)
                 if (follow && item.media.autoDownloadEpisodes != true) {
                     api.setAutoDownload(podcastId, true)
@@ -253,7 +259,12 @@ class SpokenRepository(
                 val check = api.item(podcastId)?.media?.tags ?: next
                 dao.setPodcastTags(podcastId, check.joinToString("\n"))
                 if (FollowTags.isFollowing(check, user) == follow) {
-                    if (follow) dao.podcastOnce(podcastId)?.let { downloads.planAutoDownloads(listOf(it)) } else downloads.onUnfollowed(podcastId)
+                    if (follow) {
+                        downloads.onFollowed(podcastId)
+                        dao.podcastOnce(podcastId)?.let { downloads.planAutoDownloads(listOf(it)) }
+                    } else {
+                        downloads.onUnfollowed(podcastId)
+                    }
                     return null
                 }
             }
@@ -261,6 +272,32 @@ class SpokenRepository(
         } catch (e: Exception) {
             before?.let { dao.setPodcastTags(podcastId, it.tags) }
             return userMessage(e)
+        }
+    }
+
+    private fun rememberIntent(podcastId: String, user: String, follow: Boolean) =
+        store.updateFollowIntents { it + (podcastId to FollowIntent(podcastId, user.lowercase(), follow, System.currentTimeMillis())) }
+
+    private fun forgetIntent(podcastId: String) = store.updateFollowIntents { it - podcastId }
+
+    /**
+     * Self-heal after a sync: where this user recently followed (or unfollowed) a show on this phone and
+     * the server's tags say otherwise, write the choice again. Choices expire after a few days, so a
+     * later change made on another device isn't fought over for ever.
+     */
+    private suspend fun healFollows(items: List<AbsLibraryItem>) {
+        val user = username ?: return
+        val now = System.currentTimeMillis()
+        val byId = items.associateBy { it.id }
+        val intents = store.followIntents()
+        store.updateFollowIntents { m -> m.filterValues { now - it.at < FollowTags.INTENT_TTL_MS && it.podcastId in byId } }
+        for (intent in intents.values) {
+            if (now - intent.at >= FollowTags.INTENT_TTL_MS || !intent.username.equals(user, ignoreCase = true)) continue
+            val item = byId[intent.podcastId] ?: continue
+            if (FollowTags.heal(intent.follow, item.media.tags, user) != FollowTags.Heal.NONE) {
+                im.flume.hearth.logHandledError(context, "spoken follow heal", IllegalStateException("Follow tag out of step; writing it again"))
+                setFollowing(intent.podcastId, intent.follow)
+            }
         }
     }
 
@@ -289,9 +326,21 @@ class SpokenRepository(
         val feed = api.podcastFeed(feedUrl)
         val item = api.createPodcast(
             library.id, folder.id, folder.fullPath, feed.metadata, feedUrl, directoryEntry,
-            tags = if (follow) listOf(FollowTags.tagFor(user)) else emptyList(), autoDownload = follow,
+            tags = if (follow) listOf(FollowTags.tagFor(user)) else FollowTags.nextTags(emptyList(), user, false, api.clock.serverNow()),
+            autoDownload = follow,
         )
         dao.upsertPodcasts(listOf(item.toPodcast(null)))
+        if (follow) {
+            // Make sure the follower tag really landed (the server's cleanup relies on it): read the new
+            // item back and, if the tag is missing, write it the careful way (read-modify-write, verified).
+            rememberIntent(item.id, user, true)
+            val tags = runCatching { api.item(item.id)?.media?.tags }.getOrNull()
+            if (tags == null || !FollowTags.isFollowing(tags, user)) {
+                setFollowing(item.id, true)?.let { if (setFollowing(item.id, true) != null) throw IllegalStateException("Added the podcast, but couldn't follow it: $it") }
+            } else {
+                dao.setPodcastTags(item.id, tags.joinToString("\n"))
+            }
+        }
         if (downloadLatest > 0) {
             val newest = feed.episodes.sortedByDescending { e -> e.jsonObject["publishedAt"]?.jsonPrimitive?.longOrNull ?: 0L }.take(downloadLatest)
             if (newest.isNotEmpty()) runCatching { api.downloadEpisodesOnServer(item.id, JsonArray(newest)) }
@@ -377,12 +426,15 @@ class SpokenRepository(
     private suspend fun syncPodcasts(lib: AbsLibrary, items: List<AbsLibraryItem>, full: Boolean) {
         val local = dao.podcastsOnce().filter { it.libraryId == lib.id }.associateBy { it.id }
         dao.upsertPodcasts(items.map { it.toPodcast(local[it.id]) })
+        // Remembered per show, so its page can still list the feed if the server removes the show.
+        items.forEach { item -> item.media.metadata.feedUrl?.let { feeds.rememberShow(item.id, it) } }
         val gone = local.keys - items.mapTo(HashSet()) { it.id }
         if (gone.isNotEmpty()) removeItems(gone.toList(), podcast = true)
         for (item in items) {
             val old = local[item.id]
             if (full || old == null || old.updatedAt != item.updatedAt || old.episodesFetchedAt == 0L) fetchItem(item.id)
         }
+        healFollows(items)
     }
 
     private suspend fun syncBooks(lib: AbsLibrary, items: List<AbsLibraryItem>, full: Boolean) {
@@ -409,6 +461,12 @@ class SpokenRepository(
             removeItems(listOf(libraryItemId), podcast = isPodcast)
             return
         }
+        storeItem(item)
+    }
+
+    /** Saves a podcast's episodes or a book's tracks and chapters, as just read from the server (expanded). */
+    internal suspend fun storeItem(item: AbsLibraryItem) {
+        val libraryItemId = item.id
         val now = System.currentTimeMillis()
         if (item.mediaType == "podcast") {
             val old = dao.podcastOnce(libraryItemId)
@@ -522,5 +580,7 @@ internal fun im.flume.hearth.api.AbsEpisode.toEntity(libraryItemId: String): Epi
         episode = episode?.takeIf { it.isNotBlank() },
         episodeType = episodeType,
         addedAt = addedAt,
+        enclosureUrl = enclosure?.url?.trim()?.takeIf { it.isNotEmpty() },
+        guid = guid?.takeIf { it.isNotBlank() },
     )
 }

@@ -140,6 +140,7 @@ class AppContainer(context: Context) {
         saveDownloadedAlbumsOnce()
         requests.start()
         spoken.start()
+        spoken.feeds.onReadyToPlay = { id, episodeId -> player.playEpisode(id, episodeId) }
     }
 
     /**

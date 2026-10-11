@@ -114,6 +114,8 @@ val LocalSpokenNow = compositionLocalOf<SpokenNowPlaying?> { null }
 
 fun podcastRoute(id: String) = "podcast/${Uri.encode(id)}"
 fun bookRoute(id: String) = "book/${Uri.encode(id)}"
+/** The show page for a feed that may not be on the server yet (from Search). */
+fun podcastFeedRoute(feedUrl: String) = "podcast-feed/${Uri.encode(feedUrl)}"
 
 /** Cover of a podcast or book (by its id on the server), or null when signed out. */
 fun AppContainer.spokenCover(libraryItemId: String, size: Int = 300): String? = spoken.coverUrl(libraryItemId, size)
@@ -281,7 +283,7 @@ fun EpisodeMenu(row: EpisodeRow, open: Boolean, onDismiss: () -> Unit, showGoToS
     }
 }
 
-private fun downloadingMessage(c: AppContainer): String =
+internal fun downloadingMessage(c: AppContainer): String =
     if (c.session.settings.value.wifiOnlyDownloads && !c.network.wifi.value) "Downloading when you're on Wi-Fi" else "Downloading"
 
 // ---------------------------------------------------------------------------------- Home
@@ -416,7 +418,7 @@ fun rememberOpmlImport(): () -> Unit {
 
 /** Expandable description: three lines, tap for the rest. */
 @Composable
-private fun Description(text: String?) {
+internal fun Description(text: String?) {
     val clean = text?.trim()?.takeIf { it.isNotEmpty() } ?: return
     var expanded by remember { mutableStateOf(false) }
     Column(
@@ -433,7 +435,7 @@ private fun Description(text: String?) {
 
 /** Cover-tinted header shared by the show and book pages. */
 @Composable
-private fun SpokenHeader(coverUrl: String?, title: String, lines: List<String>, artSize: Dp = 200.dp) {
+internal fun SpokenHeader(coverUrl: String?, title: String, lines: List<String>, artSize: Dp = 200.dp) {
     val headerColor = rememberCoverColor(null, imageUrl = coverUrl)
     Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -453,7 +455,7 @@ private fun SpokenHeader(coverUrl: String?, title: String, lines: List<String>, 
 
 /** Big round play button, as on album pages. */
 @Composable
-private fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit) {
+internal fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     androidx.compose.material3.FilledIconButton(
         onClick = onClick,
@@ -465,97 +467,7 @@ private fun RoundPlayButton(label: String, playing: Boolean = false, onClick: ()
     }
 }
 
-// ---------------------------------------------------------------------------------- show page
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PodcastScreen(id: String) {
-    val c = LocalContext.current.container
-    val actions = LocalActions.current
-    val scope = rememberCoroutineScope()
-    val podcast by remember(id) { c.spoken.podcast(id) }.collectAsStateWithLifecycle(null)
-    val episodes by remember(id) { c.spoken.episodes(id) }.collectAsStateWithLifecycle(null)
-    val account by c.spoken.account.collectAsStateWithLifecycle()
-    val now = LocalSpokenNow.current
-    val playerState by c.player.state.collectAsStateWithLifecycle()
-    var refreshing by remember { mutableStateOf(false) }
-    var followBusy by remember { mutableStateOf(false) }
-    var loaded by remember { mutableStateOf(false) }
-    LaunchedEffect(id) {
-        // Never fetched (e.g. just added): get the episodes now.
-        val p = c.db.spoken().podcastOnce(id)
-        if ((p == null || p.episodesFetchedAt == 0L) && !c.network.cannotStream) runCatching { c.spoken.fetchItem(id) }
-        loaded = true
-    }
-    val p = podcast
-    if (p == null) {
-        if (loaded) UnavailablePage(Icons.Default.Podcasts, "This podcast isn't on the server any more")
-        else Box(Modifier.fillMaxSize())
-        return
-    }
-    val following = account?.username?.let { u -> im.flume.hearth.spoken.FollowTags.isFollowing(p.tagList, u) } == true
-    val list = episodes.orEmpty()
-    val latest = remember(list) { SpokenLists.playLatest(list) }
-    val coverUrl = c.spokenCover(p.id, 600)
-    val playingThisShow = now?.libraryItemId == p.id
-
-    PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = {
-            refreshing = true
-            scope.launch {
-                runCatching { c.spoken.fetchItem(id) }.onFailure { actions.showMessage("Couldn't refresh: ${im.flume.hearth.util.userMessage(it)}") }
-                refreshing = false
-            }
-        },
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item(key = "header") {
-                SpokenHeader(coverUrl, p.title, listOfNotNull(p.author, im.flume.hearth.ui.components.plural(list.size.takeIf { it > 0 } ?: p.numEpisodes, "episode")))
-            }
-            item(key = "buttons") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (account != null) {
-                        FollowButton(following) {
-                            if (followBusy) return@FollowButton
-                            followBusy = true
-                            c.appScope.launch {
-                                val error = c.spoken.setFollowing(p.id, !following)
-                                followBusy = false
-                                when {
-                                    error != null -> actions.showMessage("Couldn't ${if (following) "unfollow" else "follow"}: $error")
-                                    following -> actions.showUndo("Unfollowed ${p.title}") { c.spoken.follow(p.id) }
-                                    else -> actions.showMessage("Following ${p.title}. New episodes will show on Home.")
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    if (latest != null) {
-                        val isLatestPlaying = playingThisShow && now?.episodeId == latest.episode.id && playerState.isPlaying
-                        RoundPlayButton(if (latest.started) "Resume latest episode" else "Play latest episode", playing = isLatestPlaying) {
-                            if (playingThisShow && now?.episodeId == latest.episode.id) c.player.playPause()
-                            else playEpisode(c, actions, p.id, latest.episode.id, latest.downloadState == SpokenDownloadState.DONE)
-                        }
-                    }
-                }
-            }
-            item(key = "description") { Description(p.description) }
-            if (episodes != null && list.isEmpty()) {
-                item(key = "empty") {
-                    EmptyState(
-                        Icons.Default.Podcasts,
-                        if (c.network.cannotStream) "No episodes on this phone yet. Connect to the internet to see them."
-                        else "No episodes yet. The server fetches new ones on its own; pull down to check.",
-                    )
-                }
-            }
-            if (list.isNotEmpty()) item(key = "eps-head") { SectionHeader("Episodes") }
-            items(list, key = { it.episode.id }) { row -> EpisodeListRow(row, Modifier.animateItem()) }
-        }
-    }
-}
+// The show page ("podcast/{id}", "podcast-feed/{url}") is in ShowPage.kt.
 
 // ---------------------------------------------------------------------------------- book page
 
@@ -779,7 +691,8 @@ fun DirectoryRow(r: im.flume.hearth.api.AbsPodcastSearchResult, library: List<Po
     MediaRow(
         r.title,
         listOfNotNull(r.artistName?.takeIf { it.isNotBlank() }, r.trackCount?.takeIf { it > 0 }?.let { im.flume.hearth.ui.components.plural(it, "episode") }).joinToString(" • ").ifEmpty { null },
-        onClick = existing?.let { e -> { actions.open(podcastRoute(e.id)) } },
+        // On the server: its page. Not yet: the feed's page, where any episode can be fetched.
+        onClick = existing?.let { e -> { actions.open(podcastRoute(e.id)) } } ?: r.feedUrl?.let { f -> { actions.open(podcastFeedRoute(f)) } },
         modifier = modifier,
         coverUrl = r.cover,
         trailing = {

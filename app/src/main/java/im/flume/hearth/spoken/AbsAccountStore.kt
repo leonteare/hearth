@@ -63,6 +63,17 @@ class AbsAccountStore(context: Context) : AbsAuthStore {
         get() = prefs.getLong("lastFullSyncAt", 0)
         set(v) = prefs.edit { putLong("lastFullSyncAt", v) }
 
+    /** Recent follow / unfollow choices made on this phone (see FollowTags.heal), by podcast id. */
+    fun followIntents(): Map<String, FollowIntent> = runCatching {
+        json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(FollowIntent.serializer()), prefs.getString("followIntents", null) ?: "[]")
+    }.getOrDefault(emptyList()).associateBy { it.podcastId }
+
+    @Synchronized
+    fun updateFollowIntents(transform: (Map<String, FollowIntent>) -> Map<String, FollowIntent>) {
+        val next = transform(followIntents()).values.toList()
+        prefs.edit { putString("followIntents", json.encodeToString(kotlinx.serialization.builtins.ListSerializer(FollowIntent.serializer()), next)) }
+    }
+
     fun updateSettings(transform: (SpokenSettings) -> SpokenSettings) {
         val s = transform(_settings.value)
         prefs.edit { putBoolean("autoDownloadOnWifi", s.autoDownloadOnWifi) }
@@ -90,7 +101,7 @@ class AbsAccountStore(context: Context) : AbsAuthStore {
     }
 
     fun signOut() {
-        prefs.edit { listOf("serverUrl", "username", "userId", "needsSignIn", "lastFullSyncAt").forEach(::remove) }
+        prefs.edit { listOf("serverUrl", "username", "userId", "needsSignIn", "lastFullSyncAt", "followIntents").forEach(::remove) }
         vault.clear()
         cached = null
         _account.value = null

@@ -1,0 +1,161 @@
+{
+ "podcast": {
+  "metadata": {
+   "image": "https://npr.brightspotcdn.com/dims3/default/strip/false/crop/3000x3000+0+0/resize/1400/quality/66/format/jpg/?url=http%3A%2F%2Fnpr-brightspot.s3.amazonaws.com%2Fe0%2F7a%2Ffe9d16a44fbf9dd2d9932ffe799b%2F510318.png",
+   "categories": [
+    "News:Daily News"
+   ],
+   "feedUrl": "https://feeds.npr.org/510318/podcast.xml",
+   "description": "NPR's Up First is the news you need to start your day. The three biggest stories of the day, with reporting and analysis",
+   "descriptionPlain": "NPR's Up First is the news you need to start your day. The three biggest stories of the day, with reporting and analysis",
+   "type": "episodic",
+   "title": "Up First from NPR",
+   "language": "en-us",
+   "explicit": null,
+   "author": "NPR",
+   "pubDate": null,
+   "link": "https://www.npr.org/podcasts/510318/up-first"
+  },
+  "episodes": [
+   {
+    "title": "The women who fought back when their jailers assaulted them",
+    "subtitle": "",
+    "description": "Aliksandria Prout had only been at the Central California Women’s Facility for a few days when a male officer stopped he",
+    "descriptionPlain": "Aliksandria Prout had only been at the Central California Women’s Facility for a few days when a male officer stopped he",
+    "pubDate": "Sun, 11 Oct 2026 07:00:00 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "1696",
+    "durationSeconds": 1696,
+    "explicit": "no",
+    "publishedAt": 1791702000000,
+    "enclosure": {
+     "length": "27145282",
+     "type": "audio/mpeg",
+     "url": "https://prfx.byspotify.com/e/play.podtrac.com/npr-510318/npr.simplecastaudio.com/d52bee4a-b10a-40f8-9417-45064e6b8632/episodes/d9f3d9a0-cb0c-4fb8-9903-3ffedd1159b9/audio/128/default.mp3?awCollectionId=d52bee4a-b10a-40f8-9417-45064e6b8632&awEpisodeId=d9f3d9a0-cb0c-4fb8-9903-3ffedd1159b9&feed=HMwRVgVt&t=podcast&e=nx-s1-5996599&p=510318&d=1696&size=27145282"
+    },
+    "guid": "99895a21-c51a-4eab-8a41-cb462d41842d",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   },
+   {
+    "title": "Hurricane Isaias Floods the Panhandle, A Russian Oil Deal, ICE Shooting in New York",
+    "subtitle": "",
+    "description": "The first hurricane of the Atlantic hurricane season strikes the Florida panhandle and drenches the southeast. Trump agr",
+    "descriptionPlain": "The first hurricane of the Atlantic hurricane season strikes the Florida panhandle and drenches the southeast. Trump agr",
+    "pubDate": "Sat, 10 Oct 2026 13:43:06 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "918",
+    "durationSeconds": 918,
+    "explicit": "no",
+    "publishedAt": 1791639786000,
+    "enclosure": {
+     "length": "14697996",
+     "type": "audio/mpeg",
+     "url": "https://prfx.byspotify.com/e/play.podtrac.com/npr-510318/npr.simplecastaudio.com/d52bee4a-b10a-40f8-9417-45064e6b8632/episodes/11fe23c0-82da-4a6b-a2fc-57b24d7c364e/audio/128/default.mp3?awCollectionId=d52bee4a-b10a-40f8-9417-45064e6b8632&awEpisodeId=11fe23c0-82da-4a6b-a2fc-57b24d7c364e&feed=HMwRVgVt&t=podcast&e=nx-s1-5996581&p=510318&d=918&size=14697996"
+    },
+    "guid": "0d509e43-9793-426e-9b35-174e27d1bb5b",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   },
+   {
+    "title": "Bracing For Hurricane Isaias, Ukraine Pushes Russia Back, Iran War Impact On Midterms",
+    "subtitle": "",
+    "description": "Hurricane Isaias is expected to strike near the Alabama-Florida state line as communities prepare for dangerous winds, f",
+    "descriptionPlain": "Hurricane Isaias is expected to strike near the Alabama-Florida state line as communities prepare for dangerous winds, f",
+    "pubDate": "Fri, 09 Oct 2026 09:53:38 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "784",
+    "durationSeconds": 784,
+    "explicit": "no",
+    "publishedAt": 1791539618000,
+    "enclosure": {
+     "length": "12550522",
+     "type": "audio/mpeg",
+     "url": "https://prfx.byspotify.com/e/play.podtrac.com/npr-510318/npr.simplecastaudio.com/d52bee4a-b10a-40f8-9417-45064e6b8632/episodes/618728b8-9e95-48c8-9405-98f2ce3af8fe/audio/128/default.mp3?awCollectionId=d52bee4a-b10a-40f8-9417-45064e6b8632&awEpisodeId=618728b8-9e95-48c8-9405-98f2ce3af8fe&feed=HMwRVgVt&t=podcast&e=nx-s1-5996414&p=510318&d=784&size=12550522"
+    },
+    "guid": "5016f037-5bb9-4f51-9a1d-c0e9be0ba80b",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   },
+   {
+    "title": "Hurricane Isaias Prep, Competitive Midterm Races, Trump's Media Ban In Court",
+    "subtitle": "",
+    "description": "Communities along the Alabama and Florida Gulf Coast are preparing for Hurricane Isaias as officials warn of flooding, d",
+    "descriptionPlain": "Communities along the Alabama and Florida Gulf Coast are preparing for Hurricane Isaias as officials warn of flooding, d",
+    "pubDate": "Thu, 08 Oct 2026 09:41:18 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "812",
+    "durationSeconds": 812,
+    "explicit": "no",
+    "publishedAt": 1791452478000,
+    "enclosure": {
+     "length": "12998575",
+     "type": "audio/mpeg",
+     "url": "https://prfx.byspotify.com/e/play.podtrac.com/npr-510318/npr.simplecastaudio.com/d52bee4a-b10a-40f8-9417-45064e6b8632/episodes/18318ca0-5907-4a19-b552-e13815ace276/audio/128/default.mp3?awCollectionId=d52bee4a-b10a-40f8-9417-45064e6b8632&awEpisodeId=18318ca0-5907-4a19-b552-e13815ace276&feed=HMwRVgVt&t=podcast&e=nx-s1-5994869&p=510318&d=812&size=12998575"
+    },
+    "guid": "b6f59ea7-7798-47af-b12a-374ece183fb8",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   },
+   {
+    "title": "Hurricane Isaias Floods the Panhandle, A Russian Oil Deal, ICE Shooting in New York",
+    "subtitle": "",
+    "description": "The first hurricane of the Atlantic hurricane season strikes the Florida panhandle and drenches the southeast. Trump agr",
+    "descriptionPlain": "The first hurricane of the Atlantic hurricane season strikes the Florida panhandle and drenches the southeast. Trump agr",
+    "pubDate": "Sat, 10 Oct 2026 13:43:06 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "918",
+    "durationSeconds": 918,
+    "explicit": "no",
+    "publishedAt": 1791639786000,
+    "enclosure": {
+     "length": "14697996",
+     "type": "audio/mpeg",
+     "url": "https://prfx.byspotify.com/e/play.podtrac.com/npr-510318/npr.simplecastaudio.com/d52bee4a-b10a-40f8-9417-45064e6b8632/episodes/11fe23c0-82da-4a6b-a2fc-57b24d7c364e/audio/128/default.mp3?awCollectionId=d52bee4a-b10a-40f8-9417-45064e6b8632&awEpisodeId=11fe23c0-82da-4a6b-a2fc-57b24d7c364e&feed=HMwRVgVt&t=podcast&e=nx-s1-5996581&p=510318&d=918&size=14697996"
+    },
+    "guid": "0d509e43-9793-426e-9b35-174e27d1bb5b",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   },
+   {
+    "title": "Bracing For Hurricane Isaias, Ukraine Pushes Russia Back, Iran War Impact On Midterms",
+    "subtitle": "",
+    "description": "Hurricane Isaias is expected to strike near the Alabama-Florida state line as communities prepare for dangerous winds, f",
+    "descriptionPlain": "Hurricane Isaias is expected to strike near the Alabama-Florida state line as communities prepare for dangerous winds, f",
+    "pubDate": "Fri, 09 Oct 2026 09:53:38 +0000",
+    "episodeType": "full",
+    "season": "",
+    "episode": "",
+    "author": "",
+    "duration": "784",
+    "durationSeconds": 784,
+    "explicit": "no",
+    "publishedAt": 1791539618000,
+    "guid": "no-audio",
+    "chaptersUrl": null,
+    "chaptersType": null,
+    "chapters": []
+   }
+  ]
+ }
+}

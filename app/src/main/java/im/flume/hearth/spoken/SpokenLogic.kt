@@ -130,13 +130,51 @@ object FollowTags {
         val others = tags.filterNot { it.equals(mine, ignoreCase = true) }
         return if (follow) others + mine else others
     }
+
+    /** Marks when the last follower left; the server's cleanup job deletes what was on the server before then. */
+    const val UNFOLLOWED_PREFIX = "hearth-unfollowed:"
+
+    fun isUnfollowedMarker(tag: String): Boolean = tag.startsWith(UNFOLLOWED_PREFIX, ignoreCase = true)
+
+    /**
+     * The tags to write when [username] follows or unfollows, given the tags just read from the server.
+     * Following strips any "hearth-unfollowed:" marker. Unfollowing as the last follower replaces any old
+     * marker with "hearth-unfollowed:<[serverNowMs]>"; while someone else still follows, no marker.
+     */
+    fun nextTags(tags: List<String>, username: String, follow: Boolean, serverNowMs: Long): List<String> {
+        val base = withFollower(tags, username, follow).filterNot(::isUnfollowedMarker)
+        return if (!follow && followers(base).isEmpty()) base + (UNFOLLOWED_PREFIX + serverNowMs) else base
+    }
+
+    enum class Heal { NONE, ADD_TAG, REMOVE_TAG }
+
+    /**
+     * Self-heal on sync: this phone remembers what this user last chose ([wantFollow]) for a while after
+     * choosing it. If the server's tags disagree (e.g. a write that never landed), write it again.
+     */
+    fun heal(wantFollow: Boolean?, serverTags: List<String>, username: String): Heal = when {
+        wantFollow == null -> Heal.NONE
+        wantFollow && !isFollowing(serverTags, username) -> Heal.ADD_TAG
+        !wantFollow && isFollowing(serverTags, username) -> Heal.REMOVE_TAG
+        else -> Heal.NONE
+    }
+
+    /** How long a follow / unfollow choice is remembered for [heal]. */
+    const val INTENT_TTL_MS = 3L * 24 * 3_600_000
 }
+
+/** A follow / unfollow this user made on this phone, kept for [FollowTags.heal]. */
+@kotlinx.serialization.Serializable
+data class FollowIntent(val podcastId: String, val username: String, val follow: Boolean, val at: Long)
 
 /** Episode facts the download planner needs. */
 data class EpisodeInfo(val id: String, val publishedAt: Long, val finished: Boolean, val started: Boolean)
 
 /** The phone's download row for an episode, if any. */
 data class DownloadInfo(val state: SpokenDownloadState, val auto: Boolean)
+
+/** One of a show's download rows, for [SpokenDownloadPolicy.unfollowPlan]. */
+data class DownloadRowInfo(val episodeId: String, val state: SpokenDownloadState)
 
 object SpokenDownloadPolicy {
     const val KEEP_UNPLAYED = 3
@@ -150,6 +188,18 @@ object SpokenDownloadPolicy {
         finished && !isCurrent && state != SpokenDownloadState.REMOVED
 
     data class Plan(val toQueue: List<String>, val toRemove: List<String>)
+
+    data class UnfollowPlan(val removeNow: List<String>, val removeLater: List<String>)
+
+    /**
+     * Unfollowing clears a show off this phone: every downloaded (or downloading) episode goes now,
+     * except the one loaded in the player ([currentEpisodeId]), which goes when playback moves on.
+     * Rows already REMOVED are left alone.
+     */
+    fun unfollowPlan(downloads: List<DownloadRowInfo>, currentEpisodeId: String?): UnfollowPlan {
+        val live = downloads.filter { it.state != SpokenDownloadState.REMOVED }.map { it.episodeId }
+        return UnfollowPlan(live.filter { it != currentEpisodeId }, live.filter { it == currentEpisodeId })
+    }
 
     /**
      * Auto-download for a followed show: the newest [keep] episodes not yet finished should be on the
