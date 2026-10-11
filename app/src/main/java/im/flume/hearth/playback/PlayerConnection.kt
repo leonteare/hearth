@@ -187,6 +187,13 @@ class PlayerConnection(private val context: Context) {
         }
     }
 
+    fun pause() = withController { it.pause() }
+
+    fun resume() = withController {
+        if (it.playbackState == Player.STATE_IDLE) it.prepare()
+        it.play()
+    }
+
     fun next() = controller?.seekToNext()
     fun previous() = controller?.seekToPrevious()
     fun seekTo(ms: Long) = controller?.seekTo(ms)

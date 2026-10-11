@@ -125,6 +125,8 @@ class AppContainer(context: Context) {
     val queueInfo = kotlinx.coroutines.flow.MutableStateFlow(im.flume.hearth.playback.QueueInfo())
     val updater = Updater(context, http, appScope)
     val requests = im.flume.hearth.requests.RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
+    /** 30 second previews of music that isn't on the server; separate from the main player. */
+    val preview = im.flume.hearth.playback.PreviewPlayer(context, http, { requests.tidarr }, player, appScope)
 
     /** A page to open, e.g. from a notification tap; AppRoot navigates there and clears it. */
     val pendingRoute = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
