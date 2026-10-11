@@ -40,9 +40,10 @@ object ProgressMerge {
         duration > 0 && (position >= duration * FINISHED_FRACTION || duration - position <= FINISHED_TAIL_SECONDS)
 
     /**
-     * Combines this phone's progress with the server's. The most recent position wins (by lastUpdate,
-     * both on the server's clock); finished is sticky, so if either side finished it, it stays finished,
-     * unless the user marked it unplayed on this phone after the server's update ([localMarkedUnplayed]).
+     * Combines this phone's progress with the server's. The most recent change wins, for position and
+     * for played/unplayed alike (by lastUpdate, both on the server's clock), so marking something
+     * unplayed on another device sticks too. A late, stale offline update can't undo a newer finish,
+     * because it's older. [localMarkedUnplayed] is kept for callers; the timestamp already decides.
      */
     fun merge(local: ProgressSnapshot?, server: ProgressSnapshot?, localMarkedUnplayed: Boolean = false): MergeResult? {
         if (local == null && server == null) return null
@@ -51,8 +52,8 @@ object ProgressMerge {
 
         val localNewer = local.lastUpdate > server.lastUpdate
         val newer = if (localNewer) local else server
-        val unplayedWins = localMarkedUnplayed && localNewer
-        val finished = if (unplayedWins) false else local.isFinished || server.isFinished
+        @Suppress("UNUSED_VARIABLE") val markedUnplayedHere = localMarkedUnplayed
+        val finished = newer.isFinished
         val finishedAt = when {
             !finished -> null
             else -> listOfNotNull(local.finishedAt.takeIf { local.isFinished }, server.finishedAt.takeIf { server.isFinished }).minOrNull()
@@ -66,8 +67,7 @@ object ProgressMerge {
             finishedAt = finishedAt,
         )
         val resumedElsewhere = !localNewer && !finished && abs(server.currentTime - local.currentTime) > JUMP_SECONDS
-        val push = (localNewer && (abs(local.currentTime - server.currentTime) >= 1.0 || local.isFinished != server.isFinished)) ||
-            (finished && !server.isFinished) || (unplayedWins && server.isFinished)
+        val push = localNewer && (abs(local.currentTime - server.currentTime) >= 1.0 || local.isFinished != server.isFinished)
         return MergeResult(merged, if (localNewer) ProgressSource.LOCAL else ProgressSource.SERVER, resumedElsewhere, push)
     }
 }
@@ -145,8 +145,9 @@ object SpokenDownloadPolicy {
      * Delete this phone's copy once this user finished the episode, but never the one that's loaded in
      * the player right now (it may still be playing its last seconds). Books are kept until removed.
      */
-    fun shouldAutoDelete(isEpisode: Boolean, finished: Boolean, isCurrent: Boolean, state: SpokenDownloadState): Boolean =
-        isEpisode && finished && !isCurrent && state != SpokenDownloadState.REMOVED
+    /** A finished episode or book leaves this phone (books stay on the server); never the one playing. */
+    fun shouldAutoDelete(finished: Boolean, isCurrent: Boolean, state: SpokenDownloadState): Boolean =
+        finished && !isCurrent && state != SpokenDownloadState.REMOVED
 
     data class Plan(val toQueue: List<String>, val toRemove: List<String>)
 

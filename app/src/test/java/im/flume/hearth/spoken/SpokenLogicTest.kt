@@ -44,17 +44,22 @@ class SpokenLogicTest {
     }
 
     @Test
-    fun `finished is sticky either way`() {
-        // Server says finished, phone has a newer (re-listen) position: stays finished.
+    fun `the most recent change wins for played and unplayed`() {
+        // Server says finished, phone has a newer position (re-listening): in progress again.
         val a = ProgressMerge.merge(p(30.0, at = 5_000), p(3600.0, at = 1_000, finished = true, finishedAt = 900))!!
-        assertTrue(a.merged.isFinished)
-        assertEquals(900L, a.merged.finishedAt)
-        assertFalse(a.resumedElsewhere)
-        // Phone finished, server has a newer unfinished position (another device lagging): finished, and push.
-        val b = ProgressMerge.merge(p(3500.0, at = 1_000, finished = true, finishedAt = 1_000), p(200.0, at = 5_000))!!
+        assertFalse(a.merged.isFinished)
+        assertTrue(a.pushToServer)
+        // Phone finished after the server's last update: finished, and sent to the server.
+        val b = ProgressMerge.merge(p(3500.0, at = 5_000, finished = true, finishedAt = 5_000), p(200.0, at = 1_000))!!
         assertTrue(b.merged.isFinished)
         assertTrue(b.pushToServer)
-        assertFalse(b.resumedElsewhere)
+        // Marked unplayed on another device after this phone finished it: unplayed here too.
+        val c = ProgressMerge.merge(p(3500.0, at = 1_000, finished = true, finishedAt = 1_000), p(0.0, at = 5_000))!!
+        assertFalse(c.merged.isFinished)
+        assertFalse(c.pushToServer)
+        // A stale offline update can't undo a newer finish.
+        val d = ProgressMerge.merge(p(1200.0, at = 1_000), p(3600.0, at = 5_000, finished = true, finishedAt = 5_000))!!
+        assertTrue(d.merged.isFinished)
     }
 
     @Test
@@ -157,11 +162,10 @@ class SpokenLogicTest {
 
     @Test
     fun `auto delete only finished episodes not playing`() {
-        assertTrue(SpokenDownloadPolicy.shouldAutoDelete(isEpisode = true, finished = true, isCurrent = false, state = SpokenDownloadState.DONE))
-        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(isEpisode = true, finished = true, isCurrent = true, state = SpokenDownloadState.DONE))
-        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(isEpisode = true, finished = false, isCurrent = false, state = SpokenDownloadState.DONE))
-        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(isEpisode = false, finished = true, isCurrent = false, state = SpokenDownloadState.DONE))
-        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(isEpisode = true, finished = true, isCurrent = false, state = SpokenDownloadState.REMOVED))
+        assertTrue(SpokenDownloadPolicy.shouldAutoDelete(finished = true, isCurrent = false, state = SpokenDownloadState.DONE))
+        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(finished = true, isCurrent = true, state = SpokenDownloadState.DONE))
+        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(finished = false, isCurrent = false, state = SpokenDownloadState.DONE))
+        assertFalse(SpokenDownloadPolicy.shouldAutoDelete(finished = true, isCurrent = false, state = SpokenDownloadState.REMOVED))
     }
 
     @Test

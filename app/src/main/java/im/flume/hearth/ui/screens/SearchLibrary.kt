@@ -569,7 +569,7 @@ fun LibraryScreen() {
                         }
                         // Not a playlist: only shown while songs are downloading or failed (always reachable from Settings → Storage).
                         item(key = "downloads") {
-                            val counts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+                            val counts by remember { c.allDownloadCounts() }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
                             val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
                             downloadsShortcutLabel(counts, coming)?.let { label ->
                                 MediaRow(label, null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })

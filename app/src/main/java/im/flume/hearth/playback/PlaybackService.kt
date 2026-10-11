@@ -1019,10 +1019,10 @@ class PlaybackService : MediaSessionService() {
                 val end = now?.timeline?.durationSec ?: 0.0
                 scope.launch {
                     tracker.pause(end)
-                    // A finished episode leaves this phone straight away rather than when the next thing
+                    // A finished episode or book leaves this phone straight away rather than when the next thing
                     // plays: it's no longer held by the player, so deleting it is safe. Playing it again
                     // just streams it from the server.
-                    if (now != null && !now.isBook) {
+                    if (now != null) {
                         c.spoken.downloads.current = null
                         runCatching { c.spoken.downloads.autoDeleteFinished() }
                     }

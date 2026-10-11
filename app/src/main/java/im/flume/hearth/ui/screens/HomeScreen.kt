@@ -82,7 +82,7 @@ fun HomeScreen() {
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
-    val downloadCounts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+    val downloadCounts by remember { c.allDownloadCounts() }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
     val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
     val downloadsLabel = downloadsShortcutLabel(downloadCounts, coming)
     // Yours and ones you've joined; everyone else's stay out of sight.
@@ -234,6 +234,16 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
     in 12..17 -> "Good afternoon"
     else -> "Good evening"
 }
+
+/** Songs plus podcast episodes and audiobooks downloading to this phone, for the Downloads shortcut. */
+fun im.flume.hearth.AppContainer.allDownloadCounts(): kotlinx.coroutines.flow.Flow<im.flume.hearth.data.DownloadCounts> =
+    kotlinx.coroutines.flow.combine(downloads.counts, spoken.downloads.rows) { songs, rows ->
+        im.flume.hearth.data.DownloadCounts(
+            queued = songs.queued + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.QUEUED },
+            downloading = songs.downloading + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.DOWNLOADING },
+            failed = songs.failed + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.FAILED },
+        )
+    }
 
 /**
  * The Downloads shortcut's label while songs are downloading (or failed), or music is on its way to

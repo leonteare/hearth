@@ -169,17 +169,17 @@ class SpokenDownloads(
     /** This user finished an episode: delete this phone's copy (later, if it's the one playing). */
     suspend fun onFinished(libraryItemId: String, episodeId: String) {
         val row = dao.download(libraryItemId, episodeId) ?: return
-        if (SpokenDownloadPolicy.shouldAutoDelete(episodeId.isNotEmpty(), finished = true, isCurrent = current == SpokenKey(libraryItemId, episodeId), state = row.state)) {
+        if (SpokenDownloadPolicy.shouldAutoDelete(finished = true, isCurrent = current == SpokenKey(libraryItemId, episodeId), state = row.state)) {
             deleteLocal(SpokenKey(libraryItemId, episodeId), keepRemovedMarker = true)
         }
     }
 
     /** Deletes downloaded episodes that are finished and not loaded in the player. Run after sync and when playback moves on. */
     suspend fun autoDeleteFinished() {
-        val finished = dao.allProgress().filter { it.isFinished && it.episodeId.isNotEmpty() }.mapTo(HashSet()) { SpokenKey(it.libraryItemId, it.episodeId) }
+        val finished = dao.allProgress().filter { it.isFinished }.mapTo(HashSet()) { SpokenKey(it.libraryItemId, it.episodeId) }
         for (row in dao.downloadsOnce()) {
             val key = SpokenKey(row.libraryItemId, row.episodeId)
-            if (SpokenDownloadPolicy.shouldAutoDelete(!row.isBook, key in finished, key == current, row.state)) deleteLocal(key, keepRemovedMarker = true)
+            if (SpokenDownloadPolicy.shouldAutoDelete(key in finished, key == current, row.state)) deleteLocal(key, keepRemovedMarker = true)
         }
     }
 
