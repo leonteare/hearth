@@ -413,22 +413,31 @@ fun AlbumRow(title: String, albums: List<AlbumEntity>) {
 
 /** Big round play button + shuffle button used on album / playlist / artist headers. */
 @Composable
-fun PlayShuffleButtons(onPlay: () -> Unit, onShuffle: () -> Unit, modifier: Modifier = Modifier, extra: @Composable () -> Unit = {}) {
+fun PlayShuffleButtons(
+    onPlay: () -> Unit,
+    onShuffle: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    /** Spoken label of the play button, e.g. "Play preview" for music not on the server. */
+    playLabel: String = "Play",
+    extra: @Composable () -> Unit = {},
+) {
     val accent = MaterialTheme.colorScheme.primary
     Row(modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
         extra()
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = onShuffle, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Default.Shuffle, "Shuffle", tint = accent, modifier = Modifier.size(28.dp))
+        if (onShuffle != null) {
+            IconButton(onClick = onShuffle, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Default.Shuffle, "Shuffle", tint = accent, modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.width(8.dp))
         }
-        Spacer(Modifier.width(8.dp))
         FilledIconButton(
             onClick = onPlay,
             modifier = Modifier.size(56.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
         ) {
-            Icon(Icons.Default.PlayArrow, "Play", modifier = Modifier.size(32.dp))
+            Icon(Icons.Default.PlayArrow, playLabel, modifier = Modifier.size(32.dp))
         }
     }
 }

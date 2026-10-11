@@ -83,6 +83,8 @@ fun HomeScreen() {
     val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     val downloadCounts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+    val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+    val downloadsLabel = downloadsShortcutLabel(downloadCounts, coming)
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
 
@@ -126,10 +128,10 @@ fun HomeScreen() {
                     add(QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
                     add(QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") })
                     // Only while something is downloading or failed; finished downloads live in their albums and playlists.
-                    if (downloadCounts.active) {
-                        add(QuickTile(downloadCounts.summary, Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
+                    if (downloadsLabel != null) {
+                        add(QuickTile(downloadsLabel, Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
                     }
-                    recent.take(if (downloadCounts.active) 3 else 4).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
+                    recent.take(if (downloadsLabel != null) 3 else 4).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
                 }
             )
         }
@@ -221,4 +223,19 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
     in 5..11 -> "Good morning"
     in 12..17 -> "Good afternoon"
     else -> "Good evening"
+}
+
+/**
+ * The Downloads shortcut's label while songs are downloading (or failed), or music is on its way to
+ * the server; null hides the shortcut.
+ */
+fun downloadsShortcutLabel(counts: im.flume.hearth.data.DownloadCounts, requests: List<im.flume.hearth.data.RequestEntity>): String? {
+    val coming = requests.count { it.status.active }
+    val failed = requests.count { it.status == im.flume.hearth.data.RequestStatus.FAILED }
+    return when {
+        counts.active -> counts.summary
+        coming > 0 -> "Coming to your server · $coming"
+        failed > 0 -> "Downloads · $failed couldn't get"
+        else -> null
+    }
 }

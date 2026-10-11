@@ -31,6 +31,7 @@ import im.flume.hearth.api.TidarrClient
 import im.flume.hearth.api.TidarrConfig
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.AppDatabase
+import im.flume.hearth.data.Availability
 import im.flume.hearth.data.ArtistEntity
 import im.flume.hearth.data.LibraryRepository
 import im.flume.hearth.data.RequestEntity
@@ -79,7 +80,11 @@ class RequestsRepository(
 
     init {
         // Before 2.3.1 a request that produced nothing was marked done ("On the server"); it actually failed.
-        scope.launch { runCatching { dao.allOnce().forEach { r -> RequestTracking.reclassified(r)?.let { dao.upsert(it) } } } }
+        scope.launch {
+            runCatching { dao.allOnce().forEach { r -> RequestTracking.reclassified(r)?.let { dao.upsert(it) } } }
+            // Finished ones are in the library now; nothing lists them any more.
+            runCatching { dao.clearDone() }
+        }
     }
 
     @Volatile private var apiKey: String? = null
@@ -125,7 +130,10 @@ class RequestsRepository(
     suspend fun searchTidal(query: String): TidalSearchResults {
         val raw = tidarr.search(query, limit = 15)
         val filtered = localCatalog().filter(raw)
-        return TidalSearchResults(filtered.tracks.take(5), filtered.albums.take(5), filtered.artists.take(3))
+        val cat = localCatalog()
+        // Artists the server has are shown from the library (their page fills in what's missing).
+        val artists = filtered.artists.filter { cat.localArtist(it.name) == null }
+        return TidalSearchResults(filtered.tracks.take(5), filtered.albums.take(5), artists.take(3))
             .also { synchronized(searchCache) { searchCache[query.lowercase()] = System.currentTimeMillis() to it } }
     }
 
@@ -144,27 +152,81 @@ class RequestsRepository(
         tidarr.countryCode()
     }
 
-    /** A Tidal artist's page, with what of it is already on the server. Throws (safe message) if Tidarr can't be reached. */
-    suspend fun tidalArtist(id: String): TidalArtistView {
-        val page = tidarr.artistPage(id)
-        val cat = localCatalog()
-        return TidalArtistView(
-            page,
-            localArtistId = cat.localArtist(page.artist.name)?.id,
-            localTracks = page.topTracks.mapNotNull { t -> cat.localTrack(t)?.let { t.id to it.id } }.toMap(),
-            localAlbums = (page.albums + page.singles).mapNotNull { a -> cat.localAlbum(a)?.let { a.id to it.id } }.toMap(),
-        )
+    private val artistIds = im.flume.hearth.api.TtlCache<String, String>(max = 100, ttlMs = 10 * 60_000L)
+    private val albumIds = im.flume.hearth.api.TtlCache<String, String>(max = 100, ttlMs = 10 * 60_000L)
+
+    /** True when pages and Search should show music that isn't on the server. */
+    fun enabled(): Boolean = session.settings.value.tidalSearchEnabled
+
+    /**
+     * The remote artist named [name] (exact normalised name), with their popular tracks and releases;
+     * null when there's no such artist. Lookups are cached for 10 minutes. Throws when unreachable.
+     */
+    suspend fun artistByName(name: String): TidalArtistPage? {
+        val key = RequestMatching.baseTitle(name).ifEmpty { name.lowercase() }
+        val id = artistIds.get(key) ?: run {
+            val found = Availability.pickArtist(tidarr.search(name, limit = 10).artists, name)?.id.orEmpty()
+            artistIds.put(key, found)
+            found
+        }
+        return id.takeIf { it.isNotEmpty() }?.let { tidarr.artistPage(it) }
     }
 
-    /** A Tidal album's page, with which tracks (or the whole album) are already on the server. */
-    suspend fun tidalAlbum(id: String): TidalAlbumView {
-        val page = tidarr.albumPage(id)
+    suspend fun artistPage(id: String): TidalArtistPage = tidarr.artistPage(id)
+
+    /** The remote copy of the server's album [title] by [artist], with its tracks; null when not found. Cached 10 minutes. */
+    suspend fun albumByName(title: String, artist: String): TidalAlbumPage? {
+        val key = "$title|$artist".lowercase()
+        val id = albumIds.get(key) ?: run {
+            val q = "${RequestMatching.searchTitle(title)} ${RequestMatching.splitArtists(artist).first()}"
+            val found = Availability.pickAlbum(tidarr.search(q, limit = 15).albums, title, artist)?.id.orEmpty()
+            albumIds.put(key, found)
+            found
+        }
+        return id.takeIf { it.isNotEmpty() }?.let { tidarr.albumPage(it) }
+    }
+
+    suspend fun albumPage(id: String): TidalAlbumPage = tidarr.albumPage(id)
+
+    /** The server's copies of these tracks, by remote track id. */
+    suspend fun ownedTracks(tracks: List<TidalTrack>): Map<String, SongEntity> {
         val cat = localCatalog()
-        return TidalAlbumView(
-            page,
-            localAlbumId = cat.localAlbum(page.album)?.id,
-            localTracks = page.tracks.mapNotNull { t -> cat.localTrack(t)?.let { t.id to it.id } }.toMap(),
-        )
+        return tracks.mapNotNull { t -> cat.localTrack(t)?.let { t.id to it } }.toMap()
+    }
+
+    /** The server's copies of these albums, by remote album id. */
+    suspend fun ownedAlbums(albums: List<TidalAlbum>): Map<String, AlbumEntity> {
+        val cat = localCatalog()
+        return albums.mapNotNull { a -> cat.localAlbum(a)?.let { a.id to it } }.toMap()
+    }
+
+    suspend fun localArtist(name: String): ArtistEntity? = localCatalog().localArtist(name)
+
+    // --- following artists the server doesn't have yet ---
+
+    private val prefs = context.getSharedPreferences("get-music", Context.MODE_PRIVATE)
+    private val _followIntents = kotlinx.coroutines.flow.MutableStateFlow(prefs.getStringSet("follow", emptySet()).orEmpty().toSet())
+
+    /** Names of artists followed before the server had them; they're followed for real once their music arrives. */
+    val followIntents: kotlinx.coroutines.flow.StateFlow<Set<String>> = _followIntents
+
+    fun setFollowIntent(name: String, follow: Boolean) {
+        val n = im.flume.hearth.data.SearchIndex.norm(name)
+        val next = if (follow) _followIntents.value + n else _followIntents.value - n
+        _followIntents.value = next
+        prefs.edit().putStringSet("follow", next).apply()
+    }
+
+    fun isFollowIntent(name: String): Boolean = im.flume.hearth.data.SearchIndex.norm(name) in _followIntents.value
+
+    /** Follows the server's artist for any arrived music whose artist was followed early. */
+    private suspend fun applyFollowIntents(credits: List<Pair<String, String?>>) {
+        if (_followIntents.value.isEmpty()) return
+        for ((artist, artistId) in credits) {
+            if (artistId == null) continue
+            val hit = _followIntents.value.firstOrNull { RequestMatching.artistMatches(listOf(it), artist) } ?: continue
+            runCatching { library.setArtistFollowed(artistId, true) }.onSuccess { setFollowIntent(hit, false) }
+        }
     }
 
     /** Checks that Tidarr answers at [url] and can search. Returns null when fine, or what went wrong. */
@@ -420,6 +482,7 @@ class RequestsRepository(
                     runCatching { api.album(id) }.getOrNull()?.let { lib.insertMissingAlbums(listOf(it.toEntity())) }
                 }
                 found.songs.forEach { s -> runCatching { library.setStarred(s.id, true) } }
+                applyFollowIntents(found.songs.map { it.artist to it.artistId })
                 downloads.download(library.songsByIds(found.songs.map { it.id }))
                 matched = found.songs.map { it.id }
                 route = found.songs.firstOrNull()?.albumId?.let { "album/${Uri.encode(it)}" }
@@ -428,6 +491,7 @@ class RequestsRepository(
                 lib.insertMissingSongs(found.songs)
                 lib.insertMissingAlbums(listOf(found.album))
                 runCatching { library.setAlbumSaved(found.album.id, true) }
+                applyFollowIntents(listOf(found.album.artist to found.album.artistId))
                 downloads.pinAndDownload(DownloadRepository.KIND_ALBUM, found.album.id, found.songs)
                 matched = listOf(found.album.id)
                 route = "album/${Uri.encode(found.album.id)}"
@@ -435,6 +499,7 @@ class RequestsRepository(
             is Found.Artist -> {
                 lib.insertMissingArtists(listOf(found.artist))
                 runCatching { library.setArtistFollowed(found.artist.id, true) }
+                setFollowIntent(found.artist.name, false)
                 matched = listOf(found.artist.id)
                 route = "artist/${Uri.encode(found.artist.id)}"
                 // The whole discography arrives with the next full sync; nothing is downloaded to the phone.
@@ -467,10 +532,10 @@ class RequestsRepository(
     private fun notifyDone(r: RequestEntity, title: String, text: String?, route: String?) {
         runCatching {
             val nm = context.getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Requests", NotificationManager.IMPORTANCE_DEFAULT))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, "New music", NotificationManager.IMPORTANCE_DEFAULT))
             val intent = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                .putExtra(MainActivity.EXTRA_ROUTE, route ?: "requests")
+                .putExtra(MainActivity.EXTRA_ROUTE, route ?: "downloads")
             val id = "${r.type}:${r.tidalId}".hashCode()
             val pending = PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val n = NotificationCompat.Builder(context, CHANNEL)
@@ -492,21 +557,6 @@ class RequestsRepository(
         private const val SCAN_POLL_MS = 10_000L
     }
 }
-
-/** A Tidal artist page plus local ids: [localTracks] and [localAlbums] map Tidal ids to the server's. */
-data class TidalArtistView(
-    val page: TidalArtistPage,
-    val localArtistId: String?,
-    val localTracks: Map<String, String>,
-    val localAlbums: Map<String, String>,
-)
-
-/** A Tidal album page plus local ids; [localAlbumId] is set when the whole album is already on the server. */
-data class TidalAlbumView(
-    val page: TidalAlbumPage,
-    val localAlbumId: String?,
-    val localTracks: Map<String, String>,
-)
 
 /** Follows requests every 15 minutes while the app is closed; cancels itself once nothing is in progress. */
 class RequestsWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {

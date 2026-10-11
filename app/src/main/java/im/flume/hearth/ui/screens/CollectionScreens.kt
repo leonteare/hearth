@@ -97,6 +97,14 @@ import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.SongEntity
+import im.flume.hearth.data.SongItem
+import im.flume.hearth.data.RequestEntity
+import im.flume.hearth.api.tidalImageUrl
+import im.flume.hearth.ui.components.AvailabilityIcon
+import im.flume.hearth.ui.components.MissingSongRow
+import im.flume.hearth.ui.components.RemoteCover
+import im.flume.hearth.ui.components.formatDuration
+import im.flume.hearth.ui.theme.NotOnServerAlpha
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.BackButton
@@ -122,6 +130,17 @@ import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.components.formatLongDuration
 import im.flume.hearth.ui.theme.TextSecondary
 
+/** Header of a page for music that isn't on the server: its artwork, a status line, and what Play does (a preview). */
+data class RemoteHeader(
+    val coverUuid: String?,
+    /** Replaces the "N songs • duration" line. */
+    val info: String,
+    /** "Not on your server yet", "Coming to your server…". */
+    val status: String,
+    val request: RequestEntity?,
+    val onPlay: () -> Unit,
+)
+
 /** Pin target for the download toggle: albums and playlists stay in sync; other lists are one-off downloads. */
 data class PinTarget(val kind: String, val id: String)
 
@@ -145,6 +164,13 @@ fun CollectionScreen(
     /** Albums only: whether it's in Your Library. Null hides the heart. */
     saved: Boolean? = null,
     onSavedChange: (Boolean) -> Unit = {},
+    /**
+     * The list to show when it includes songs that aren't on the server (in album order); null shows
+     * [songs]. Owned items must be in [songs].
+     */
+    tracks: List<SongItem>? = null,
+    /** Music not on the server: artwork from the remote image server, a dimmed header and this status line. */
+    remote: RemoteHeader? = null,
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -160,7 +186,8 @@ fun CollectionScreen(
         (pin == null || isPinned) &&
             songs.any { downloads[it.id] == DownloadState.QUEUED || downloads[it.id] == DownloadState.DOWNLOADING }
     }
-    val headerColor = rememberCoverColor(cover)
+    val headerColor = rememberCoverColor(cover, imageUrl = remote?.let { tidalImageUrl(it.coverUuid, 160) })
+    val onPlay: () -> Unit = remote?.onPlay ?: { actions.play(source) }
     var confirmCancel by remember { mutableStateOf(false) }
     if (confirmCancel) {
         AlertDialog(
@@ -242,17 +269,36 @@ fun CollectionScreen(
     }
     val showBar by remember { derivedStateOf { barAlpha > 0f } }
     val wide = isWideWindow()
-    val subtitleLine = listOfNotNull(subtitle.takeIf { it.isNotBlank() }, plural(songs.size, "song"), formatLongDuration(totalSec).takeIf { totalSec > 0 })
+    val subtitleLine = remote?.info ?: listOfNotNull(subtitle.takeIf { it.isNotBlank() }, plural(songs.size, "song"), formatLongDuration(totalSec).takeIf { totalSec > 0 })
         .joinToString(" • ")
+    val titleColor = if (remote != null) Color.White.copy(alpha = NotOnServerAlpha) else Color.Unspecified
     val art: @Composable (Dp) -> Unit = { size ->
-        if (headerIcon != null) headerIcon(size) else CoverArt(cover, size, requestSize = 600, fallback = title)
+        when {
+            remote != null -> Box(Modifier.size(size).clip(HearthShapes.Cover)) { RemoteCover(remote.coverUuid, title, 640) }
+            headerIcon != null -> headerIcon(size)
+            else -> CoverArt(cover, size, requestSize = 600, fallback = title)
+        }
+    }
+    val statusLine: @Composable (TextAlign) -> Unit = { align ->
+        remote?.let { r ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (align == TextAlign.Center) Arrangement.Center else Arrangement.Start,
+            ) {
+                AvailabilityIcon(r.request)
+                Spacer(Modifier.width(4.dp))
+                Text(r.status, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
     val buttons: @Composable () -> Unit = {
             PlayShuffleButtons(
-                onPlay = { actions.play(source) },
-                onShuffle = { actions.play(source, shuffle = true) },
+                onPlay = onPlay,
+                onShuffle = if (remote != null) null else ({ actions.play(source, shuffle = true) }),
+                playLabel = if (remote != null) "Play preview" else "Play",
                 extra = {
-                    DownloadToggle(
+                    if (remote == null) DownloadToggle(
                         downloaded = allDownloaded || (isPinned && !anyDownloading),
                         progress = if (anyDownloading) doneCount.toFloat() / songs.size.coerceAtLeast(1) else null,
                     ) {
@@ -273,7 +319,12 @@ fun CollectionScreen(
                         IconButton(onClick = { onSavedChange(!saved) }) {
                             Icon(
                                 if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                if (saved) "Remove from Your Library" else "Save to Your Library",
+                                when {
+                                    remote != null && saved -> "Stop getting this album"
+                                    remote != null -> "Get this album"
+                                    saved -> "Remove from Your Library"
+                                    else -> "Save to Your Library"
+                                },
                                 tint = if (saved) accent else TextSecondary,
                                 modifier = Modifier.size(28.dp),
                             )
@@ -303,18 +354,19 @@ fun CollectionScreen(
                         Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
                             art(160.dp)
                             Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter))
+                                Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, modifier = Modifier.padding(horizontal = Dimens.Gutter))
                                 Text(
                                     subtitleLine, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp),
                                 )
+                                statusLine(TextAlign.Start)
                                 buttons()
                             }
                         }
                     } else {
                         art(220.dp)
                         Spacer(Modifier.height(16.dp))
-                        Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+                        Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
                         Text(
                             subtitleLine,
                             color = TextSecondary,
@@ -322,6 +374,7 @@ fun CollectionScreen(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                         )
+                        statusLine(TextAlign.Center)
                     }
                 }
             }
@@ -329,34 +382,65 @@ fun CollectionScreen(
         if (!wide) item { buttons() }
         topContent()
         if (emptyState != null) item(key = "empty") { emptyState() }
-        val multiDisc = showTrackNumbers && songs.any { it.disc != songs[0].disc }
-        itemsIndexed(songs, key = { i, _ -> keys[i] }) { index, song ->
+        val songRow: @Composable (Int, SongEntity) -> Unit = { index, song ->
             val key = keys[index]
-            Column(Modifier.animateItem()) {
-                if (multiDisc && (index == 0 || songs[index - 1].disc != song.disc)) {
-                    Text(
-                        "Disc ${song.disc}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(start = 16.dp, top = if (index == 0) 4.dp else 16.dp, bottom = 4.dp),
-                    )
+            SongRow(
+                song,
+                onClick = {
+                    val sel = selection
+                    if (sel != null) selection = (if (key in sel) sel - key else sel + key).takeIf { it.isNotEmpty() }
+                    else actions.play(source, startSongId = song.id)
+                },
+                onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
+                showCover = !showTrackNumbers,
+                leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
+                selected = selection?.let { key in it },
+                onLongPress = {
+                    if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
+                    selection = (selection ?: emptySet()) + key
+                },
+            )
+        }
+        val discHeader: @Composable (Int, Boolean) -> Unit = { disc, first ->
+            Text(
+                "Disc $disc",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextSecondary,
+                modifier = Modifier.padding(start = 16.dp, top = if (first) 4.dp else 16.dp, bottom = 4.dp),
+            )
+        }
+        if (tracks == null) {
+            val multiDisc = showTrackNumbers && songs.any { it.disc != songs[0].disc }
+            itemsIndexed(songs, key = { i, _ -> keys[i] }) { index, song ->
+                Column(Modifier.animateItem()) {
+                    if (multiDisc && (index == 0 || songs[index - 1].disc != song.disc)) discHeader(song.disc, index == 0)
+                    songRow(index, song)
                 }
-                SongRow(
-                    song,
-                    onClick = {
-                        val sel = selection
-                        if (sel != null) selection = (if (key in sel) sel - key else sel + key).takeIf { it.isNotEmpty() }
-                        else actions.play(source, startSongId = song.id)
-                    },
-                    onRemoveFromPlaylist = onRemoveSong?.let { remove -> { remove(index) } },
-                    showCover = !showTrackNumbers,
-                    leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
-                    selected = selection?.let { key in it },
-                    onLongPress = {
-                        if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
-                        selection = (selection ?: emptySet()) + key
-                    },
-                )
+            }
+        } else {
+            // Songs the server doesn't have sit among the ones it does, dimmed, in album order.
+            fun disc(item: SongItem) = when (item) {
+                is SongItem.Owned -> item.song.disc
+                is SongItem.Missing -> item.track.volumeNumber ?: 1
+            }
+            val multiDisc = showTrackNumbers && tracks.any { disc(it) != disc(tracks[0]) }
+            val indexById = songs.withIndex().associate { it.value.id to it.index }
+            itemsIndexed(tracks, key = { _, item -> item.key }) { index, item ->
+                Column(Modifier.animateItem()) {
+                    if (multiDisc && (index == 0 || disc(tracks[index - 1]) != disc(item))) discHeader(disc(item), index == 0)
+                    when (item) {
+                        is SongItem.Owned -> indexById[item.song.id]?.let { songRow(it, item.song) }
+                        is SongItem.Missing -> MissingSongRow(
+                            item.track,
+                            leading = if (showTrackNumbers) item.track.trackNumber?.toString() ?: "–" else null,
+                            showCover = !showTrackNumbers,
+                            subtitle = listOfNotNull(
+                                item.track.artist.ifBlank { null },
+                                item.track.durationSec?.takeIf { it > 0 }?.let { formatDuration(it.toLong()) },
+                            ).joinToString(" · "),
+                        )
+                    }
+                }
             }
         }
         extraContent()
@@ -389,7 +473,7 @@ fun CollectionScreen(
                 BackButton()
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 FilledIconButton(
-                    onClick = { actions.play(source) },
+                    onClick = onPlay,
                     // 40dp circle inside a 48dp touch target.
                     modifier = Modifier.minimumInteractiveComponentSize().size(40.dp),
                     shape = CircleShape,
@@ -423,36 +507,6 @@ private fun SelectionBar(
         IconButton(onClick = onPlaylist) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist") }
         IconButton(onClick = onDownload) { Icon(Icons.Outlined.ArrowCircleDown, "Download") }
     }
-}
-
-@Composable
-fun AlbumScreen(id: String) {
-    val dao = LocalContext.current.container.db.library()
-    val album by remember(id) { dao.album(id) }.collectAsStateWithLifecycle(null)
-    val songs by remember(id) { dao.albumSongs(id) }.collectAsStateWithLifecycle(emptyList())
-    val a = album
-    val actions = LocalActions.current
-    CollectionScreen(
-        title = a?.name ?: songs.firstOrNull()?.album.orEmpty(),
-        subtitle = listOfNotNull(a?.artist, a?.year?.toString()).joinToString(" • "),
-        cover = a?.coverArt ?: songs.firstOrNull()?.coverArt,
-        songs = songs,
-        source = PlaySource(PlaySource.Kind.ALBUM, id, a?.name.orEmpty()),
-        pin = PinTarget(DownloadRepository.KIND_ALBUM, id),
-        showTrackNumbers = true,
-        saved = a?.starred,
-        onSavedChange = { actions.setAlbumSaved(id, it) },
-        extraContent = {
-            item { AlbumDetails(a, id, songs.size, songs.sumOf { it.durationSec.toLong() }) }
-            a?.artistId?.let { artistId ->
-                item {
-                    TextButton(onClick = { actions.openArtist(artistId) }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text("More by ${a.artist}")
-                    }
-                }
-            }
-        },
-    )
 }
 
 @Composable
@@ -726,101 +780,6 @@ fun PlaylistEditScreen(id: String) {
                 }
             }
         }
-    }
-}
-
-@Composable
-fun ArtistScreen(id: String) {
-    val dao = LocalContext.current.container.db.library()
-    val artist by remember(id) { dao.artist(id) }.collectAsStateWithLifecycle(null)
-    val songs by remember(id) { dao.artistSongs(id) }.collectAsStateWithLifecycle(emptyList())
-    val albums by remember(id) { dao.artistAlbums(id) }.collectAsStateWithLifecycle(emptyList())
-    val actions = LocalActions.current
-    val name = artist?.name ?: songs.firstOrNull()?.artist.orEmpty()
-    val source = PlaySource(PlaySource.Kind.ARTIST, id, name)
-
-    val wide = isWideWindow()
-    val artistCover = artist?.coverArt ?: albums.firstOrNull()?.coverArt
-    val counts = "${plural(albums.size, "album")} • ${plural(songs.size, "song")}"
-    val buttons: @Composable () -> Unit = {
-        PlayShuffleButtons(
-            onPlay = { actions.play(source) },
-            onShuffle = { actions.play(source, shuffle = true) },
-            extra = {
-                artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
-                Spacer(Modifier.width(4.dp))
-                TextButton(onClick = { actions.startArtistRadio(id, name) }) {
-                    Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Radio")
-                }
-            },
-        )
-    }
-
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item {
-            val artistColor = rememberCoverColor(artistCover)
-            Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(artistColor, Color.Transparent)))) {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.fillMaxWidth()) { BackButton() }
-                    if (wide) {
-                        Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
-                            CoverArt(artistCover, 160.dp, Modifier.clip(CircleShape), requestSize = 600, fallback = name)
-                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text(name, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter))
-                                Text(counts, color = TextSecondary, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp))
-                                buttons()
-                            }
-                        }
-                    } else {
-                        CoverArt(artistCover, 180.dp, Modifier.clip(CircleShape), requestSize = 600)
-                        Spacer(Modifier.height(16.dp))
-                        Text(name, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-                        Text(counts, color = TextSecondary, modifier = Modifier.padding(4.dp))
-                    }
-                }
-            }
-        }
-        if (!wide) item { buttons() }
-        if (songs.isNotEmpty()) {
-            item { SectionHeader("Popular") }
-            items(songs.take(5), key = { "top:${it.id}" }) { s ->
-                SongRow(s, onClick = { actions.play(PlaySource(PlaySource.Kind.SONGS, label = name, songIds = songs.map { it.id }), startSongId = s.id) })
-            }
-        }
-        if (albums.isNotEmpty()) {
-            item {
-                SectionHeader("Albums")
-                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
-                    items(albums, key = { it.id }) { al ->
-                        MediaCard(al.name, al.year?.toString().orEmpty(), onClick = { actions.openAlbum(al.id) }, coverArt = al.coverArt)
-                    }
-                }
-            }
-        }
-        if (songs.size > 5) {
-            item { SectionHeader("All songs") }
-            items(songs.drop(5), key = { "all:${it.id}" }) { s ->
-                SongRow(s, onClick = { actions.play(source, startSongId = s.id) })
-            }
-        }
-        item { ArtistAbout(id) }
-    }
-}
-
-/** Outlined pill: "Follow" adds the artist to Your Library, "Following" when they're already there. */
-@Composable
-private fun FollowButton(following: Boolean, onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    OutlinedButton(
-        onClick = onClick,
-        shape = CircleShape,
-        border = BorderStroke(1.dp, if (following) accent else TextSecondary),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-        modifier = Modifier.height(32.dp),
-    ) {
-        Text(if (following) "Following" else "Follow", color = if (following) accent else Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }
 

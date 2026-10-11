@@ -90,8 +90,8 @@ fun SettingsScreen() {
     val actions = LocalActions.current
     SettingsPage("Settings") {
         listOf(
-            Triple("General", "Account, library, requests, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
-            Triple("Storage", "Downloads, cache", Icons.Outlined.Storage) to "settings/storage",
+            Triple("General", "Account, library, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
+            Triple("Storage", "Downloads, cache, getting music you don't have", Icons.Outlined.Storage) to "settings/storage",
             Triple("Appearance", "Accent colour, lyrics", Icons.Outlined.Palette) to "settings/appearance",
         ).forEach { (row, route) ->
             val (title, subtitle, icon) = row
@@ -139,8 +139,6 @@ fun GeneralSettings() {
             title = if (sync is SyncState.Running) "Syncing…" else "Resync library now",
             subtitle = (sync as? SyncState.Failed)?.message ?: "Fetches any changes from Navidrome",
         ) { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } }
-
-        TidarrSettings()
 
         Section("Playback")
         Choice("Volume levelling", settings.volumeLevelling, listOf(0 to "Off", 1 to "Per song", 2 to "Per album")) { v ->
@@ -252,6 +250,8 @@ fun StorageSettings() {
             "Cache size changes apply after the app restarts.",
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
+
+        GetMusicSettings()
     }
 
     if (confirmRemoveAll) {
@@ -376,14 +376,17 @@ private fun Choice(title: String, value: Int, options: List<Pair<Int, String>>, 
     ChoiceSheet(open, title, options, value, onDismiss = { open = false }, onPick = onChange)
 }
 
-/** Requests (Tidarr): where Tidarr is, its optional API key, a connection test, and the Search toggle. */
+/**
+ * Getting music you don't have: where Tidarr is (it fetches music onto the server), its optional API
+ * key, a connection test, and whether Search and artist pages show music that isn't on the server.
+ * The one place the service is named.
+ */
 @Composable
-private fun TidarrSettings() {
+private fun GetMusicSettings() {
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val scope = rememberCoroutineScope()
     val settings by c.session.settings.collectAsStateWithLifecycle()
-    val requests by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
     var url by remember { mutableStateOf(settings.tidarrUrl) }
     var key by remember { mutableStateOf("") }
     var keyLoaded by remember { mutableStateOf(false) }
@@ -401,9 +404,9 @@ private fun TidarrSettings() {
         scope.launch { withContext(Dispatchers.IO) { c.requests.setApiKey(key) } }
     }
 
-    Section("Requests (Tidarr)")
+    Section("Get music you don't have")
     Text(
-        "Search can show music that isn't on your server yet. Requesting it asks Tidarr to fetch it into your library; it's then liked and downloaded to this phone.",
+        "Search and artist pages can show music that isn't on your server yet. Tap a song to hear a preview; tap ♡ and Tidarr fetches it onto your server, then it's added to your library and downloaded to this phone.",
         color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
     )
     androidx.compose.material3.OutlinedTextField(
@@ -441,16 +444,7 @@ private fun TidarrSettings() {
             style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
-    Toggle("Show Tidal results in Search", settings.tidalInSearch, "Under your library's results, for music not on the server") { v ->
+    Toggle("Show music you don't have in Search and artist pages", settings.tidalInSearch, "Shown dimmed, after your own music") { v ->
         c.session.updateSettings { it.copy(tidalInSearch = v) }
     }
-    val inProgress = requests.count { it.status.active }
-    Clickable(
-        "Your requests",
-        when {
-            requests.isEmpty() -> "Nothing requested yet"
-            inProgress > 0 -> "$inProgress in progress"
-            else -> "${requests.size} requested"
-        },
-    ) { actions.open("requests") }
 }

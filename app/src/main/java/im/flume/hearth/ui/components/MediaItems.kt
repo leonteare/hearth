@@ -57,6 +57,8 @@ fun MediaRow(
     enabled: Boolean = true,
     titleColor: Color = Color.Unspecified,
     subtitleColor: Color = TextSecondary,
+    /** Small status icon before the subtitle (e.g. the not-on-your-server cloud). */
+    subtitleIcon: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val click = if (onClick != null || onLongClick != null) {
@@ -88,7 +90,13 @@ fun MediaRow(
         Column(Modifier.weight(1f)) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = titleColor, style = MaterialTheme.typography.bodyLarge)
             subtitle?.let {
-                Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = subtitleColor, style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (subtitleIcon != null) {
+                        subtitleIcon()
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = subtitleColor, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
         trailing?.invoke(this)
@@ -108,6 +116,7 @@ fun IconTile(icon: ImageVector, color: Color) {
  * to the card. [round] makes the cover a circle and centres the text (artists). [cover] replaces the
  * artwork (e.g. a mix's 2x2 grid).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaCard(
     title: String,
@@ -118,20 +127,35 @@ fun MediaCard(
     width: Dp = Dimens.CardWidth,
     round: Boolean = false,
     subtitleLines: Int = 1,
+    /** Not on the server yet: title and subtitle dimmed (the cover isn't). */
+    dimmed: Boolean = false,
+    /** Small status icon before the subtitle. */
+    subtitleIcon: (@Composable () -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     cover: (@Composable () -> Unit)? = null,
 ) {
     val align = if (round) TextAlign.Center else TextAlign.Start
-    Column(modifier.width(width).clip(HearthShapes.Card).clickable(onClick = onClick)) {
+    val textAlpha = if (dimmed) im.flume.hearth.ui.theme.NotOnServerAlpha else 1f
+    Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         if (cover != null) cover()
         else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title)
         Spacer(Modifier.height(8.dp))
-        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = CardTitleStyle, textAlign = align, modifier = Modifier.fillMaxWidth())
+        Text(
+            title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = CardTitleStyle, textAlign = align,
+            color = Color.White.copy(alpha = textAlpha), modifier = Modifier.fillMaxWidth(),
+        )
         subtitle?.let {
-            Text(
-                it, maxLines = subtitleLines, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelMedium, color = TextSecondary,
-                textAlign = align, modifier = Modifier.fillMaxWidth(),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (subtitleIcon != null) {
+                    subtitleIcon()
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    it, maxLines = subtitleLines, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelMedium, color = TextSecondary.copy(alpha = textAlpha),
+                    textAlign = align, modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }

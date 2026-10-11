@@ -31,10 +31,10 @@ data class Settings(
     val smartShuffle: Boolean = true,
     /** Tidarr, for requesting music that isn't on the server. Blank = not set up. */
     val tidarrUrl: String = DEFAULT_TIDARR_URL,
-    /** Show "On Tidal" results under the library results in Search. */
+    /** Show music that isn't on the server (dimmed) in Search and on artist and album pages. */
     val tidalInSearch: Boolean = true,
 ) {
-    /** Tidal results are shown when switched on and Tidarr has an address. */
+    /** Music not on the server is shown when switched on and Tidarr has an address. */
     val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank()
 
     companion object {

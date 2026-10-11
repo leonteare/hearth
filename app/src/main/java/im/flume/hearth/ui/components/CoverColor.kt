@@ -50,13 +50,15 @@ private val coverColorCache = LruCache<String, Color>(200)
 
 /** A rich but dark-enough colour taken from the cover art, for header gradients. Fades in once known. */
 @Composable
-fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback): Color {
+fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback, imageUrl: String? = null): Color {
     val context = LocalContext.current
     val actions = LocalActions.current
-    var found by remember(coverArt) { mutableStateOf(coverArt?.let { coverColorCache.get(it) }) }
-    LaunchedEffect(coverArt) {
-        if (coverArt == null || found != null) return@LaunchedEffect
-        val url = actions.coverUrl(coverArt, 120) ?: return@LaunchedEffect
+    // [imageUrl] is for artwork that isn't the server's (music not on it yet); it's also the cache key.
+    val key = coverArt ?: imageUrl
+    var found by remember(key) { mutableStateOf(key?.let { coverColorCache.get(it) }) }
+    LaunchedEffect(key) {
+        if (key == null || found != null) return@LaunchedEffect
+        val url = (if (coverArt != null) actions.coverUrl(coverArt, 120) else imageUrl) ?: return@LaunchedEffect
         val request = ImageRequest.Builder(context).data(url).size(120).allowHardware(false).build()
         val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return@LaunchedEffect
         val bitmap = result.image.toBitmap()
@@ -64,7 +66,7 @@ fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback):
         val swatch = palette.vibrantSwatch ?: palette.darkVibrantSwatch ?: palette.dominantSwatch ?: return@LaunchedEffect
         // Pull well towards black so white and secondary text on top stay readable, even on bright covers.
         val colour = lerp(Color(swatch.rgb), Color.Black, 0.55f)
-        coverColorCache.put(coverArt, colour)
+        coverColorCache.put(key, colour)
         found = colour
     }
     val color by animateColorAsState(found ?: fallback, tween(500), label = "cover")

@@ -27,6 +27,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
+import im.flume.hearth.data.RequestEntity
+import im.flume.hearth.data.RequestStatus
+import im.flume.hearth.api.TidalType
+import im.flume.hearth.ui.components.AvailabilityIcon
+import im.flume.hearth.ui.components.LocalGetMusic
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.RemoteCover
+import im.flume.hearth.ui.components.comingLabel
+import im.flume.hearth.ui.components.remoteAlbumId
+import im.flume.hearth.ui.components.remoteArtistId
+import im.flume.hearth.ui.theme.NotOnServerAlpha
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.ui.components.BannerCard
@@ -70,6 +86,10 @@ fun DownloadsScreen() {
     val backingOff by c.downloads.backingOff.collectAsStateWithLifecycle()
     val storageFull by c.downloads.storageFull.collectAsStateWithLifecycle()
     var confirmCancelAll by remember { mutableStateOf(false) }
+    // Music on its way to the server (it then downloads here). Look now rather than at the next round.
+    val requests by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+    val coming = remember(requests) { requests.filter { it.status.active || it.status == RequestStatus.FAILED } }
+    LaunchedEffect(Unit) { runCatching { c.requests.poll() } }
 
     val groups = remember(pending, states) { pending.groupBy { states[it.id] ?: DownloadState.QUEUED } }
     val downloading = groups[DownloadState.DOWNLOADING].orEmpty()
@@ -97,14 +117,18 @@ fun DownloadsScreen() {
     Column(Modifier.fillMaxSize()) {
         TopBar("Downloads")
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            if (pending.isEmpty()) {
+            if (coming.isNotEmpty()) {
+                item(key = "c-head") { SectionHeader("Coming to your server") }
+                items(coming, key = { "c:${it.type}:${it.tidalId}" }) { r -> ComingRow(r, Modifier.animateItem()) }
+            }
+            if (pending.isEmpty() && coming.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
                         Icons.Outlined.ArrowCircleDown,
                         "No downloads in progress. Tap the download button on an album or playlist to keep it on your phone.",
                     )
                 }
-            } else {
+            } else if (pending.isNotEmpty()) {
                 item(key = "status") {
                     val (title, body) = when {
                         left == 0 -> "Nothing downloading" to null
@@ -176,6 +200,41 @@ private fun LazyListScope.finishedSection(finished: List<SongEntity>, onPlay: (S
     if (finished.isEmpty()) return
     item(key = "done-head") { SectionHeader("Finished") }
     items(finished, key = { "done:${it.id}" }) { song -> Column(Modifier.animateItem()) { SongRow(song, onClick = { onPlay(song) }) } }
+}
+
+/** Something on its way to the server: where it is, and ⋯ to try again or cancel. */
+@Composable
+private fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
+    val actions = LocalActions.current
+    val get = LocalGetMusic.current
+    val failed = r.status == RequestStatus.FAILED
+    val what = when (r.type) {
+        TidalType.ALBUM.api -> "Album · ${r.artist}"
+        TidalType.ARTIST.api -> "All their music"
+        else -> r.artist
+    }
+    MediaRow(
+        title = r.title,
+        subtitle = listOfNotNull(comingLabel(r), what).joinToString(" · "),
+        onClick = {
+            when (r.type) {
+                TidalType.ALBUM.api -> actions.openAlbum(remoteAlbumId(r.tidalId))
+                TidalType.ARTIST.api -> actions.openArtist(remoteArtistId(r.tidalId))
+                else -> get.requestMenu = r
+            }
+        },
+        onLongClick = { get.requestMenu = r },
+        modifier = modifier,
+        round = r.type == TidalType.ARTIST.api,
+        cover = { RemoteCover(r.coverUuid, r.title) },
+        titleColor = Color.White.copy(alpha = NotOnServerAlpha),
+        subtitleColor = if (failed) Destructive else TextSecondary,
+        subtitleIcon = { AvailabilityIcon(r) },
+        trailing = {
+            if (failed) TextButton(onClick = { get.retry(r) }) { Text("Try again") }
+            IconButton(onClick = { get.requestMenu = r }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        },
+    )
 }
 
 @Composable

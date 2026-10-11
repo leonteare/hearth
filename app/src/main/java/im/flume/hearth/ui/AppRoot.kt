@@ -308,6 +308,12 @@ fun AppRoot() {
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     val downloads by c.downloads.states.collectAsStateWithLifecycle(emptyMap())
     val rowContext = RowContext(playerState.current?.mediaId, online, downloads)
+    // Music that isn't on the server: what's on its way, the preview playing, and the hearts that get it.
+    val requestList by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+    val requestsByKey = remember(requestList) { requestList.associateBy { "${it.type}:${it.tidalId}" } }
+    val preview by c.preview.current.collectAsStateWithLifecycle()
+    val getMusic = im.flume.hearth.ui.components.rememberGetMusic(c, actions)
+    LaunchedEffect(Unit) { c.preview.messages.collect { actions.showMessage(it) } }
 
     // The tab you're "in" is the last tab page on the back stack, even when deep inside an album.
     val backStack by nav.currentBackStack.collectAsStateWithLifecycle()
@@ -341,7 +347,13 @@ fun AppRoot() {
     val landscape = config.screenWidthDp > config.screenHeightDp
     val ease = FastOutSlowInEasing
 
-    CompositionLocalProvider(LocalActions provides actions, LocalRowContext provides rowContext) {
+    CompositionLocalProvider(
+        LocalActions provides actions,
+        LocalRowContext provides rowContext,
+        im.flume.hearth.ui.components.LocalRequests provides requestsByKey,
+        im.flume.hearth.ui.components.LocalPreview provides preview,
+        im.flume.hearth.ui.components.LocalGetMusic provides getMusic,
+    ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
                 if (landscape) SideRail(currentTab, badged, onTabClick)
@@ -352,6 +364,7 @@ fun AppRoot() {
                     snackbarHost = { SnackbarHost(snackbar) },
                     bottomBar = {
                         Column(if (landscape) Modifier.navigationBarsPadding().padding(bottom = 8.dp) else Modifier) {
+                            im.flume.hearth.ui.components.PreviewBar()
                             if (playerState.current != null) MiniPlayer(playerState, onOpen = { nowPlayingOpen = true })
                             if (!landscape) BottomBar(currentTab, badged, onTabClick)
                         }
@@ -380,9 +393,6 @@ fun AppRoot() {
                         screen("browse/songs") { BrowseSongsScreen() }
                         screen("liked") { LikedScreen() }
                         screen("downloads") { DownloadsScreen() }
-                        screen("requests") { im.flume.hearth.ui.screens.RequestsScreen() }
-                        screen("tidal/artist/{id}") { im.flume.hearth.ui.screens.TidalArtistScreen(it.arguments!!.getString("id")!!) }
-                        screen("tidal/album/{id}") { im.flume.hearth.ui.screens.TidalAlbumScreen(it.arguments!!.getString("id")!!) }
                         screen("settings") { SettingsScreen() }
                         screen("settings/general") { GeneralSettings() }
                         screen("settings/storage") { StorageSettings() }
@@ -397,6 +407,8 @@ fun AppRoot() {
                     }
                 }
             }
+
+            im.flume.hearth.ui.components.GetMusicSheets(getMusic)
 
             if (actions.creatingPlaylist.value) {
                 NewPlaylistDialog(onDismiss = { actions.creatingPlaylist.value = false }, onCreate = actions::createEmptyPlaylist)

@@ -12,6 +12,14 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.text.style.TextAlign
 import im.flume.hearth.data.YourLibrary
+import im.flume.hearth.data.AlbumItem
+import im.flume.hearth.data.ArtistItem
+import im.flume.hearth.data.SongItem
+import im.flume.hearth.ui.components.MissingAlbumRow
+import im.flume.hearth.ui.components.MissingArtistRow
+import im.flume.hearth.ui.components.MissingSongRow
+import im.flume.hearth.ui.components.remoteAlbumId
+import im.flume.hearth.ui.components.remoteArtistId
 import im.flume.hearth.data.PlaylistItem
 import im.flume.hearth.data.PlaylistRules
 import im.flume.hearth.ui.theme.NoticeDot
@@ -145,33 +153,31 @@ fun SearchScreen() {
     val gridColumns = gridColumns()
     LaunchedEffect(Unit) { focus.requestFocus() }
 
-    // "On Tidal": music that isn't on the server, fetched separately so the library results never wait on it.
+    // Music that isn't on the server is fetched separately, so the library's results never wait on it,
+    // then shown in the same sections, after the library's. If it can't be reached, it just isn't shown.
     val settings by c.session.settings.collectAsStateWithLifecycle()
     val online by c.network.isOnline.collectAsStateWithLifecycle()
-    val requestList by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
-    val requestsByKey = remember(requestList) { requestList.associateBy { "${it.type}:${it.tidalId}" } }
-    val requester = rememberTidalRequester()
-    var tidal by remember { mutableStateOf<TidalSearchState>(TidalSearchState.Hidden) }
-    // Open the connection to Tidarr as soon as Search opens, so the first search doesn't pay for it.
+    var remote by remember { mutableStateOf<im.flume.hearth.api.TidalSearchResults?>(null) }
+    // Open the connection as soon as Search opens, so the first search doesn't pay for it.
     LaunchedEffect(settings.tidalSearchEnabled, online) {
         if (settings.tidalSearchEnabled && online) runCatching { withContext(Dispatchers.IO) { c.requests.warmUp() } }
     }
     LaunchedEffect(query, online, settings.tidalSearchEnabled) {
         val q = query.trim()
-        if (!settings.tidalSearchEnabled || !online || q.length < 2) { tidal = TidalSearchState.Hidden; return@LaunchedEffect }
+        if (!settings.tidalSearchEnabled || !online || q.length < 2) { remote = null; return@LaunchedEffect }
         // Recently seen searches come back instantly; otherwise wait for a short pause in typing.
-        c.requests.cachedTidalSearch(q)?.let { tidal = TidalSearchState.Results(it); return@LaunchedEffect }
+        c.requests.cachedTidalSearch(q)?.let { remote = it; return@LaunchedEffect }
         delay(200)
-        // Keep the previous results on screen while the new ones load, so the page doesn't jump.
-        if (tidal !is TidalSearchState.Results) tidal = TidalSearchState.Loading
-        tidal = try {
-            TidalSearchState.Results(withContext(Dispatchers.IO) { c.requests.searchTidal(q) })
+        // The previous results stay until the new ones arrive, so the page doesn't jump.
+        remote = try {
+            withContext(Dispatchers.IO) { c.requests.searchTidal(q) }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            TidalSearchState.Unavailable
+            null
         }
     }
+    val sections = remember(songs, albums, artists, remote) { im.flume.hearth.data.Availability.mergeSearch(songs, albums, artists, remote) }
 
     LaunchedEffect(query) {
         val q = query.trim()
@@ -227,7 +233,6 @@ fun SearchScreen() {
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
             if (query.isBlank()) {
-                requestsEntry(requestList) { actions.open("requests") }
                 if (recent.isNotEmpty()) {
                     item {
                         SectionHeader("Recent searches") {
@@ -290,33 +295,49 @@ fun SearchScreen() {
                         )
                     }
                 }
-                if (artists.isNotEmpty()) {
-                    item { SectionHeader("Artists") }
-                    items(artists, key = { "ar:${it.id}" }) { a -> ArtistRow(a) }
-                }
-                if (albums.isNotEmpty()) {
-                    item { SectionHeader("Albums") }
-                    items(albums, key = { "al:${it.id}" }) { a -> AlbumListRow(a) }
-                }
-                if (songs.isNotEmpty()) {
-                    item { SectionHeader("Songs") }
-                    items(songs, key = { "s:${it.id}" }) { s ->
-                        SongRow(s, onClick = {
-                            actions.play(PlaySource(PlaySource.Kind.SONGS, label = "Search", songIds = songs.map { it.id }), startSongId = s.id)
-                        })
+                if (sections.artists.isNotEmpty()) {
+                    item(key = "h-artists") { SectionHeader("Artists") }
+                    items(sections.artists, key = { "ar:${it.key}" }) { a ->
+                        Column(Modifier.animateItem()) {
+                            when (a) {
+                                is ArtistItem.Owned -> ArtistRow(a.artist)
+                                is ArtistItem.Missing -> MissingArtistRow(a.artist) { actions.openArtist(remoteArtistId(a.artist.id)) }
+                            }
+                        }
                     }
                 }
-                if (!indexing && artists.isEmpty() && albums.isEmpty() && songs.isEmpty()) {
+                if (sections.albums.isNotEmpty()) {
+                    item(key = "h-albums") { SectionHeader("Albums") }
+                    items(sections.albums, key = { "al:${it.key}" }) { a ->
+                        Column(Modifier.animateItem()) {
+                            when (a) {
+                                is AlbumItem.Owned -> AlbumListRow(a.album)
+                                is AlbumItem.Missing -> MissingAlbumRow(a.album) { actions.openAlbum(remoteAlbumId(a.album.id)) }
+                            }
+                        }
+                    }
+                }
+                if (sections.songs.isNotEmpty()) {
+                    item(key = "h-songs") { SectionHeader("Songs") }
+                    items(sections.songs, key = { it.key }) { s ->
+                        Column(Modifier.animateItem()) {
+                            when (s) {
+                                is SongItem.Owned -> SongRow(s.song, onClick = {
+                                    actions.play(PlaySource(PlaySource.Kind.SONGS, label = "Search", songIds = songs.map { it.id }), startSongId = s.song.id)
+                                })
+                                is SongItem.Missing -> MissingSongRow(s.track)
+                            }
+                        }
+                    }
+                }
+                if (!indexing && sections.isEmpty) {
                     item {
-                        val where = if (tidal == TidalSearchState.Hidden) "" else " on your server"
-                        Text("No results$where for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
+                        Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
                     }
                 }
-                tidalResults(tidal, requestsByKey, requester)
             }
         }
     }
-    TidalSheets(requester, requestsByKey)
 }
 
 @Composable
@@ -459,8 +480,9 @@ fun LibraryScreen() {
                         // Not a playlist: only shown while songs are downloading or failed (always reachable from Settings → Storage).
                         item(key = "downloads") {
                             val counts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
-                            if (counts.active) {
-                                MediaRow(counts.summary, null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
+                            val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
+                            downloadsShortcutLabel(counts, coming)?.let { label ->
+                                MediaRow(label, null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
                             }
                         }
                         items(sortedPlaylists, key = { it.playlist.id }) { item -> PlaylistListRow(item) }

@@ -39,6 +39,9 @@ val Surface = Color(0xFF1C1C1C)
 val SurfaceHigh = Color(0xFF282828)
 val TextSecondary = Color(0xFFB3B3B3)
 
+/** Text alpha for music that isn't on the server yet (rows, cards, headers). Cover art is never dimmed. */
+const val NotOnServerAlpha = 0.55f
+
 /** Tile colour for Liked Songs (shortcuts, quick tiles, page header). */
 val LikedColor = Color(0xFF5038A0)
 
