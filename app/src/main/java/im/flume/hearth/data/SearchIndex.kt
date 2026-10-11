@@ -151,3 +151,13 @@ class SearchIndex(songs: List<SongEntity>, albums: List<AlbumEntity>, artists: L
         }
     }
 }
+
+/** Finding songs within one list (a playlist, Liked Songs): every word in the title, artist or album. */
+object SongFilter {
+    fun matches(song: SongEntity, query: String): Boolean {
+        val words = SearchIndex.norm(query).split(' ').filter { it.isNotBlank() }
+        if (words.isEmpty()) return true
+        val text = SearchIndex.norm("${song.title} ${song.artist} ${song.album}")
+        return words.all { text.contains(it) }
+    }
+}

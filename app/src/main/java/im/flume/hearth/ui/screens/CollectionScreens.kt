@@ -69,6 +69,9 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.SurfaceHigh
 import sh.calvin.reorderable.ReorderableItem
@@ -178,6 +181,8 @@ fun CollectionScreen(
     remote: RemoteHeader? = null,
     /** Called when the download toggle downloads the collection (not when it removes it). */
     onDownloaded: () -> Unit = {},
+    /** Pulling down at the top reveals a search bar that filters the songs (playlists, Liked Songs). */
+    searchable: Boolean = false,
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -263,6 +268,25 @@ fun CollectionScreen(
     val usage = c.usage
     androidx.activity.compose.BackHandler(enabled = selection != null) { selection = null }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // Search within the list: hidden until you pull down at the top, like other music apps.
+    var searchOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    val searchFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val pullToSearch = remember(searchable) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                // Left over downward drag means the list is already at the top and you're pulling further.
+                if (searchable && !searchOpen && available.y > 12f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) searchOpen = true
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    val filtered = remember(songs, query, searchable) {
+        if (!searchable || query.isBlank()) null else songs.indices.filter { im.flume.hearth.data.SongFilter.matches(songs[it], query) }
+    }
     // The slim top bar fades in over the second half of the header's scroll instead of popping in.
     var headerHeight by remember { mutableIntStateOf(0) }
     val barAlpha by remember {
@@ -344,7 +368,10 @@ fun CollectionScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize().then(if (searchable) Modifier.nestedScroll(pullToSearch) else Modifier),
+        state = listState, contentPadding = PaddingValues(bottom = 24.dp),
+    ) {
         item {
             Box(
                 Modifier
@@ -357,6 +384,20 @@ fun CollectionScreen(
                         BackButton()
                         Spacer(Modifier.weight(1f))
                         Box(Modifier.statusBarsPadding()) { headerActions() }
+                    }
+                    androidx.compose.animation.AnimatedVisibility(searchOpen) {
+                        LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
+                        OutlinedTextField(
+                            value = query, onValueChange = { query = it },
+                            placeholder = { Text("Find in ${if (title.isBlank()) "this list" else title}") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                IconButton(onClick = { query = ""; searchOpen = false }) { Icon(Icons.Default.Close, "Close search") }
+                            },
+                            singleLine = true,
+                            shape = HearthShapes.Card,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp).focusRequester(searchFocus),
+                        )
                     }
                     if (wide) {
                         // Landscape: art on the left, title and buttons beside it, so the list stays in view.
@@ -418,7 +459,13 @@ fun CollectionScreen(
                 modifier = Modifier.padding(start = 16.dp, top = if (first) 4.dp else 16.dp, bottom = 4.dp),
             )
         }
-        if (tracks == null) {
+        if (filtered != null) {
+            // Searching: just the matching songs (tapping one still plays the whole list from it).
+            if (filtered.isEmpty()) item(key = "no-match") {
+                Text("No songs match \"$query\"", color = TextSecondary, modifier = Modifier.padding(Dimens.Gutter))
+            }
+            items(filtered, key = { keys[it] }) { index -> Column(Modifier.animateItem()) { songRow(index, songs[index]) } }
+        } else if (tracks == null) {
             val multiDisc = showTrackNumbers && songs.any { it.disc != songs[0].disc }
             itemsIndexed(songs, key = { i, _ -> keys[i] }) { index, song ->
                 Column(Modifier.animateItem()) {
@@ -566,6 +613,7 @@ fun PlaylistScreen(id: String) {
         if ((shared || unknownSongs) && online) runCatching { c.library.refreshPlaylist(id) }
     }
     CollectionScreen(
+        searchable = true,
         title = playlist?.name.orEmpty(),
         // Only name the owner when it's someone else's playlist. A server mix says when it leaves instead.
         subtitle = when {
@@ -824,6 +872,7 @@ fun LikedScreen() {
     val order = SongOrder.liked(sort)
     val sorted = remember(loaded, order) { loaded?.let { order.sort(it) }.orEmpty() }
     CollectionScreen(
+        searchable = true,
         title = "Liked Songs",
         subtitle = "",
         cover = null,
