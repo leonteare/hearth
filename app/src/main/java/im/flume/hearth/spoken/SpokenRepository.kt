@@ -107,9 +107,10 @@ class SpokenRepository(
 
     /** App start: sync if signed in, send unsent progress, keep the periodic sync scheduled. */
     fun start() {
-        if (store.account.value == null) return
-        schedulePeriodicSync()
-        scope.launch { refresh(force = false) }
+        if (store.account.value != null) {
+            schedulePeriodicSync()
+            scope.launch { refresh(force = false) }
+        }
         scope.launch(Dispatchers.Main) {
             ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {

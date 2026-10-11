@@ -214,6 +214,7 @@ class ListeningTracker(private val progress: SpokenProgress) {
     private var lastSaveAt = 0L
     private var lastSessionAt = 0L
     private var pausedAt = 0L
+    private var lastFlushAt = 0L
 
     fun begin(item: SpokenNow, positionSec: Double, alreadyFinished: Boolean) {
         now = item
@@ -243,7 +244,12 @@ class ListeningTracker(private val progress: SpokenProgress) {
             finished = true
             save(item)
         } else if (wallNow - lastSaveAt >= SAVE_EVERY_MS) save(item)
-        if (wallNow - lastSessionAt >= SESSION_EVERY_MS) { saveSession(item); lastSessionAt = wallNow }
+        if (wallNow - lastSessionAt >= SESSION_EVERY_MS) {
+            saveSession(item)
+            lastSessionAt = wallNow
+            // While online, keep the server (and so the other phone) roughly up to date.
+            if (wallNow - lastFlushAt >= FLUSH_EVERY_MS) { lastFlushAt = wallNow; progress.flushSoon() }
+        }
     }
 
     /** Paused, stopped or skipped: save everything now and try to send it. */
@@ -254,7 +260,7 @@ class ListeningTracker(private val progress: SpokenProgress) {
         save(item)
         saveSession(item)
         lastSessionAt = pausedAt
-        if (send && !progress.flush()) progress.scheduleFlush()
+        if (send) progress.flushSoon()
     }
 
     /** A seek while paused should still be remembered. */
@@ -291,5 +297,6 @@ class ListeningTracker(private val progress: SpokenProgress) {
         const val SAVE_EVERY_MS = 5_000L
         const val SESSION_EVERY_MS = 30_000L
         const val NEW_SESSION_AFTER_PAUSE_MS = 10 * 60_000L
+        const val FLUSH_EVERY_MS = 60_000L
     }
 }

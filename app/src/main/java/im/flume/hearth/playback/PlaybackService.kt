@@ -282,7 +282,9 @@ class PlaybackService : MediaSessionService() {
     /** Leaves spoken-word mode, saving where we got to. The player's items are left for the caller to replace. */
     private suspend fun exitSpoken() {
         if (spokenNow == null) return
-        tracker.pause(spokenPositionSec())
+        // Saved on the phone now; sent in the background so starting the next thing never waits on the network.
+        tracker.pause(spokenPositionSec(), send = false)
+        c.spoken.progress.flushSoon()
         tracker.end()
         spokenNow = null
         spokenNeedsServerCheck = false

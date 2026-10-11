@@ -33,7 +33,7 @@ data class PlayerUiState(
     val sourceLabel: String = "",
     val queue: List<QueueEntry> = emptyList(),
     val pendingCount: Int = 0,
-    /** Epoch ms when the sleep timer pauses playback, -1 for end of song, 0 for none. */
+    /** Epoch ms when the sleep timer pauses playback, -1 for end of song, -2 for end of chapter, 0 for none. */
     val sleepAt: Long = 0,
     val error: String? = null,
     /** Set while a podcast episode or audiobook is loaded instead of music. */

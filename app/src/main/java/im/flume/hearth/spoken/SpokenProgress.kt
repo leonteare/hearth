@@ -96,7 +96,7 @@ class SpokenProgress(
     suspend fun resolveStart(libraryItemId: String, episodeId: String?, title: String, online: Boolean): StartPoint {
         val ep = episodeId.orEmpty()
         val server: AbsMediaProgress? = if (online && store.account.value?.needsSignIn == false) {
-            withTimeoutOrNull(4_000) { runCatching { api.progress(libraryItemId, episodeId) }.getOrNull() }
+            withTimeoutOrNull(3_000) { runCatching { api.progress(libraryItemId, episodeId) }.getOrNull() }
         } else null
         val result = writeLock.withLock {
             val local = dao.progress(libraryItemId, ep)
@@ -177,7 +177,7 @@ class SpokenProgress(
             enqueueProgress(libraryItemId, ep, row.snapshot())
             if (finished && old?.isFinished != true) onFinished?.invoke(libraryItemId, ep)
         }
-        scope.launch { if (!flush()) scheduleFlush() }
+        flushSoon()
     }
 
     /** Queues (or updates) the listening session being recorded on this phone. */
@@ -257,6 +257,11 @@ class SpokenProgress(
     private suspend fun sent(row: OutboxEntity) {
         dao.deleteOutbox(row.key, row.seq)
         if (dao.outboxCountFor(row.libraryItemId, row.episodeId) == 0) dao.markProgressSynced(row.libraryItemId, row.episodeId)
+    }
+
+    /** Sends the outbox in the background; if that fails, leaves it to [OutboxWorker]. */
+    fun flushSoon() {
+        scope.launch { if (!flush()) scheduleFlush() }
     }
 
     /** Makes sure the outbox is sent once there's a connection, even if the app is closed meanwhile. */
