@@ -765,3 +765,45 @@ fun SpokenSignInPrompt(what: String) {
     )
 }
 
+
+/**
+ * A podcast from the directory in Search: Follow adds it to the server (if it isn't there yet) and
+ * follows it; one already on the server opens its page.
+ */
+@Composable
+fun DirectoryRow(r: im.flume.hearth.api.AbsPodcastSearchResult, library: List<PodcastEntity>, username: String?, modifier: Modifier = Modifier) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val (state, existing) = remember(r, library, username) { im.flume.hearth.spoken.SpokenDiscovery.state(r, library, username) }
+    var busy by remember(r.feedUrl) { mutableStateOf(false) }
+    MediaRow(
+        r.title,
+        listOfNotNull(r.artistName?.takeIf { it.isNotBlank() }, r.trackCount?.takeIf { it > 0 }?.let { im.flume.hearth.ui.components.plural(it, "episode") }).joinToString(" • ").ifEmpty { null },
+        onClick = existing?.let { e -> { actions.open(podcastRoute(e.id)) } },
+        modifier = modifier,
+        coverUrl = r.cover,
+        trailing = {
+            if (busy) {
+                androidx.compose.material3.CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Box(Modifier.padding(end = 8.dp)) {
+                    FollowButton(following = state == im.flume.hearth.spoken.DirectoryState.FOLLOWING) {
+                        if (state == im.flume.hearth.spoken.DirectoryState.FOLLOWING) {
+                            existing?.let { actions.open(podcastRoute(it.id)) }
+                            return@FollowButton
+                        }
+                        val feed = r.feedUrl ?: return@FollowButton
+                        busy = true
+                        c.appScope.launch {
+                            c.spoken.addPodcast(feed, r, follow = true).fold(
+                                onSuccess = { actions.showMessage("Following ${r.title}. Its newest episodes are on their way.") },
+                                onFailure = { actions.showMessage("Couldn't follow ${r.title}: ${im.flume.hearth.util.userMessage(it)}") },
+                            )
+                            busy = false
+                        }
+                    }
+                }
+            }
+        },
+    )
+}

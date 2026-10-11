@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Person
@@ -146,7 +147,8 @@ fun SearchScreen() {
     }
     // Searches that found something are remembered when you leave the page.
     val latestQuery by rememberUpdatedState(query)
-    val hadResults by rememberUpdatedState(songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty())
+    var hadSpokenResults by remember { mutableStateOf(false) }
+    val hadResults by rememberUpdatedState(songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty() || hadSpokenResults)
     DisposableEffect(Unit) { onDispose { if (hadResults) saveRecent(latestQuery) } }
 
     val focus = remember { FocusRequester() }
@@ -178,6 +180,39 @@ fun SearchScreen() {
         }
     }
     val sections = remember(songs, albums, artists, remote) { im.flume.hearth.data.Availability.mergeSearch(songs, albums, artists, remote) }
+
+    // Podcasts, episodes and audiobooks from the phone's catalogue (instant, offline), after the music.
+    val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
+    val spokenPodcasts by remember { c.spoken.podcasts() }.collectAsStateWithLifecycle(emptyList())
+    val spokenBooks by remember { c.spoken.books() }.collectAsStateWithLifecycle(emptyList())
+    var spokenEpisodes by remember { mutableStateOf<List<im.flume.hearth.spoken.EpisodeRow>?>(null) }
+    var spoken by remember { mutableStateOf(im.flume.hearth.spoken.SpokenSearchResults()) }
+    LaunchedEffect(query, spokenAccount != null, spokenPodcasts, spokenBooks) {
+        val q = query.trim()
+        if (spokenAccount == null || q.isEmpty()) { spoken = im.flume.hearth.spoken.SpokenSearchResults(); return@LaunchedEffect }
+        delay(120)
+        val episodes = spokenEpisodes ?: c.spoken.allEpisodes().also { spokenEpisodes = it }
+        spoken = withContext(Dispatchers.Default) { im.flume.hearth.spoken.SpokenSearch.search(q, spokenPodcasts, episodes, spokenBooks) }
+        hadSpokenResults = !spoken.isEmpty
+    }
+    // Podcasts that aren't on the server yet, from the podcast directory (online only, after a pause in typing).
+    var directory by remember { mutableStateOf<List<im.flume.hearth.api.AbsPodcastSearchResult>>(emptyList()) }
+    var directoryLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(query, spokenAccount != null) {
+        val q = query.trim()
+        if (spokenAccount == null || q.length < 3 || c.network.cannotStream) { directory = emptyList(); directoryLoading = false; return@LaunchedEffect }
+        delay(450)
+        directoryLoading = true
+        directory = try {
+            withContext(Dispatchers.IO) { im.flume.hearth.spoken.SpokenDiscovery.usable(c.spoken.searchDirectory(q)).take(8) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        } finally {
+            directoryLoading = false
+        }
+    }
 
     LaunchedEffect(query) {
         val q = query.trim()
@@ -220,7 +255,12 @@ fun SearchScreen() {
                 keyboardActions = KeyboardActions(onSearch = { saveRecent(query) }),
                 modifier = Modifier.weight(1f).focusRequester(focus),
                 decorationBox = { inner ->
-                    if (query.isEmpty()) Text("Songs, artists or albums", color = SearchFieldHint, style = MaterialTheme.typography.bodyLarge)
+                    if (query.isEmpty()) {
+                        Text(
+                            if (spokenAccount != null) "Songs, artists, albums or podcasts" else "Songs, artists or albums",
+                            color = SearchFieldHint, style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                     inner()
                 },
             )
@@ -330,9 +370,31 @@ fun SearchScreen() {
                         }
                     }
                 }
-                if (!indexing && sections.isEmpty) {
+                if (spoken.podcasts.isNotEmpty()) {
+                    item(key = "h-podcasts") { SectionHeader("Podcasts") }
+                    items(spoken.podcasts, key = { "pod:${it.id}" }) { p -> PodcastListRow(p, modifier = Modifier.animateItem()) }
+                }
+                if (spoken.episodes.isNotEmpty()) {
+                    item(key = "h-episodes") { SectionHeader("Episodes") }
+                    items(spoken.episodes, key = { "ep:${it.episode.id}" }) { e -> EpisodeListRow(e, Modifier.animateItem(), showCover = true, withShow = true) }
+                }
+                if (spoken.books.isNotEmpty()) {
+                    item(key = "h-books") { SectionHeader("Audiobooks") }
+                    items(spoken.books, key = { "book:${it.book.id}" }) { b -> BookListRow(b, Modifier.animateItem()) }
+                }
+                if (!indexing && sections.isEmpty && spoken.isEmpty) {
                     item {
                         Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
+                    }
+                }
+                if (directory.isNotEmpty() || directoryLoading) {
+                    item(key = "h-directory") {
+                        SectionHeader("Find podcasts") {
+                            if (directoryLoading) CircularProgressIndicator(Modifier.padding(end = 12.dp).size(18.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                    items(directory, key = { "dir:${it.feedUrl}" }) { r ->
+                        DirectoryRow(r, spokenPodcasts, spokenAccount?.username, Modifier.animateItem())
                     }
                 }
             }
@@ -374,7 +436,7 @@ fun AlbumListRow(a: AlbumEntity) {
     )
 }
 
-private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums") }
+private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums"), PODCASTS("Podcasts"), AUDIOBOOKS("Audiobooks") }
 
 private val ARTIST_SORTS = listOf("A–Z", "Most albums")
 private val ALBUM_SORTS = listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
@@ -423,7 +485,32 @@ fun LibraryScreen() {
         LibraryTab.PLAYLISTS -> listOf("A–Z", "Recently updated", "Most songs")
         LibraryTab.ARTISTS -> ARTIST_SORTS
         LibraryTab.ALBUMS -> ALBUM_SORTS
+        LibraryTab.PODCASTS -> listOf("A–Z", "Newest episode")
+        LibraryTab.AUDIOBOOKS -> listOf("A–Z", "Recently added", "Author", "Recently listened")
     }
+    // Podcasts you follow and the server's audiobooks (each person follows their own shows).
+    val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
+    val spokenSyncing by c.spoken.syncing.collectAsStateWithLifecycle()
+    val followed by remember { c.spoken.followedPodcasts() }.collectAsStateWithLifecycle(emptyList())
+    val latestEpisodes by remember { c.spoken.latestEpisodes(300) }.collectAsStateWithLifecycle(emptyList())
+    val books by remember { c.spoken.books() }.collectAsStateWithLifecycle(emptyList())
+    val newCounts = remember(latestEpisodes) { im.flume.hearth.spoken.SpokenLists.newCounts(latestEpisodes) }
+    val sortedPodcasts = remember(followed, latestEpisodes, sort, tab) {
+        if (tab == LibraryTab.PODCASTS && sort == 1) {
+            val newest = latestEpisodes.groupBy { it.episode.libraryItemId }.mapValues { (_, eps) -> eps.maxOf { it.episode.publishedAt } }
+            followed.sortedByDescending { newest[it.id] ?: 0L }
+        } else followed
+    }
+    val sortedBooks = remember(books, sort, tab) {
+        if (tab != LibraryTab.AUDIOBOOKS) books else when (sort) {
+            1 -> books.sortedByDescending { it.book.addedAt }
+            2 -> books.sortedWith(compareBy({ it.book.author.orEmpty().lowercase() }, { it.book.title.lowercase() }))
+            3 -> books.sortedByDescending { it.progressUpdatedAt ?: 0L }
+            else -> books
+        }
+    }
+    val importOpml = rememberOpmlImport()
+    val spokenTab = tab == LibraryTab.PODCASTS || tab == LibraryTab.AUDIOBOOKS
     val sortedPlaylists = when (sort) {
         1 -> playlists.sortedByDescending { it.playlist.changed }
         2 -> playlists.sortedByDescending { it.playlist.songCount }
@@ -460,8 +547,11 @@ fun LibraryScreen() {
             }
         }
         PullToRefreshBox(
-            isRefreshing = sync is SyncState.Running,
-            onRefresh = { c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) } },
+            isRefreshing = if (spokenTab) spokenSyncing else sync is SyncState.Running,
+            onRefresh = {
+                if (spokenTab) c.appScope.launch { c.spoken.refresh(force = true) }
+                else c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
+            },
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(Modifier.fillMaxSize()) {
@@ -507,10 +597,55 @@ fun LibraryScreen() {
                         }
                         items(sortedAlbums, key = { it.id }) { AlbumListRow(it) }
                     }
+                    LibraryTab.PODCASTS -> {
+                        if (spokenAccount == null) {
+                            item { SpokenSignInPrompt("podcasts") }
+                        } else {
+                            item(key = "add-podcast") {
+                                MediaRow(
+                                    "Find a podcast", null,
+                                    onClick = { actions.open("search") },
+                                    cover = { IconTile(Icons.Default.Search, SurfaceHigh) },
+                                )
+                            }
+                            item(key = "import-opml") {
+                                MediaRow(
+                                    "Import podcasts (OPML)", "Bring the shows you follow from another app",
+                                    onClick = importOpml,
+                                    cover = { IconTile(Icons.Default.UploadFile, SurfaceHigh) },
+                                )
+                            }
+                            if (sortedPodcasts.isEmpty()) item {
+                                LibraryEmpty(
+                                    "No podcasts yet",
+                                    "Search for a show and tap Follow. New episodes then show up on Home and download on Wi-Fi.",
+                                    "Find a podcast",
+                                ) { actions.open("search") }
+                            }
+                            items(sortedPodcasts, key = { "pod:${it.id}" }) { PodcastListRow(it, newCounts[it.id] ?: 0) }
+                        }
+                    }
+                    LibraryTab.AUDIOBOOKS -> {
+                        when {
+                            spokenAccount == null -> item { SpokenSignInPrompt("audiobooks") }
+                            sortedBooks.isEmpty() -> item {
+                                LibraryEmpty(
+                                    "No audiobooks yet",
+                                    if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on the server show up here. Pull down to check again.",
+                                    "Search",
+                                ) { actions.open("search") }
+                            }
+                        }
+                        if (spokenAccount != null) items(sortedBooks, key = { "book:${it.book.id}" }) { BookListRow(it) }
+                    }
                 }
                 item {
                     Text(
-                        "${plural(songCount, "song")} on the server • pull down to refresh",
+                        when (tab) {
+                            LibraryTab.PODCASTS -> if (spokenAccount == null) "" else "Following ${plural(followed.size, "podcast")} • pull down to refresh"
+                            LibraryTab.AUDIOBOOKS -> if (spokenAccount == null) "" else "${plural(books.size, "audiobook")} on the server • pull down to refresh"
+                            else -> "${plural(songCount, "song")} on the server • pull down to refresh"
+                        },
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(16.dp),
