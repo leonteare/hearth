@@ -210,6 +210,14 @@ class SpokenRepository(
     /** A server book, or a book on the phone shown the same way (see [LocalBookIds]). */
     fun book(id: String): Flow<BookRow?> = if (LocalBookIds.isLocal(id)) local.book(id).map { it?.toBookRow() } else dao.book(id)
 
+    /**
+     * What the player shows for a book: its title, writer and cover. They can change while it plays
+     * (a phone book's details are looked up after a scan; the server's can be edited), so the player
+     * follows this rather than what was known when it started.
+     */
+    fun bookDetails(id: String): Flow<SpokenBookDetails?> =
+        book(id).map { r -> r?.let { SpokenBookDetails(it.book.title, it.book.author, coverUrl(id, 300)) } }.distinctUntilChanged()
+
     /** Chapters of a book ([episodeId] null) or episode; times on the whole item's timeline. */
     fun chapters(libraryItemId: String, episodeId: String? = null): Flow<List<ChapterEntity>> =
         if (LocalBookIds.isLocal(libraryItemId)) local.chapters(libraryItemId) else dao.chaptersFlow(libraryItemId, episodeId.orEmpty())
@@ -644,3 +652,6 @@ internal fun im.flume.hearth.api.AbsEpisode.toEntity(libraryItemId: String): Epi
         guid = guid?.takeIf { it.isNotBlank() },
     )
 }
+
+/** A book's title, writer and cover as the player and notification show them. */
+data class SpokenBookDetails(val title: String, val author: String?, val coverUrl: String?)

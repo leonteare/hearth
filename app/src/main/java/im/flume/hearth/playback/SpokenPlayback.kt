@@ -51,7 +51,25 @@ object SpokenMedia {
         return if (segs.size == 2) segs[0] to segs[1] else null
     }
 
-    fun coverUri(libraryItemId: String): Uri = Uri.Builder().scheme(COVER_SCHEME).authority("item").appendPath(libraryItemId).build()
+    /** [version] changes when the cover does, so the notification loads the new picture instead of its cached one. */
+    fun coverUri(libraryItemId: String, version: String? = null): Uri = Uri.Builder().scheme(COVER_SCHEME).authority("item").appendPath(libraryItemId)
+        .apply { if (version != null) appendQueryParameter("v", version) }.build()
+
+    private val PART = Regex(""" \(\d+/\d+\)$""")
+
+    /**
+     * The same player item with a book's new title, writer and cover, keeping its "(2/5)" part number.
+     * Null when nothing changed.
+     */
+    fun withDetails(item: MediaItem, title: String, author: String?, coverVersion: String?): MediaItem? {
+        val m = item.mediaMetadata
+        val part = m.title?.toString()?.let { PART.find(it)?.value }.orEmpty()
+        val itemId = m.extras?.getString(EXTRA_ITEM_ID) ?: return null
+        val meta = m.buildUpon().setTitle(title + part).setArtist(author).setAlbumTitle(title).setAlbumArtist(author)
+            .setArtworkUri(coverUri(itemId, coverVersion)).build()
+        if (meta.title == m.title && meta.artist == m.artist && meta.albumTitle == m.albumTitle && meta.artworkUri == m.artworkUri) return null
+        return item.buildUpon().setMediaMetadata(meta).build()
+    }
 
     fun coverItemId(uri: Uri): String? = if (uri.scheme == COVER_SCHEME) uri.lastPathSegment?.takeIf { it.isNotEmpty() } else null
 

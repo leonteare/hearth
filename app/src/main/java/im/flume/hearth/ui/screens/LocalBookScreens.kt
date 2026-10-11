@@ -270,7 +270,12 @@ fun LocalBookScreen(id: String) {
     FindDetailsSheet(findDetails, b, signedIn = account != null && account?.needsSignIn != true) { findDetails = false }
     ActionSheet(menu, { menu = false }, title = b.title, subtitle = b.author, showCover = false) {
         if (!busy) MenuItem("Add to server", Icons.Outlined.CloudUpload) { menu = false; confirmUpload = true }
-        MenuItem("Find details", Icons.Default.Search) { menu = false; findDetails = true }
+        // Where the title, writer and cover came from, and the way to look them up or change them.
+        val matched = b.matchState == LocalMatchState.AUTO.name || b.matchState == LocalMatchState.CONFIRMED.name
+        MenuItem(
+            if (matched) "Change details (from ${BookMatch.providerName(b.matchSource)})" else "Find details",
+            Icons.Default.Search,
+        ) { menu = false; findDetails = true }
         if (r.finished || started) {
             MenuItem("Mark as not started", Icons.Outlined.RadioButtonUnchecked) { menu = false; c.appScope.launch { c.spoken.markFinished(id, null, false) } }
         }
@@ -296,6 +301,7 @@ fun LocalBookScreen(id: String) {
                     b.author, b.narrator?.let { "Read by $it" }, b.series,
                     listOfNotNull("On this phone", SpokenFormat.length(b.durationSec).ifEmpty { null }, b.publishedYear).joinToString(" • "),
                 ),
+                onMenu = { menu = true },
             )
         }
         item(key = "progress") {
@@ -312,7 +318,6 @@ fun LocalBookScreen(id: String) {
         }
         item(key = "buttons") {
             Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
                 Spacer(Modifier.weight(1f))
                 val playing = isThis && playerState.isPlaying
                 Button(
@@ -335,7 +340,6 @@ fun LocalBookScreen(id: String) {
             }
         }
         item(key = "upload") { UploadStatus(uploadState, b.uploadError, uploads[id], onRetry = { startUpload() }) }
-        item(key = "details") { DetailsSource(b.matchState, b.matchSource) { findDetails = true } }
         if (!b.description.isNullOrBlank()) item(key = "description") { Description(b.description) }
         if (chapters.isNotEmpty()) {
             item(key = "chapters-head") { SectionHeader("Chapters") }
@@ -375,29 +379,6 @@ private fun UploadStatus(state: LocalUploadState?, error: String?, progress: Flo
             }
         }
     }
-}
-
-/**
- * Under the play button: where the book's details came from, with a way to change them ("Not
- * right?"), or "Find details" when the files' own names are in use.
- */
-@Composable
-private fun DetailsSource(matchState: String?, matchSource: String?, onOpen: () -> Unit) {
-    val matched = matchState == LocalMatchState.AUTO.name || matchState == LocalMatchState.CONFIRMED.name
-    if (!matched) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) { TextButton(onClick = onOpen) { Text("Find details") } }
-        return
-    }
-    val action = if (matchState == LocalMatchState.AUTO.name) "Not right?" else "Change"
-    val accent = Accent
-    Text(
-        buildAnnotatedString {
-            append("Details from ${BookMatch.providerName(matchSource)} · ")
-            withStyle(SpanStyle(color = accent, fontWeight = FontWeight.Bold)) { append(action) }
-        },
-        color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = Dimens.Gutter, vertical = 10.dp),
-    )
 }
 
 /**

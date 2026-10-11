@@ -264,8 +264,40 @@ class PlaybackService : MediaSessionService() {
         enterSpoken(now, items, startSec ?: start.positionSec, start.finished, playWhenReady = true)
     }
 
+    private var bookDetailsJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * While a book plays, keeps its title, writer and cover in the player, notification and lock screen
+     * in step with the library (a phone book's proper details can arrive after it started playing).
+     */
+    private fun followBookDetails(now: SpokenNow?) {
+        bookDetailsJob?.cancel()
+        if (now == null || !now.isBook) return
+        val id = now.libraryItemId
+        bookDetailsJob = scope.launch {
+            c.spoken.bookDetails(id).collect { d ->
+                val current = spokenNow?.takeIf { it.libraryItemId == id } ?: return@collect
+                if (d == null) return@collect
+                val version = d.coverUrl?.hashCode()?.let { Integer.toHexString(it) }
+                var changed = false
+                for (i in 0 until player.mediaItemCount) {
+                    val item = player.getMediaItemAt(i)
+                    if (item.mediaMetadata.extras?.getString(SpokenMedia.EXTRA_ITEM_ID) != id) continue
+                    SpokenMedia.withDetails(item, d.title, d.author, version)?.let { player.replaceMediaItem(i, it); changed = true }
+                }
+                if (current.title != d.title || current.author != d.author.orEmpty()) {
+                    spokenNow = current.copy(title = d.title, author = d.author.orEmpty())
+                    sourceLabel = d.title
+                    changed = true
+                }
+                if (changed) { publishExtras(); saveQueue() }
+            }
+        }
+    }
+
     private suspend fun enterSpoken(now: SpokenNow, items: List<MediaItem>, startSec: Double, finished: Boolean, playWhenReady: Boolean) {
         spokenNow = now
+        followBookDetails(now)
         c.spoken.downloads.current = im.flume.hearth.spoken.SpokenKey(now.libraryItemId, now.episodeId.orEmpty())
         context = emptyList()
         pending = ArrayDeque()
@@ -293,6 +325,7 @@ class PlaybackService : MediaSessionService() {
         c.spoken.progress.flushSoon()
         tracker.end()
         spokenNow = null
+        followBookDetails(null)
         spokenNeedsServerCheck = false
         c.spoken.downloads.current = null
         player.setPlaybackSpeed(1f)
@@ -921,6 +954,7 @@ class PlaybackService : MediaSessionService() {
                     }
                     val (now, items, start) = spoken
                     spokenNow = now
+                    followBookDetails(now)
                     c.spoken.downloads.current = im.flume.hearth.spoken.SpokenKey(now.libraryItemId, now.episodeId.orEmpty())
                     context = emptyList(); pending = ArrayDeque(); shuffled = false; sourceLabel = saved.label
                     tracker.begin(now, start.first, start.second)

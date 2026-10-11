@@ -440,11 +440,19 @@ internal fun Description(text: String?) {
 
 /** Cover-tinted header shared by the show and book pages. */
 @Composable
-internal fun SpokenHeader(coverUrl: String?, title: String, lines: List<String>, artSize: Dp = 200.dp) {
+internal fun SpokenHeader(
+    coverUrl: String?, title: String, lines: List<String>, artSize: Dp = 200.dp,
+    /** Opens the page's ⋮ menu, shown top right opposite the back button. */
+    onMenu: (() -> Unit)? = null,
+) {
     val headerColor = rememberCoverColor(null, imageUrl = coverUrl)
     Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth()) { BackButton() }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                BackButton()
+                Spacer(Modifier.weight(1f))
+                if (onMenu != null) IconButton(onClick = onMenu) { Icon(Icons.Default.MoreVert, "More") }
+            }
             CoverArt(null, artSize, requestSize = 600, fallback = title, url = coverUrl)
             Spacer(Modifier.height(16.dp))
             Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
@@ -573,6 +581,7 @@ fun BookScreen(id: String) {
                         b.narrator?.let { "Read by $it" },
                         listOfNotNull(b.series, b.publishedYear, SpokenFormat.length(b.durationSec).ifEmpty { null }).joinToString(" • "),
                     ),
+                    onMenu = { menu = true },
                 )
             }
             item(key = "progress") {
@@ -598,7 +607,6 @@ fun BookScreen(id: String) {
                             }
                         }
                     }
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
                     Spacer(Modifier.weight(1f))
                     val playing = isThis && playerState.isPlaying
                     Button(
