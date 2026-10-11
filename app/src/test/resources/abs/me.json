@@ -1,0 +1,47 @@
+{
+ "id": "48466816-62a6-4e2a-8dde-48d2b7600757",
+ "username": "leon",
+ "email": null,
+ "type": "root",
+ "token": "REDACTED",
+ "mediaProgress": [
+  {
+   "id": "76c55daf-869c-4752-91e5-064fc232236c",
+   "userId": "48466816-62a6-4e2a-8dde-48d2b7600757",
+   "libraryItemId": "eb6314f8-a620-4aaa-958f-ac9735cb4c6b",
+   "episodeId": "6c2fae16-f9d8-4f0a-acc3-eee7219d78be",
+   "mediaItemId": "6c2fae16-f9d8-4f0a-acc3-eee7219d78be",
+   "mediaItemType": "podcastEpisode",
+   "duration": 1696.600816,
+   "progress": 0.08870678275095208,
+   "currentTime": 150.5,
+   "isFinished": false,
+   "hideFromContinueListening": false,
+   "ebookLocation": null,
+   "ebookProgress": 0,
+   "lastUpdate": 1791730024759,
+   "startedAt": 1791730014955,
+   "finishedAt": null
+  }
+ ],
+ "seriesHideFromContinueListening": [],
+ "bookmarks": [],
+ "isActive": true,
+ "isLocked": false,
+ "lastSeen": null,
+ "createdAt": 1791729667030,
+ "permissions": {
+  "download": true,
+  "update": true,
+  "delete": true,
+  "upload": true,
+  "createEreader": true,
+  "accessAllLibraries": true,
+  "accessAllTags": true,
+  "accessExplicitContent": true,
+  "selectedTagsNotAccessible": false
+ },
+ "librariesAccessible": [],
+ "itemTagsSelected": [],
+ "hasOpenIDLink": false
+}

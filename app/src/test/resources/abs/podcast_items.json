@@ -1,0 +1,61 @@
+{
+ "results": [
+  {
+   "id": "eb6314f8-a620-4aaa-958f-ac9735cb4c6b",
+   "ino": "136215",
+   "oldLibraryItemId": null,
+   "libraryId": "1c14322d-26cc-45cd-9cd1-2860f255922f",
+   "folderId": "be5b80ab-a7f5-4119-87fb-c85245ca1e77",
+   "path": "/podcasts/Up First",
+   "relPath": "Up First",
+   "isFile": false,
+   "mtimeMs": 1791729814365,
+   "ctimeMs": 1791729814365,
+   "birthtimeMs": 0,
+   "addedAt": 1791729814371,
+   "updatedAt": 1791729842751,
+   "isMissing": false,
+   "isInvalid": false,
+   "mediaType": "podcast",
+   "media": {
+    "id": "cba460e1-42e7-4280-a14c-fb7011d3b0ae",
+    "metadata": {
+     "title": "Up First from NPR",
+     "author": "NPR",
+     "description": "NPR's Up First is the news you need to start your day. The three biggest stories of the day, with reporting and analysis from NPR News — in 10 minutes. Available weekdays at 6:30 a.m. ET, with hosts Leila Fadel, Steve Inskeep, Michel Martin and A Martinez. Also available on Saturdays at 9 a.m. ET, with Ayesha Rascoe and Scott Simon. On Sundays, hear a longer exploration behind the headlines with Ayesha Rascoe on \"The Sunday Story,\" available by 8 a.m. ET. Subscribe and listen, then support your local NPR station at donate.npr.org.<br /><br /><em> Support public media by joining NPR+ at </em><a href=\"http://plus.npr.org/\" target=\"_blank\"><em>plus.npr.org</em></a><em>. You’ll get perks for over 25 NPR podcasts, including sponsor-free listening for Up First, NPR News Now, and more.</em>",
+     "releaseDate": null,
+     "genres": [],
+     "feedUrl": "https://feeds.npr.org/510318/podcast.xml",
+     "imageUrl": "https://npr.brightspotcdn.com/dims3/default/strip/false/crop/3000x3000+0+0/resize/1400/quality/66/format/jpg/?url=http%3A%2F%2Fnpr-brightspot.s3.amazonaws.com%2Fe0%2F7a%2Ffe9d16a44fbf9dd2d9932ffe799b%2F510318.png",
+     "itunesPageUrl": null,
+     "itunesId": null,
+     "itunesArtistId": null,
+     "explicit": false,
+     "language": "en-us",
+     "type": null,
+     "titleIgnorePrefix": "Up First from NPR"
+    },
+    "coverPath": "/podcasts/Up First/cover.jpg",
+    "tags": [],
+    "numEpisodes": 0,
+    "autoDownloadEpisodes": false,
+    "autoDownloadSchedule": "0 * * * *",
+    "lastEpisodeCheck": 1791729814368,
+    "maxEpisodesToKeep": 0,
+    "maxNewEpisodesToDownload": 3,
+    "size": 27190784
+   },
+   "numFiles": 1,
+   "size": 27190784
+  }
+ ],
+ "total": 1,
+ "limit": 50,
+ "page": 0,
+ "sortDesc": false,
+ "mediaType": "podcast",
+ "minified": false,
+ "collapseseries": false,
+ "include": "",
+ "offset": 0
+}

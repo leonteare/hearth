@@ -1,0 +1,52 @@
+{
+ "_comment": "Synthesized from Audiobookshelf v2.37.1 Book.toOldJSONExpanded (the Audiobooks library was empty when fixtures were captured).",
+ "id": "b1",
+ "ino": "200100",
+ "libraryId": "fe1c39a1-9e08-44ed-9b45-6dcff26181b2",
+ "folderId": "8ac1ca60-b73d-4eeb-8ec2-4ec9a6aca849",
+ "path": "/audiobooks/Some Author/A Long Book",
+ "mediaType": "book",
+ "addedAt": 1791729000000,
+ "updatedAt": 1791729500000,
+ "isMissing": false,
+ "media": {
+  "id": "bm1",
+  "libraryItemId": "b1",
+  "metadata": {
+   "title": "A Long Book",
+   "subtitle": null,
+   "authors": [{ "id": "a1", "name": "Some Author" }],
+   "narrators": ["A Narrator"],
+   "series": [{ "id": "s1", "name": "The Series", "sequence": "2" }],
+   "genres": [],
+   "publishedYear": "2019",
+   "description": "<p>About the book.</p>",
+   "descriptionPlain": "About the book.",
+   "language": null,
+   "explicit": false,
+   "authorName": "Some Author",
+   "narratorName": "A Narrator",
+   "seriesName": "The Series #2"
+  },
+  "coverPath": "/audiobooks/Some Author/A Long Book/cover.jpg",
+  "tags": [],
+  "numTracks": 3,
+  "numAudioFiles": 3,
+  "numChapters": 4,
+  "duration": 5400.5,
+  "size": 86400000,
+  "audioFiles": [],
+  "chapters": [
+   { "id": 0, "start": 0, "end": 1200, "title": "Opening" },
+   { "id": 1, "start": 1200, "end": 2400, "title": "Middle" },
+   { "id": 2, "start": 2400, "end": 4000, "title": "Turn" },
+   { "id": 3, "start": 4000, "end": 5400.5, "title": "End" }
+  ],
+  "tracks": [
+   { "index": 1, "ino": "300001", "startOffset": 0, "duration": 1800.25, "title": "01.mp3", "contentUrl": "/api/items/b1/file/300001", "mimeType": "audio/mpeg", "metadata": { "filename": "01.mp3", "ext": ".mp3", "size": 28800000 } },
+   { "index": 2, "ino": "300002", "startOffset": 1800.25, "duration": 1800.25, "title": "02.mp3", "contentUrl": "/api/items/b1/file/300002", "mimeType": "audio/mpeg", "metadata": { "filename": "02.mp3", "ext": ".mp3", "size": 28800000 } },
+   { "index": 3, "ino": "300003", "startOffset": 3600.5, "duration": 1800, "title": "03.mp3", "contentUrl": "/api/items/b1/file/300003", "mimeType": "audio/mpeg", "metadata": { "filename": "03.mp3", "ext": ".mp3", "size": 28800000 } }
+  ]
+ },
+ "libraryFiles": []
+}
