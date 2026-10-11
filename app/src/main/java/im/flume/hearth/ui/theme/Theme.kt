@@ -48,6 +48,12 @@ val LikedColor = Color(0xFF5038A0)
 /** Tile colour for Downloads (shortcuts, quick tiles, page header). */
 val DownloadsColor = Color(0xFF1E6B52)
 
+/** Tile colour for Podcasts (Home's quick tiles). */
+val PodcastsColor = Color(0xFF1E5A8C)
+
+/** Tile colour for Audiobooks (Home's quick tiles). */
+val AudiobooksColor = Color(0xFF8C4A1E)
+
 /**
  * Destructive actions. [Destructive] is for text and icons on the dark background (readable pink-red);
  * [DestructiveFill] is for solid fills such as the swipe-to-remove background, with white content on top.

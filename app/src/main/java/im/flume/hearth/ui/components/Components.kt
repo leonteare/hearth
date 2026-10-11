@@ -117,9 +117,28 @@ interface Actions {
     fun setAlbumSaved(albumId: String, saved: Boolean) {}
     /** Follows or unfollows an artist, which puts them in Your Library. */
     fun setArtistFollowed(artistId: String, followed: Boolean) {}
+    /**
+     * Switches to the Your Library tab showing [tab] (a library tab name, e.g. "PODCASTS"), like
+     * tapping the tab itself, so tapping Your Library again doesn't land somewhere unexpected.
+     */
+    fun openLibraryTab(tab: String) {}
+    /** Switches to the Search tab with [filter] chosen and the keyboard up, ready to type. */
+    fun openSearchTab(filter: im.flume.hearth.data.SearchFilter) {}
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }
+
+/**
+ * What a tab page should show when it was opened by [Actions.openLibraryTab] or
+ * [Actions.openSearchTab]. The page takes the request once and clears it, so its own choices
+ * stick afterwards.
+ */
+class TabRequests {
+    var libraryTab by mutableStateOf<String?>(null)
+    var searchFilter by mutableStateOf<im.flume.hearth.data.SearchFilter?>(null)
+}
+
+val LocalTabRequests = compositionLocalOf { TabRequests() }
 
 /** Current playing song id and offline state, used to highlight / dim rows. */
 data class RowContext(val playingId: String?, val online: Boolean, val downloads: Map<String, DownloadState>)
@@ -225,6 +244,8 @@ fun SongRow(
     /** Null when not selecting; otherwise whether this row is selected. */
     selected: Boolean? = null,
     onLongPress: (() -> Unit)? = null,
+    /** The line under the title; Search puts "Song • " in front so it reads apart from albums and shows. */
+    subtitle: String = song.artist,
 ) {
     val ctx = LocalRowContext.current
     val haptics = LocalHapticFeedback.current
@@ -283,7 +304,7 @@ fun SongRow(
                 }
                 if (dl != null && dl != DownloadState.FAILED) Spacer(Modifier.width(4.dp))
                 Text(
-                    song.artist,
+                    subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = TextSecondary.copy(alpha = if (playable) 1f else 0.5f),

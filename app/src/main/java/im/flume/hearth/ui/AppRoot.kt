@@ -224,6 +224,22 @@ private class AppActions(
     /** Closes the player and queue overlays, so pages opened from them aren't hidden underneath. */
     var closeOverlays: () -> Unit = {}
 
+    /** Goes to a bottom tab the same way tapping it does (set by [AppRoot]). */
+    var switchTab: (String) -> Unit = {}
+    val tabRequests = im.flume.hearth.ui.components.TabRequests()
+
+    override fun openLibraryTab(tab: String) {
+        closeOverlays()
+        tabRequests.libraryTab = tab
+        switchTab("library")
+    }
+
+    override fun openSearchTab(filter: im.flume.hearth.data.SearchFilter) {
+        closeOverlays()
+        tabRequests.searchFilter = filter
+        switchTab("search")
+    }
+
     fun createEmptyPlaylist(name: String) {
         creatingPlaylist.value = false
         scope.launch {
@@ -354,6 +370,7 @@ fun AppRoot() {
             }
         }
     }
+    actions.switchTab = onTabClick
 
     // Pages opened from outside, e.g. tapping an "Added to your phone" notification.
     val pendingRoute by c.pendingRoute.collectAsStateWithLifecycle()
@@ -374,6 +391,7 @@ fun AppRoot() {
         im.flume.hearth.ui.components.LocalPreview provides preview,
         im.flume.hearth.ui.components.LocalGetMusic provides getMusic,
         im.flume.hearth.ui.screens.LocalSpokenNow provides playerState.spoken,
+        im.flume.hearth.ui.components.LocalTabRequests provides actions.tabRequests,
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {

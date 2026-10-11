@@ -2,6 +2,71 @@ package im.flume.hearth.data
 
 import java.text.Normalizer
 
+/** A search result with how well its text matched (see [SearchMatch]); higher is better. */
+data class Scored<out T>(val item: T, val relevance: Int)
+
+/**
+ * How well a query matches an item's title ([primary]) and the rest of its text ([secondary], e.g.
+ * the artist or show). One scale for everything Search shows (songs, podcasts, music that isn't on
+ * the server), so a single list can be ranked fairly: the exact title beats a title that starts with
+ * the query, which beats one that contains it, which beats every word appearing somewhere, which
+ * beats a near-miss with a typo.
+ */
+object SearchMatch {
+    const val EXACT = 500
+    const val STARTS_WITH = 400
+    const val CONTAINS = 300
+    const val ALL_WORDS = 200
+    const val CLOSE = 100
+    const val NONE = 0
+
+    /** A query, normalised once. */
+    class Query(raw: String) {
+        val text: String = SearchIndex.norm(raw)
+        val words: List<String> = text.split(' ').filter { it.isNotBlank() }
+        val isBlank: Boolean get() = words.isEmpty()
+    }
+
+    /**
+     * The match without typos, or [NONE] when some word of the query is missing. [primary] and
+     * [secondary] must already be normalised with [SearchIndex.norm].
+     */
+    fun exact(q: Query, primary: String, secondary: String): Int {
+        if (q.isBlank) return NONE
+        val all = "$primary $secondary"
+        if (!q.words.all { all.contains(it) }) return NONE
+        return when {
+            primary == q.text -> EXACT
+            primary.startsWith(q.text) -> STARTS_WITH
+            primary.contains(q.text) -> CONTAINS
+            else -> ALL_WORDS
+        }
+    }
+
+    /**
+     * Every query word close to some word in the item (allowing a typo or two): [CLOSE] minus the
+     * number of typos, or [NONE].
+     */
+    fun close(q: Query, primary: String, secondary: String): Int {
+        if (q.isBlank) return NONE
+        val words = "$primary $secondary".split(' ')
+        var total = 0
+        for (t in q.words) {
+            val best = words.minOfOrNull { w -> SearchIndex.distance(t, w.take(t.length + 2)) } ?: return NONE
+            if (best > SearchIndex.allowedTypos(t)) return NONE
+            total += best
+        }
+        return (CLOSE - total).coerceAtLeast(1)
+    }
+
+    /** The exact match if there is one, else the close one. */
+    fun score(q: Query, primary: String, secondary: String): Int =
+        exact(q, primary, secondary).takeIf { it > NONE } ?: close(q, primary, secondary)
+
+    /** Same as [score], normalising the raw [title] and [rest] first. */
+    fun scoreText(q: Query, title: String, rest: String): Int = score(q, SearchIndex.norm(title), SearchIndex.norm(rest))
+}
+
 /**
  * In-memory search over the whole library. Matching ignores case, accents and a leading "the",
  * so "beyonce" finds "Beyoncé" and "beatles" finds "The Beatles". If nothing matches that way,
@@ -15,49 +80,45 @@ class SearchIndex(songs: List<SongEntity>, albums: List<AlbumEntity>, artists: L
     private val albumEntries = albums.map { Entry(it, norm(it.name), norm(it.artist), it.playCount) }
     private val artistEntries = artists.map { Entry(it, norm(it.name), "", it.albumCount.toLong()) }
 
-    data class Results(val songs: List<SongEntity>, val albums: List<AlbumEntity>, val artists: List<ArtistEntity>, val fuzzy: Boolean)
+    /** Each list best first: by [SearchMatch] relevance, then the most played (or most albums). */
+    data class Results(
+        val songHits: List<Scored<SongEntity>>,
+        val albumHits: List<Scored<AlbumEntity>>,
+        val artistHits: List<Scored<ArtistEntity>>,
+        val fuzzy: Boolean,
+    ) {
+        val songs: List<SongEntity> get() = songHits.map { it.item }
+        val albums: List<AlbumEntity> get() = albumHits.map { it.item }
+        val artists: List<ArtistEntity> get() = artistHits.map { it.item }
+        val isEmpty: Boolean get() = songHits.isEmpty() && albumHits.isEmpty() && artistHits.isEmpty()
 
-    fun search(query: String): Results {
-        val q = norm(query)
-        if (q.isBlank()) return Results(emptyList(), emptyList(), emptyList(), false)
-        val tokens = q.split(' ').filter { it.isNotBlank() }
-        val exact = Results(
-            exact(songEntries, q, tokens, 50),
-            exact(albumEntries, q, tokens, 10),
-            exact(artistEntries, q, tokens, 5),
-            fuzzy = false,
-        )
-        if (exact.songs.isNotEmpty() || exact.albums.isNotEmpty() || exact.artists.isNotEmpty()) return exact
-        return Results(fuzzy(songEntries, tokens, 30), fuzzy(albumEntries, tokens, 10), fuzzy(artistEntries, tokens, 5), fuzzy = true)
+        companion object {
+            val EMPTY = Results(emptyList(), emptyList(), emptyList(), false)
+        }
     }
 
-    private fun <T> exact(entries: List<Entry<T>>, q: String, tokens: List<String>, limit: Int): List<T> =
-        entries.mapNotNull { e ->
-            val all = "${e.primary} ${e.secondary}"
-            if (!tokens.all { all.contains(it) }) return@mapNotNull null
-            val rank = when {
-                e.primary == q -> 0
-                e.primary.startsWith(q) -> 1
-                e.primary.contains(q) -> 2
-                else -> 3
-            }
-            Triple(e, rank, e.popularity)
-        }.sortedWith(compareBy<Triple<Entry<T>, Int, Long>> { it.second }.thenByDescending { it.third })
-            .take(limit).map { it.first.item }
+    fun search(query: String): Results {
+        val q = SearchMatch.Query(query)
+        if (q.isBlank) return Results.EMPTY
+        val exact = Results(
+            rank(songEntries, 50) { SearchMatch.exact(q, it.primary, it.secondary) },
+            rank(albumEntries, 10) { SearchMatch.exact(q, it.primary, it.secondary) },
+            rank(artistEntries, 5) { SearchMatch.exact(q, it.primary, it.secondary) },
+            fuzzy = false,
+        )
+        if (!exact.isEmpty) return exact
+        return Results(
+            rank(songEntries, 30) { SearchMatch.close(q, it.primary, it.secondary) },
+            rank(albumEntries, 10) { SearchMatch.close(q, it.primary, it.secondary) },
+            rank(artistEntries, 5) { SearchMatch.close(q, it.primary, it.secondary) },
+            fuzzy = true,
+        )
+    }
 
-    /** Every query word must be close to some word in the item (allowing a typo or two). */
-    private fun <T> fuzzy(entries: List<Entry<T>>, tokens: List<String>, limit: Int): List<T> =
-        entries.mapNotNull { e ->
-            val words = "${e.primary} ${e.secondary}".split(' ')
-            var total = 0
-            for (t in tokens) {
-                val best = words.minOfOrNull { w -> distance(t, w.take(t.length + 2)) } ?: return@mapNotNull null
-                if (best > allowedTypos(t)) return@mapNotNull null
-                total += best
-            }
-            Triple(e, total, e.popularity)
-        }.sortedWith(compareBy<Triple<Entry<T>, Int, Long>> { it.second }.thenByDescending { it.third })
-            .take(limit).map { it.first.item }
+    private fun <T> rank(entries: List<Entry<T>>, limit: Int, score: (Entry<T>) -> Int): List<Scored<T>> =
+        entries.mapNotNull { e -> score(e).takeIf { it > SearchMatch.NONE }?.let { e to it } }
+            .sortedWith(compareByDescending<Pair<Entry<T>, Int>> { it.second }.thenByDescending { it.first.popularity })
+            .take(limit).map { Scored(it.first.item, it.second) }
 
     companion object {
         private val marks = Regex("\\p{Mn}+")

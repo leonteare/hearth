@@ -35,8 +35,8 @@ class AvailabilityTest {
     }
 
     @Test
-    fun `search puts the library first and appends what isn't on the server`() {
-        val sections = Availability.mergeSearch(
+    fun `search keeps only the remote results the library doesn't already show`() {
+        val missing = Availability.notInLibrary(
             songs = listOf(song("s1", "Get Lucky")),
             albums = listOf(album("a1", "Discovery", 2001)),
             artists = listOf(ArtistEntity("ar", "Daft Punk", 4, null, false)),
@@ -47,17 +47,15 @@ class AvailabilityTest {
             ),
         )
         // The library's own copy wins; duplicates among the remote results show once.
-        assertEquals(listOf("s:s1", "t:t2"), keys(sections.songs))
-        assertEquals(listOf("s:a1", "t:r2"), keys(sections.albums))
-        assertEquals(listOf("s:ar", "t:x2"), keys(sections.artists))
+        assertEquals(listOf("t2"), missing.tracks.map { it.id })
+        assertEquals(listOf("r2"), missing.albums.map { it.id })
+        assertEquals(listOf("x2"), missing.artists.map { it.id })
     }
 
     @Test
-    fun `search without remote results is just the library`() {
-        val sections = Availability.mergeSearch(listOf(song("s1", "A")), emptyList(), emptyList(), null)
-        assertEquals(listOf("s:s1"), keys(sections.songs))
-        assertTrue(sections.albums.isEmpty())
-        assertTrue(Availability.mergeSearch(emptyList(), emptyList(), emptyList(), null).isEmpty)
+    fun `search without remote results has nothing missing`() {
+        val missing = Availability.notInLibrary(listOf(song("s1", "A")), emptyList(), emptyList(), null)
+        assertTrue(missing.tracks.isEmpty() && missing.albums.isEmpty() && missing.artists.isEmpty())
     }
 
     @Test

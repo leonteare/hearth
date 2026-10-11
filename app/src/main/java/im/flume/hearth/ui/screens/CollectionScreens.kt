@@ -96,6 +96,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.PlaySource
+import im.flume.hearth.data.SongOrder
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.SongItem
 import im.flume.hearth.data.RequestEntity
@@ -812,14 +813,26 @@ fun GenreScreen(name: String) {
 fun LikedScreen() {
     val dao = LocalContext.current.container.db.library()
     val loaded by remember { dao.starredSongs() }.collectAsStateWithLifecycle(null)
+    // Title A–Z unless you pick another order; the choice is remembered like Your Library's sorts.
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
+    var sort by remember { mutableStateOf(prefs.getInt("sort-LIKED", 0)) }
+    val order = SongOrder.liked(sort)
+    val sorted = remember(loaded, order) { loaded?.let { order.sort(it) }.orEmpty() }
     CollectionScreen(
         title = "Liked Songs",
         subtitle = "",
         cover = null,
-        songs = loaded.orEmpty(),
-        source = PlaySource.Liked,
+        songs = sorted,
+        source = PlaySource.Liked.copy(order = order),
         pin = PinTarget(DownloadRepository.KIND_LIKED, "liked"),
         headerIcon = { size -> BigIcon(Icons.Default.Favorite, LikedColor, size) },
+        headerActions = {
+            SortMenu(SongOrder.LIKED.map { it.second }, sort) {
+                sort = it
+                prefs.edit().putInt("sort-LIKED", it).apply()
+            }
+        },
         emptyState = if (loaded?.isEmpty() == true) {
             { EmptyState(Icons.Default.FavoriteBorder, "Songs you like show up here. Tap the heart on any song to add it.") }
         } else null,
