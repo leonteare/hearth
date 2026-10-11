@@ -113,6 +113,9 @@ class TtlCache<K, V>(private val max: Int, private val ttlMs: Long, private val 
     }
 }
 
+/** A streamable URL for a preview. [fullQuality] streams (FLAC from Tidarr) should only play a short window. */
+data class PreviewStream(val url: String, val mimeType: String?, val codecs: String?, val fullQuality: Boolean = false)
+
 /** One row of Tidarr's download queue. [status] is Tidarr's own word (queue_download, download, …). */
 data class TidarrQueueItem(
     val id: String,
@@ -261,6 +264,32 @@ class TidarrClient(http: OkHttpClient, private val config: () -> TidarrConfig?) 
         TidalAlbumPage(a, tracks.await().sortedWith(compareBy({ it.volumeNumber ?: 1 }, { it.trackNumber ?: 0 })).map { t -> if (t.cover == null) t.copy(cover = a.cover, albumId = t.albumId ?: a.id, albumTitle = t.albumTitle ?: a.title) else t })
     }
 
+    /**
+     * Where to stream [trackId] from for a preview: Tidal's CDN at low quality (a signed URL that needs
+     * no login) when the playback info carries a plain manifest, otherwise Tidarr's own signed stream.
+     * Never cached: the URLs expire.
+     */
+    suspend fun previewStream(trackId: String): PreviewStream {
+        val cfg = cfg()
+        val direct = runCatching {
+            val body = send(
+                "proxy/tidal/v1/tracks/$trackId/playbackinfopostpaywall",
+                query = linkedMapOf(
+                    "audioquality" to "LOW", "playbackmode" to "STREAM", "assetpresentation" to "FULL",
+                    "countryCode" to countryCode(cfg),
+                ),
+                quick = true, cfg = cfg,
+            )
+            TidarrParsing.playbackInfo(body)
+        }.getOrNull()
+        if (direct != null) return direct
+        val signed = TidarrParsing.signedStreamPath(send("api/stream/sign/$trackId", quick = true, cfg = cfg))
+            ?: throw TidarrException("No preview for this song")
+        val base = normalizeUrl(cfg.url).toHttpUrlOrNull() ?: throw TidarrException("The Tidarr address isn't valid")
+        val url = base.resolve(signed) ?: throw TidarrException("No preview for this song")
+        return PreviewStream(url.toString(), mimeType = null, codecs = null, fullQuality = true)
+    }
+
     suspend fun queue(): List<TidarrQueueItem> = TidarrParsing.queue(send("api/queue/list"))
 
     /** Tries every failed item in Tidarr's queue again. */
@@ -377,6 +406,25 @@ object TidarrParsing {
             )
         }
     }
+
+    /**
+     * Tidal's playback info: the stream URL from a "BTS" manifest (base64 JSON with `urls`), or null
+     * when the manifest is anything else (e.g. DASH) or carries no URL.
+     */
+    fun playbackInfo(body: String): PreviewStream? {
+        val root = json.parseToJsonElement(body).obj() ?: return null
+        if (root["manifestMimeType"].str() != "application/vnd.tidal.bts") return null
+        val encoded = root["manifest"].str() ?: return null
+        val decoded = runCatching { String(java.util.Base64.getDecoder().decode(encoded.trim()), Charsets.UTF_8) }.getOrNull() ?: return null
+        val manifest = runCatching { json.parseToJsonElement(decoded).obj() }.getOrNull() ?: return null
+        val url = manifest["urls"].arr()?.firstNotNullOfOrNull { it.str() }?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+            ?: return null
+        return PreviewStream(url, manifest["mimeType"].str(), manifest["codecs"].str())
+    }
+
+    /** Tidarr's /api/stream/sign answer: the relative play path, e.g. "/api/stream/play/1?exp=…&sig=…". */
+    fun signedStreamPath(body: String): String? =
+        json.parseToJsonElement(body).obj()?.get("url").str()
 
     /** tiddl_config.auth.country_code from /api/settings, or null. */
     fun countryCode(body: String): String? =

@@ -128,6 +128,46 @@ class TidarrClientTest {
     }
 
     @Test
+    fun `bts manifest gives the cdn url`() {
+        val stream = TidarrParsing.playbackInfo(fixture("playbackinfo_bts.json"))!!
+        assertEquals("https://sp-ad-cf.audio.tidal.com/mediatracks/abc/0.mp4?token=xyz", stream.url)
+        assertEquals("audio/mp4", stream.mimeType)
+        assertEquals("mp4a.40.5", stream.codecs)
+        assertFalse(stream.fullQuality)
+    }
+
+    @Test
+    fun `other manifests and broken ones give nothing`() {
+        assertNull(TidarrParsing.playbackInfo("""{"manifestMimeType":"application/dash+xml","manifest":"PE1QRD4="}"""))
+        assertNull(TidarrParsing.playbackInfo("""{"manifestMimeType":"application/vnd.tidal.bts","manifest":"not base64!"}"""))
+        assertNull(TidarrParsing.playbackInfo("""{"manifestMimeType":"application/vnd.tidal.bts","manifest":"e30="}"""))
+        assertEquals("/api/stream/play/1?exp=2&sig=s", TidarrParsing.signedStreamPath("""{"url":"/api/stream/play/1?exp=2&sig=s"}"""))
+    }
+
+    @Test
+    fun `preview asks for low quality, and falls back to tidarr's signed stream`() = runTest {
+        server.enqueue(MockResponse().setBody(fixture("settings.json")))
+        server.enqueue(MockResponse().setBody(fixture("playbackinfo_bts.json")))
+        val direct = client.previewStream("77646168")
+        assertTrue(direct.url.startsWith("https://sp-ad-cf.audio.tidal.com/"))
+        server.takeRequest()
+        val info = server.takeRequest().requestUrl!!
+        assertEquals("/proxy/tidal/v1/tracks/77646168/playbackinfopostpaywall", info.encodedPath)
+        assertEquals("LOW", info.queryParameter("audioquality"))
+        assertEquals("STREAM", info.queryParameter("playbackmode"))
+        assertEquals("FULL", info.queryParameter("assetpresentation"))
+        assertEquals("GB", info.queryParameter("countryCode"))
+
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setBody("""{"url":"/api/stream/play/5?exp=9&sig=abc"}"""))
+        val fallback = client.previewStream("5")
+        server.takeRequest()
+        assertEquals("/api/stream/sign/5", server.takeRequest().requestUrl!!.encodedPath)
+        assertTrue(fallback.fullQuality)
+        assertEquals(server.url("/api/stream/play/5?exp=9&sig=abc").toString(), fallback.url)
+    }
+
+    @Test
     fun `no api key means no header`() = runTest {
         server.enqueue(MockResponse().setBody(fixture("queue.json")))
         client.queue()
