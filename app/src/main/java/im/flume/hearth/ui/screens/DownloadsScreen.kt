@@ -27,6 +27,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
+import im.flume.hearth.spoken.SpokenDownloadRow
+import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.spoken.SpokenKey
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Refresh
 import im.flume.hearth.data.RequestEntity
 import im.flume.hearth.data.RequestIntent
 import androidx.compose.foundation.layout.size
@@ -98,6 +104,17 @@ fun DownloadsScreen() {
     val downloading = groups[DownloadState.DOWNLOADING].orEmpty()
     val queued = groups[DownloadState.QUEUED].orEmpty()
     val failed = groups[DownloadState.FAILED].orEmpty()
+    // Podcast episodes and audiobooks.
+    val spokenRows by remember { c.spoken.downloadRows() }.collectAsStateWithLifecycle(emptyList())
+    val spokenBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    val spokenGroups = remember(spokenRows) { spokenRows.groupBy { it.download.state } }
+    val spokenDownloading = spokenGroups[SpokenDownloadState.DOWNLOADING].orEmpty()
+    val spokenQueued = spokenGroups[SpokenDownloadState.QUEUED].orEmpty()
+    val spokenFailed = spokenGroups[SpokenDownloadState.FAILED].orEmpty()
+    val spokenFinished = remember(spokenGroups) {
+        spokenGroups[SpokenDownloadState.DONE].orEmpty().filter { it.download.completedAt >= since }.sortedByDescending { it.download.completedAt }
+    }
+    val spokenActive = spokenDownloading + spokenQueued + spokenFailed
     val left = downloading.size + queued.size
     val userPaused = settings.downloadsPaused
     val waitingForWifi = left > 0 && settings.wifiOnlyDownloads && !onWifi
@@ -124,14 +141,20 @@ fun DownloadsScreen() {
                 item(key = "c-head") { SectionHeader("Coming to your server") }
                 items(coming, key = { "c:${it.type}:${it.tidalId}" }) { r -> ComingRow(r, Modifier.animateItem()) }
             }
-            if (pending.isEmpty() && coming.isEmpty()) {
+            if (pending.isEmpty() && coming.isEmpty() && spokenActive.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
                         Icons.Outlined.ArrowCircleDown,
                         "No downloads in progress. Tap the download button on an album or playlist to keep it on your phone.",
                     )
                 }
-            } else if (pending.isNotEmpty()) {
+            }
+            if (pending.isEmpty()) {
+                // Podcasts and audiobooks download on their own; their rows sit in the same sections as songs.
+                spokenSection("sd", "Downloading", spokenDownloading)
+                spokenSection("sq", "Up next", spokenQueued)
+                spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Retry") } }
+            } else {
                 item(key = "status") {
                     val (title, body) = when {
                         left == 0 -> "Nothing downloading" to null
@@ -164,19 +187,23 @@ fun DownloadsScreen() {
                         },
                     )
                 }
-                if (downloading.isNotEmpty()) {
+                if (downloading.isNotEmpty() || spokenDownloading.isNotEmpty()) {
                     item(key = "d-head") { SectionHeader("Downloading") }
                     items(downloading, key = { "d:${it.id}" }) { song -> PendingSongRow(song, { play(downloading, song) }, Modifier.animateItem()) }
+                    spokenRows("sd", spokenDownloading)
                 }
-                if (queued.isNotEmpty()) {
+                if (queued.isNotEmpty() || spokenQueued.isNotEmpty()) {
                     item(key = "q-head") { SectionHeader("Up next") }
                     val shown = queued.take(SECTION_LIMIT)
                     items(shown, key = { "q:${it.id}" }) { song -> PendingSongRow(song, { play(shown, song) }, Modifier.animateItem()) }
                     if (queued.size > SECTION_LIMIT) {
                         item(key = "q-more") { MoreLine("+${queued.size - SECTION_LIMIT} more waiting") }
                     }
+                    spokenRows("sq", spokenQueued)
                 }
-                if (failed.isNotEmpty()) {
+                if (failed.isEmpty()) {
+                    spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Retry") } }
+                } else {
                     item(key = "f-head") {
                         SectionHeader("Couldn't download") {
                             if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry") }
@@ -189,11 +216,25 @@ fun DownloadsScreen() {
                     if (failed.size > SECTION_LIMIT) {
                         item(key = "f-more") { MoreLine("+${failed.size - SECTION_LIMIT} more") }
                     }
+                    if (spokenFailed.isNotEmpty()) {
+                        item(key = "sf-retry") {
+                            TextButton(onClick = { c.spoken.downloads.retryFailed() }, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Retry podcasts and audiobooks") }
+                        }
+                        spokenRows("sf", spokenFailed)
+                    }
                 }
             }
-            finishedSection(finished) { song -> play(finished, song) }
+            if (finished.isEmpty()) {
+                spokenSection("sdone", "Finished", spokenFinished)
+            } else {
+                finishedSection(finished) { song -> play(finished, song) }
+                spokenRows("sdone", spokenFinished)
+            }
             item(key = "space") {
-                MoreLine("${formatBytes(bytes)} of music downloaded to this phone")
+                MoreLine(
+                    if (spokenBytes > 0) "${formatBytes(bytes + spokenBytes)} downloaded to this phone: ${formatBytes(bytes)} of music, ${formatBytes(spokenBytes)} of podcasts and audiobooks"
+                    else "${formatBytes(bytes)} of music downloaded to this phone"
+                )
             }
         }
     }
@@ -278,6 +319,72 @@ private fun PendingSongRow(song: SongEntity, onClick: () -> Unit, modifier: Modi
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
+        }
+    }
+}
+
+/** Podcast / audiobook downloads in a section of their own (when no songs share that section). */
+private fun LazyListScope.spokenSection(
+    key: String,
+    title: String,
+    rows: List<SpokenDownloadRow>,
+    trailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
+) {
+    if (rows.isEmpty()) return
+    item(key = "$key-head") { SectionHeader(title, trailing = trailing) }
+    spokenRows(key, rows)
+}
+
+private fun LazyListScope.spokenRows(key: String, rows: List<SpokenDownloadRow>) {
+    items(rows.take(SECTION_LIMIT), key = { "$key:${it.download.libraryItemId}/${it.download.episodeId}" }) { r -> SpokenDownloadListRow(r, Modifier.animateItem()) }
+}
+
+/** An episode or book download: cover, what it is, and progress while it's on its way. Tap opens its page. */
+@Composable
+private fun SpokenDownloadListRow(r: SpokenDownloadRow, modifier: Modifier = Modifier) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val d = r.download
+    val key = SpokenKey(d.libraryItemId, d.episodeId)
+    val progress by remember(key) {
+        c.spoken.downloads.progress.map { if (key in it) it[key] ?: 0f else null }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(null)
+    var menu by remember { mutableStateOf(false) }
+    val title = r.title ?: if (d.isBook) "Audiobook" else "Episode"
+    Column(modifier) {
+        MediaRow(
+            title,
+            when (d.state) {
+                SpokenDownloadState.FAILED -> d.error ?: "Couldn't download"
+                SpokenDownloadState.DONE -> listOfNotNull(r.subtitle, formatBytes(d.bytes).takeIf { d.bytes > 0 }).joinToString(" · ")
+                else -> listOfNotNull(if (d.isBook) "Audiobook" else "Podcast", r.subtitle).joinToString(" · ")
+            },
+            onClick = { actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId)) },
+            coverUrl = c.spokenCover(d.libraryItemId, 150),
+            fallback = r.subtitle ?: title,
+            subtitleColor = if (d.state == SpokenDownloadState.FAILED) Destructive else TextSecondary,
+            trailing = { IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) } },
+        )
+        if (progress != null) {
+            LinearProgressIndicator(
+                progress = { progress ?: 0f },
+                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
+                trackColor = TextSecondary.copy(alpha = 0.25f),
+                gapSize = 0.dp,
+                drawStopIndicator = {},
+            )
+        }
+    }
+    im.flume.hearth.ui.components.ActionSheet(menu, { menu = false }, title = title, subtitle = r.subtitle, coverUrl = c.spokenCover(d.libraryItemId, 150), fallback = r.subtitle) {
+        if (d.state == SpokenDownloadState.FAILED) {
+            im.flume.hearth.ui.components.MenuItem("Try again", Icons.Default.Refresh) { menu = false; c.spoken.downloads.retryFailed() }
+        }
+        im.flume.hearth.ui.components.MenuItem(
+            if (d.state == SpokenDownloadState.DONE) "Remove download" else "Cancel download",
+            Icons.Default.Close,
+        ) { menu = false; c.spoken.downloads.remove(d.libraryItemId, d.episodeId) }
+        im.flume.hearth.ui.components.MenuItem(if (d.isBook) "Go to book" else "Go to show", Icons.Default.Podcasts) {
+            menu = false; actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId))
         }
     }
 }

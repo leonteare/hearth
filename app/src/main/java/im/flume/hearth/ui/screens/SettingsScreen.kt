@@ -208,6 +208,7 @@ fun StorageSettings() {
     val scope = rememberCoroutineScope()
     val settings by c.session.settings.collectAsStateWithLifecycle()
     val downloadedBytes by remember { c.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    val spokenDownloadedBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
     val counts by remember { c.downloads.counts }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
     val actions = LocalActions.current
     var cacheCleared by remember { mutableStateOf(false) }
@@ -218,7 +219,7 @@ fun StorageSettings() {
         Clickable(
             "Downloads",
             listOfNotNull(
-                "${formatBytes(downloadedBytes)} used",
+                "${formatBytes(downloadedBytes + spokenDownloadedBytes)} used",
                 "${counts.left} left to download".takeIf { counts.left > 0 },
                 "${counts.failed} couldn't download".takeIf { counts.failed > 0 },
             ).joinToString(" · "),
@@ -399,9 +400,15 @@ private fun PodcastsAndAudiobooksSettings() {
 
     Section("Podcasts & audiobooks")
     val a = account
+    val spokenBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+    val syncing by c.spoken.syncing.collectAsStateWithLifecycle()
     if (a != null && !a.needsSignIn) {
-        Info("Signed in to Audiobookshelf", "${a.username} · ${a.serverUrl}")
+        Info("Signed in as ${a.username}", a.serverUrl.removePrefix("https://").removePrefix("http://"))
+        if (spokenBytes > 0) Info("Downloaded to this phone", formatBytes(spokenBytes))
         Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(enabled = !syncing, onClick = { scope.launch { c.spoken.refresh(force = true) } }) {
+                Text(if (syncing) "Refreshing…" else "Refresh now")
+            }
             TextButton(
                 enabled = !busy,
                 onClick = {
@@ -417,9 +424,10 @@ private fun PodcastsAndAudiobooksSettings() {
         }
     } else {
         Text(
-            if (a?.needsSignIn == true) "Your Audiobookshelf login expired. Sign in again; nothing on this phone is lost."
-            else "Sign in to your Audiobookshelf server to listen to podcasts and audiobooks. Each person uses their own account, so progress and followed shows are yours.",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            if (a?.needsSignIn == true) "Your sign-in for podcasts & audiobooks expired. Sign in again; nothing on this phone is lost."
+            // The one place the server software is named, so you know which login it wants.
+            else "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks. Each of you has your own, so progress and followed shows are yours.",
+            color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
         androidx.compose.material3.OutlinedTextField(
             value = url, onValueChange = { url = it; result = null },
@@ -448,26 +456,28 @@ private fun PodcastsAndAudiobooksSettings() {
                 scope.launch {
                     val error = c.spoken.signIn(url, username, password)
                     busy = false
-                    if (error == null) { password = ""; actions.showMessage("Signed in to Audiobookshelf") } else result = "Failed: $error"
+                    if (error == null) { password = ""; actions.showMessage("Signed in. Your podcasts and audiobooks are on their way") } else result = "Failed: $error"
                 }
             },
         ) { Text(if (busy) "Signing in…" else "Sign in") }
     }
-    (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed: last sync: $it" })?.let {
+    (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed: last refresh: $it" })?.let {
         Text(
             it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
-    Toggle("Auto-download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Finished episodes are removed from this phone.") { v ->
-        c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
-        if (v) scope.launch { c.spoken.refresh(force = true) }
+    if (a != null) {
+        Toggle("Download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Played episodes are removed from this phone.") { v ->
+            c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
+            if (v) scope.launch { c.spoken.refresh(force = true) }
+        }
     }
 
     if (confirmSignOut) {
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
-            title = { Text("Sign out of Audiobookshelf?") },
+            title = { Text("Sign out of podcasts & audiobooks?") },
             text = { Text("Downloaded episodes and books stay on this phone. Your progress is kept on the server.") },
             confirmButton = {
                 TextButton(onClick = {
