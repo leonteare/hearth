@@ -626,6 +626,7 @@ fun LibraryScreen() {
                         }
                     }
                     LibraryTab.AUDIOBOOKS -> {
+                        item(key = "phone-books") { PhoneAudiobooks(sort) }
                         when {
                             spokenAccount == null -> item { SpokenSignInPrompt("audiobooks") }
                             sortedBooks.isEmpty() -> item {

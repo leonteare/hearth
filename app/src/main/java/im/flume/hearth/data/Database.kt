@@ -345,8 +345,10 @@ class Converters {
         im.flume.hearth.spoken.ChapterEntity::class, im.flume.hearth.spoken.SpokenProgressEntity::class,
         im.flume.hearth.spoken.OutboxEntity::class, im.flume.hearth.spoken.SpokenDownloadEntity::class,
         im.flume.hearth.spoken.SpokenPlayPrefEntity::class,
+        im.flume.hearth.spoken.LocalBookEntity::class, im.flume.hearth.spoken.LocalBookFileEntity::class,
+        im.flume.hearth.spoken.LocalBookProgressEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -356,6 +358,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun lyrics(): LyricsDao
     abstract fun requests(): RequestDao
     abstract fun spoken(): im.flume.hearth.spoken.SpokenDao
+    abstract fun localBooks(): im.flume.hearth.spoken.LocalBookDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -457,10 +460,23 @@ abstract class AppDatabase : RoomDatabase() {
             "UPDATE abs_podcasts SET episodesFetchedAt = 0",
         )
 
+        /** Audiobooks from folders on the phone, their files and progress (new tables only). Must match the entities exactly. */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_9_10_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_9_10_SQL = listOf(
+            "CREATE TABLE IF NOT EXISTS `local_books` (`id` TEXT NOT NULL, `treeUri` TEXT NOT NULL, `relPath` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `durationSec` REAL NOT NULL, `sizeBytes` INTEGER NOT NULL, `numFiles` INTEGER NOT NULL, `coverPath` TEXT, `addedAt` INTEGER NOT NULL, `scannedAt` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, `serverItemId` TEXT, `uploadState` TEXT, `uploadError` TEXT, PRIMARY KEY(`id`))",
+            "CREATE TABLE IF NOT EXISTS `local_book_files` (`bookId` TEXT NOT NULL, `fileIndex` INTEGER NOT NULL, `uri` TEXT NOT NULL, `relPath` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `lastModified` INTEGER NOT NULL, `durationSec` REAL NOT NULL, `mimeType` TEXT, `title` TEXT, PRIMARY KEY(`bookId`, `fileIndex`))",
+            "CREATE TABLE IF NOT EXISTS `local_book_progress` (`bookId` TEXT NOT NULL, `positionSec` REAL NOT NULL, `durationSec` REAL NOT NULL, `finished` INTEGER NOT NULL, `finishedAt` INTEGER, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`bookId`))",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .build()
     }
 }

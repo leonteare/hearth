@@ -131,4 +131,19 @@ class MigrationTest {
         val idx = { v: Int -> entities(v).first { it["tableName"]!!.jsonPrimitive.content == "abs_episodes" }["indices"].toString() }
         assertEquals(idx(8), idx(9))
     }
+
+    @Test
+    fun `migration 9 to 10 creates exactly the phone audiobook tables`() {
+        val v9 = entities(9).map { it["tableName"]!!.jsonPrimitive.content }.toSet()
+        val added = entities(10).filter { it["tableName"]!!.jsonPrimitive.content !in v9 }
+        val expected = added.flatMap { e ->
+            val table = e["tableName"]!!.jsonPrimitive.content
+            val index = e["indices"]?.jsonArray.orEmpty().map { it.jsonObject["createSql"]!!.jsonPrimitive.content }
+            (listOf(e["createSql"]!!.jsonPrimitive.content) + index).map { it.replace("`\${TABLE_NAME}`", "`$table`") }
+        }
+        assertEquals(expected.sorted(), AppDatabase.MIGRATION_9_10_SQL.sorted())
+        assertEquals(setOf("local_books", "local_book_files", "local_book_progress"), added.map { it["tableName"]!!.jsonPrimitive.content }.toSet())
+        // Every existing table is unchanged.
+        v9.forEach { assertEquals(it, createSql(9, it), createSql(10, it)) }
+    }
 }

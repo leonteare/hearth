@@ -375,7 +375,7 @@ private fun SpokenPlayerMenu(state: PlayerUiState, spoken: SpokenNowPlaying, inf
             MenuItem("Back to music", Icons.Default.LibraryMusic) { open = false; c.player.backToMusic() }
         }
         MenuItem(if (spoken.isBook) "Go to book" else "Go to show", Icons.Default.Podcasts) { open = false; openPage() }
-        when (info.downloadState) {
+        if (!im.flume.hearth.spoken.LocalBookIds.isLocal(spoken.libraryItemId)) when (info.downloadState) {
             SpokenDownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) {
                 open = false; c.spoken.downloads.remove(key.libraryItemId, key.episodeId)
             }

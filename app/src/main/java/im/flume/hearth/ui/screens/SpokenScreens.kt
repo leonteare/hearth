@@ -130,7 +130,7 @@ fun playEpisode(c: AppContainer, actions: Actions, libraryItemId: String, episod
 }
 
 fun playBook(c: AppContainer, actions: Actions, libraryItemId: String, downloaded: Boolean, startSec: Double? = null) {
-    if (c.network.cannotStream && !downloaded) {
+    if (c.network.cannotStream && !downloaded && !im.flume.hearth.spoken.LocalBookIds.isLocal(libraryItemId)) {
         actions.showMessage("You're offline and this book isn't downloaded")
         return
     }
@@ -477,6 +477,8 @@ internal fun RoundPlayButton(label: String, playing: Boolean = false, onClick: (
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookScreen(id: String) {
+    // A book from a folder on the phone has its own page (no server, no download).
+    if (im.flume.hearth.spoken.LocalBookIds.isLocal(id)) return LocalBookScreen(id)
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val scope = rememberCoroutineScope()

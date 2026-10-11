@@ -225,4 +225,51 @@ class AbsClientTest {
         assertEquals("AB", PodcastPaths.sanitizeFilename("A/B"))
         assertEquals("Trailing", PodcastPaths.sanitizeFilename("Trailing. "))
     }
+
+    @Test
+    fun `uploading a book sends the form fields the server reads and every file with its name`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200))
+        var lastProgress = 0L
+        client.uploadBook(
+            "lib1", "fol1", "The Hobbit", "J.R.R. Tolkien",
+            listOf(
+                AbsUploadFile("01 Chapter 1.mp3", 3, "audio/mpeg") { "abc".byteInputStream() },
+                AbsUploadFile("02 Chapter 2.mp3", 2, null) { "de".byteInputStream() },
+            ),
+        ) { lastProgress = it }
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/api/upload", req.path)
+        assertEquals("Bearer access-1", req.getHeader("Authorization"))
+        assertTrue(req.getHeader("Content-Type")!!.startsWith("multipart/form-data"))
+        val body = req.body.readUtf8()
+        listOf("title" to "The Hobbit", "author" to "J.R.R. Tolkien", "library" to "lib1", "folder" to "fol1").forEach { (k, v) ->
+            assertTrue(k, body.contains("name=\"$k\"\r\nContent-Length: ${v.length}\r\n\r\n$v\r\n"))
+        }
+        assertTrue(body.contains("name=\"0\"; filename=\"01 Chapter 1.mp3\""))
+        assertTrue(body.contains("name=\"1\"; filename=\"02 Chapter 2.mp3\""))
+        assertTrue(body.contains("\r\n\r\nabc\r\n"))
+        assertEquals(5L, lastProgress)
+    }
+
+    @Test
+    fun `an upload the server refuses for permissions says so plainly`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(403))
+        try {
+            client.uploadBook("lib1", "fol1", "Book", null, listOf(AbsUploadFile("a.m4b", 1, null) { "a".byteInputStream() }))
+            fail("expected an error")
+        } catch (e: AbsException) {
+            assertEquals("Your account isn't allowed to upload to the server", e.message)
+        }
+        assertFalse(server.takeRequest().body.readUtf8().contains("name=\"author\""))
+    }
+
+    @Test
+    fun `asking for a library scan posts to the library`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(200))
+        client.scanLibrary("lib1")
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/api/libraries/lib1/scan", req.path)
+    }
 }

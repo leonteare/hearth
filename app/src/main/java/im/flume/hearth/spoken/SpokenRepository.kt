@@ -85,6 +85,8 @@ class SpokenRepository(
     val downloads = SpokenDownloads(context, db, api, session, { store.settings.value }, network, scope)
     /** Each show's full feed, and episodes being fetched onto the server from it. */
     val feeds = ShowFeeds(context, this, scope)
+    /** Audiobooks from folders on this phone, which can be added to the server. */
+    val local = LocalBooks(context, db, this, scope)
     private val dao = db.spoken()
     private val syncLock = Mutex()
 
@@ -110,6 +112,7 @@ class SpokenRepository(
 
     /** App start: sync if signed in, send unsent progress, keep the periodic sync scheduled. */
     fun start() {
+        local.start()
         if (store.account.value != null) {
             schedulePeriodicSync()
             scope.launch { refresh(force = false) }
@@ -185,7 +188,9 @@ class SpokenRepository(
         store.account.map { it?.username }.distinctUntilChanged().flatMapLatest { u -> if (u == null) flowOf(emptyList()) else dao.latestEpisodesTagged(FollowTags.tagFor(u), limit) }
 
     /** Started, unfinished episodes and books, most recently played first. */
-    fun continueListening(limit: Int = 20): Flow<List<ContinueItem>> =
+    fun continueListening(limit: Int = 20): Flow<List<ContinueItem>> = mergeContinue(serverContinueListening(limit), local.inProgress(limit), limit)
+
+    private fun serverContinueListening(limit: Int): Flow<List<ContinueItem>> =
         combine(dao.episodesInProgress(limit), dao.booksInProgress(limit)) { eps, books ->
             (eps.map { ContinueItem(it.episode.libraryItemId, it.episode.id, it.episode.title, it.podcastTitle, it.progressSec ?: 0.0, it.episode.durationSec, it.progressUpdatedAt ?: 0) } +
                 books.map { ContinueItem(it.book.id, null, it.book.title, it.book.author, it.progressSec ?: 0.0, it.book.durationSec, it.progressUpdatedAt ?: 0) })
@@ -200,10 +205,12 @@ class SpokenRepository(
     /** Downloads with what they are (episode / book title, show / author), for the Downloads page. */
     fun downloadRows(): Flow<List<SpokenDownloadRow>> = dao.downloadRows()
 
-    fun book(id: String): Flow<BookRow?> = dao.book(id)
+    /** A server book, or a book on the phone shown the same way (see [LocalBookIds]). */
+    fun book(id: String): Flow<BookRow?> = if (LocalBookIds.isLocal(id)) local.book(id).map { it?.toBookRow() } else dao.book(id)
 
     /** Chapters of a book ([episodeId] null) or episode; times on the whole item's timeline. */
-    fun chapters(libraryItemId: String, episodeId: String? = null): Flow<List<ChapterEntity>> = dao.chaptersFlow(libraryItemId, episodeId.orEmpty())
+    fun chapters(libraryItemId: String, episodeId: String? = null): Flow<List<ChapterEntity>> =
+        if (LocalBookIds.isLocal(libraryItemId)) local.chapters(libraryItemId) else dao.chaptersFlow(libraryItemId, episodeId.orEmpty())
 
     fun progress(libraryItemId: String, episodeId: String? = null): Flow<SpokenProgressEntity?> = progress.progressFlow(libraryItemId, episodeId)
 
@@ -216,7 +223,8 @@ class SpokenRepository(
     }
 
     /** Cover image URL (needs no login), for Coil. */
-    fun coverUrl(libraryItemId: String, width: Int = 600): String? = api.coverUrl(libraryItemId, width, coverVersions[libraryItemId])
+    fun coverUrl(libraryItemId: String, width: Int = 600): String? =
+        if (LocalBookIds.isLocal(libraryItemId)) local.coverUrl(libraryItemId) else api.coverUrl(libraryItemId, width, coverVersions[libraryItemId])
 
     fun isFollowing(podcast: PodcastEntity): Boolean = username?.let { FollowTags.isFollowing(podcast.tagList, it) } == true
 
@@ -226,7 +234,7 @@ class SpokenRepository(
     // ------------------------------------------------------------------ actions
 
     suspend fun markFinished(libraryItemId: String, episodeId: String?, finished: Boolean) {
-        val duration = if (episodeId != null) dao.episodeOnce(episodeId)?.episode?.durationSec ?: 0.0 else dao.bookOnce(libraryItemId)?.durationSec ?: 0.0
+        val duration = if (LocalBookIds.isLocal(libraryItemId)) local.durationOf(libraryItemId) else if (episodeId != null) dao.episodeOnce(episodeId)?.episode?.durationSec ?: 0.0 else dao.bookOnce(libraryItemId)?.durationSec ?: 0.0
         progress.setFinished(libraryItemId, episodeId, finished, duration)
     }
 
