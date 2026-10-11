@@ -27,6 +27,7 @@ import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -268,6 +269,7 @@ class SpokenRepository(
                         dao.podcastOnce(podcastId)?.let { downloads.planAutoDownloads(listOf(it)) }
                     } else {
                         downloads.onUnfollowed(podcastId)
+                        clearFromServerSoon(podcastId)
                     }
                     return null
                 }
@@ -276,6 +278,36 @@ class SpokenRepository(
         } catch (e: Exception) {
             before?.let { dao.setPodcastTags(podcastId, it.tags) }
             return userMessage(e)
+        }
+    }
+
+    /**
+     * Once Undo has had its chance, clears an unfollowed show's episodes off the server if nobody follows
+     * it any more. Anything this misses (app closed, offline) the server's hourly cleanup removes.
+     */
+    private fun clearFromServerSoon(podcastId: String) {
+        scope.launch {
+            delay(UNFOLLOW_CLEAR_DELAY_MS)
+            try {
+                val user = username ?: return@launch
+                val item = api.item(podcastId) ?: return@launch
+                if (!UnfollowServerCleanup.shouldClear(item.media.tags)) return@launch
+                // No new episodes arriving for a show nobody follows.
+                if (item.media.autoDownloadEpisodes == true) {
+                    api.setAutoDownload(podcastId, false)
+                    dao.setPodcastAutoDownload(podcastId, false)
+                }
+                val othersPartWay = api.users().filter { !it.username.equals(user, ignoreCase = true) }
+                    .flatMap { api.user(it.id).mediaProgress }
+                    .filter { it.libraryItemId == podcastId && !it.isFinished }
+                    .mapNotNullTo(HashSet()) { it.episodeId }
+                val current = downloads.current?.takeIf { it.libraryItemId == podcastId }?.episodeId
+                val gone = UnfollowServerCleanup.toDelete(item.media.episodes.orEmpty().map { it.id }, othersPartWay, current)
+                gone.forEach { api.deleteEpisode(podcastId, it) }
+                if (gone.isNotEmpty()) refresh(force = true)
+            } catch (e: Exception) {
+                im.flume.hearth.logHandledError(context, "spoken unfollow cleanup", e)
+            }
         }
     }
 
@@ -522,6 +554,8 @@ class SpokenRepository(
         const val SYNC_WORK = "abs-sync"
         /** How many of a show's latest episodes the server fetches when it's followed. */
         const val NEWEST_ON_FOLLOW = 3
+        /** Longer than the Undo snackbar, so undoing an unfollow never finds the episodes already gone. */
+        const val UNFOLLOW_CLEAR_DELAY_MS = 15_000L
     }
 }
 

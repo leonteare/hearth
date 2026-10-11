@@ -342,6 +342,17 @@ class AbsClient(
     suspend fun parseOpml(opmlText: String): List<AbsOpmlFeed> =
         send("POST", "api/podcasts/opml/parse", buildJsonObject { put("opmlText", opmlText) }, AbsOpmlParseResponse.serializer())!!.feeds
 
+    /** Everyone with an account on the server (admins only). */
+    suspend fun users(): List<AbsUser> = get("api/users", AbsUsersResponse.serializer()).users
+
+    /** One user, with their listening progress (admins only). */
+    suspend fun user(userId: String): AbsUser = get("api/users/$userId", AbsUser.serializer())
+
+    /** Deletes an episode and its audio file from the server (admins only). */
+    suspend fun deleteEpisode(libraryItemId: String, episodeId: String) {
+        call<Unit>(Request.Builder().url(url("api/podcasts/$libraryItemId/episode/$episodeId", mapOf("hard" to "1"))).delete().build(), null)
+    }
+
     /** Has the server download these feed episodes (objects as returned by [podcastFeed]). */
     suspend fun downloadEpisodesOnServer(libraryItemId: String, episodes: JsonArray) {
         send<Unit>("POST", "api/podcasts/$libraryItemId/download-episodes", episodes, null)

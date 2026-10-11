@@ -209,7 +209,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
                                 followBusy = false
                                 when {
                                     error != null -> actions.showMessage("Couldn't ${if (following) "unfollow" else "follow"}: $error")
-                                    following -> actions.showUndo("Unfollowed $title. Its episodes are gone from this phone.") { c.spoken.follow(p!!.id) }
+                                    following -> actions.showUndo("Unfollowed $title. Its episodes are leaving this phone and your server.") { c.spoken.follow(p!!.id) }
                                     p == null -> actions.showMessage("Following $title. Its newest episodes are on their way.")
                                     else -> actions.showMessage("Following $title. New episodes will show on Home.")
                                 }

@@ -176,6 +176,20 @@ data class DownloadInfo(val state: SpokenDownloadState, val auto: Boolean)
 /** One of a show's download rows, for [SpokenDownloadPolicy.unfollowPlan]. */
 data class DownloadRowInfo(val episodeId: String, val state: SpokenDownloadState)
 
+/** What unfollowing clears off the server straight away. */
+object UnfollowServerCleanup {
+    /** Only when nobody follows the show any more (someone else following keeps it all, as before). */
+    fun shouldClear(tags: List<String>): Boolean = FollowTags.followers(tags).isEmpty()
+
+    /**
+     * Every episode on the server goes, except one someone else is part-way through (picked from the
+     * show page and still listening) and the one loaded in this phone's player. The server's hourly
+     * cleanup removes those once they're finished.
+     */
+    fun toDelete(episodeIds: List<String>, othersPartWay: Set<String>, currentEpisodeId: String?): List<String> =
+        episodeIds.filter { it !in othersPartWay && it != currentEpisodeId }
+}
+
 object SpokenDownloadPolicy {
     const val KEEP_UNPLAYED = 3
 

@@ -27,6 +27,9 @@ data class AbsUser(
 )
 
 @Serializable
+data class AbsUsersResponse(val users: List<AbsUser> = emptyList())
+
+@Serializable
 data class AbsPermissions(val download: Boolean = true, val update: Boolean = false, val delete: Boolean = false)
 
 @Serializable

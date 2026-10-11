@@ -50,4 +50,16 @@ class FollowCleanupTest {
         assertEquals(listOf("c"), plan.removeLater)
         assertEquals(listOf("a", "b", "c"), SpokenDownloadPolicy.unfollowPlan(rows, null).removeNow)
     }
+
+    @Test
+    fun `unfollowing clears the server only when nobody else follows`() {
+        assertEquals(true, UnfollowServerCleanup.shouldClear(listOf("hearth-unfollowed:500")))
+        assertEquals(false, UnfollowServerCleanup.shouldClear(listOf("hearth-follower:sadie")))
+    }
+
+    @Test
+    fun `unfollowing keeps what someone else is part-way through and what is in the player`() {
+        assertEquals(listOf("a", "d"), UnfollowServerCleanup.toDelete(listOf("a", "b", "c", "d"), othersPartWay = setOf("b"), currentEpisodeId = "c"))
+        assertEquals(listOf("a", "b"), UnfollowServerCleanup.toDelete(listOf("a", "b"), emptySet(), null))
+    }
 }
