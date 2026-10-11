@@ -87,6 +87,11 @@ fun HomeScreen() {
     val downloadsLabel = downloadsShortcutLabel(downloadCounts, coming)
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
+    // Podcasts and audiobooks, once signed in: what you're part-way through, and new episodes of shows you follow.
+    val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
+    val continueListening by remember { c.spoken.continueListening(12) }.collectAsStateWithLifecycle(emptyList())
+    val latestEpisodes by remember { c.spoken.latestEpisodes(50) }.collectAsStateWithLifecycle(emptyList())
+    val newEpisodes = remember(latestEpisodes) { im.flume.hearth.spoken.SpokenLists.newEpisodes(latestEpisodes, 5) }
 
     var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
     LaunchedEffect(online, songCount > 0) {
@@ -134,6 +139,11 @@ fun HomeScreen() {
                     recent.take(if (downloadsLabel != null) 3 else 4).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
                 }
             )
+        }
+
+        if (spokenAccount != null) {
+            continueListeningSection(continueListening, c, actions)
+            newEpisodesSection(newEpisodes)
         }
 
         items(StatsPeriod.current(), key = { "stats:${it.key}" }) { StatsCard(it) }

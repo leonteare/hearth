@@ -49,6 +49,8 @@ fun MediaRow(
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     coverArt: String? = null,
+    /** Artwork from elsewhere (podcast / audiobook covers), used instead of [coverArt]. */
+    coverUrl: String? = null,
     fallback: String? = title,
     round: Boolean = false,
     cover: (@Composable () -> Unit)? = null,
@@ -83,7 +85,7 @@ fun MediaRow(
             CoverArt(
                 coverArt, Dimens.RowCover,
                 corner = if (round) Dimens.RowCover / 2 else Dimens.CoverCorner,
-                requestSize = 150, fallback = fallback,
+                requestSize = 150, fallback = fallback, url = coverUrl,
             )
         }
         Spacer(Modifier.width(Dimens.CoverGap))
@@ -124,6 +126,8 @@ fun MediaCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     coverArt: String? = null,
+    /** Artwork from elsewhere (podcast / audiobook covers), used instead of [coverArt]. */
+    coverUrl: String? = null,
     width: Dp = Dimens.CardWidth,
     round: Boolean = false,
     subtitleLines: Int = 1,
@@ -138,7 +142,7 @@ fun MediaCard(
     val textAlpha = if (dimmed) im.flume.hearth.ui.theme.NotOnServerAlpha else 1f
     Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
         if (cover != null) cover()
-        else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title)
+        else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title, url = coverUrl)
         Spacer(Modifier.height(8.dp))
         Text(
             title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = CardTitleStyle, textAlign = align,

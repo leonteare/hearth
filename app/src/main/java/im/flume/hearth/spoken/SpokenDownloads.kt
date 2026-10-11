@@ -246,7 +246,7 @@ class SpokenDownloads(
             try {
                 withContext(Dispatchers.IO) {
                     call.execute().use { resp ->
-                        if (!resp.isSuccessful) throw IOException("Audiobookshelf answered HTTP ${resp.code}")
+                        if (!resp.isSuccessful) throw IOException("The podcast server answered HTTP ${resp.code}")
                         resp.body!!.byteStream().use { input ->
                             tmp.outputStream().use { out ->
                                 val buf = ByteArray(64 * 1024)

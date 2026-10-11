@@ -191,6 +191,12 @@ class SpokenRepository(
 
     fun books(): Flow<List<BookRow>> = dao.books()
 
+    /** Every episode on the phone, for search. */
+    suspend fun allEpisodes(): List<EpisodeRow> = dao.allEpisodesOnce()
+
+    /** Downloads with what they are (episode / book title, show / author), for the Downloads page. */
+    fun downloadRows(): Flow<List<SpokenDownloadRow>> = dao.downloadRows()
+
     fun book(id: String): Flow<BookRow?> = dao.book(id)
 
     /** Chapters of a book ([episodeId] null) or episode; times on the whole item's timeline. */
@@ -220,7 +226,7 @@ class SpokenRepository(
      * auto-download for the show. Returns null on success, or the reason it failed.
      */
     suspend fun setFollowing(podcastId: String, follow: Boolean): String? {
-        val user = username ?: return "Not signed in to Audiobookshelf"
+        val user = username ?: return "Not signed in to podcasts & audiobooks"
         val before = dao.podcastOnce(podcastId)
         before?.let { dao.setPodcastTags(podcastId, FollowTags.withFollower(it.tagList, user, follow).joinToString("\n")) } // instant UI
         try {
@@ -266,7 +272,7 @@ class SpokenRepository(
      * right away, so there's something to play. Returns the podcast's id.
      */
     suspend fun addPodcast(feedUrl: String, directoryEntry: AbsPodcastSearchResult? = null, follow: Boolean = true, downloadLatest: Int = 3): Result<String> = runCatching {
-        val user = username ?: throw AbsAuthException("Not signed in to Audiobookshelf")
+        val user = username ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
         findByFeed(feedUrl)?.let { existing ->
             if (follow) setFollowing(existing.id, true)?.let { throw IllegalStateException(it) }
             return@runCatching existing.id
@@ -310,10 +316,7 @@ class SpokenRepository(
         return lib to (lib.folders.firstOrNull() ?: throw IllegalStateException("The podcast library has no folder"))
     }
 
-    private fun sameFeed(a: String?, b: String?): Boolean {
-        fun norm(s: String?) = s?.trim()?.trimEnd('/')?.removePrefix("https://")?.removePrefix("http://")?.lowercase()
-        return a != null && b != null && norm(a) == norm(b)
-    }
+    private fun sameFeed(a: String?, b: String?): Boolean = FeedUrls.same(a, b)
 
     // ------------------------------------------------------------------ sync
 
@@ -324,7 +327,7 @@ class SpokenRepository(
      */
     suspend fun refresh(force: Boolean = true): Boolean = syncLock.withLock {
         val account = store.account.value ?: return@withLock false
-        if (account.needsSignIn) { _lastError.value = "Sign in to Audiobookshelf again in Settings"; return@withLock false }
+        if (account.needsSignIn) { _lastError.value = "Sign in to podcasts & audiobooks again in Settings"; return@withLock false }
         val now = System.currentTimeMillis()
         if (!force && now - lastSyncAt < 5 * 60_000) return@withLock true
         _syncing.value = true

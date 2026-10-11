@@ -560,7 +560,7 @@ private fun LazyListScope.albumCarousel(key: String, title: String, albums: List
 
 /** Outlined pill: "Follow" adds the artist to Your Library, "Following" when they're already there. */
 @Composable
-private fun FollowButton(following: Boolean, onClick: () -> Unit) {
+internal fun FollowButton(following: Boolean, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     OutlinedButton(
         onClick = onClick,

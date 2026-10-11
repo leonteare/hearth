@@ -198,6 +198,13 @@ data class BookRow(
     val downloadedBytes: Long?,
 )
 
+/** A download with its episode / book title and show / author, for the Downloads page. */
+data class SpokenDownloadRow(
+    @Embedded val download: SpokenDownloadEntity,
+    val title: String?,
+    val subtitle: String?,
+)
+
 @Dao
 interface SpokenDao {
     // --- podcasts ---
@@ -235,6 +242,19 @@ interface SpokenDao {
 
     @Query(EPISODE_ROW + " WHERE e.libraryItemId = :podcastId ORDER BY e.publishedAt DESC")
     suspend fun episodesOnce(podcastId: String): List<EpisodeRow>
+
+    @Query(EPISODE_ROW + " ORDER BY e.publishedAt DESC")
+    suspend fun allEpisodesOnce(): List<EpisodeRow>
+
+    @Query(
+        """SELECT d.*, COALESCE(e.title, b.title) AS title, COALESCE(p.title, b.author) AS subtitle
+        FROM abs_downloads d
+        LEFT JOIN abs_episodes e ON d.episodeId != '' AND e.id = d.episodeId
+        LEFT JOIN abs_podcasts p ON d.episodeId != '' AND p.id = d.libraryItemId
+        LEFT JOIN abs_books b ON d.episodeId = '' AND b.id = d.libraryItemId
+        WHERE d.state != 'REMOVED' ORDER BY d.addedAt"""
+    )
+    fun downloadRows(): Flow<List<SpokenDownloadRow>>
 
     @Query("SELECT id FROM abs_episodes WHERE libraryItemId = :podcastId") suspend fun episodeIds(podcastId: String): List<String>
     @Upsert suspend fun upsertEpisodes(items: List<EpisodeEntity>)

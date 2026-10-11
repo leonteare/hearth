@@ -46,7 +46,7 @@ interface AbsAuthStore {
 open class AbsException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /** The server answered with an error status. [body] is a short, token-free excerpt. */
-class AbsHttpException(val code: Int, val body: String) : AbsException("Audiobookshelf answered HTTP $code${if (body.isNotBlank()) ": $body" else ""}")
+class AbsHttpException(val code: Int, val body: String) : AbsException("The podcast server answered HTTP $code${if (body.isNotBlank()) ": $body" else ""}")
 
 /** Not signed in, or the login expired and couldn't be renewed. */
 class AbsAuthException(message: String) : AbsException(message)
@@ -114,7 +114,7 @@ class AbsClient(
     val http: OkHttpClient = baseHttp.newBuilder().addInterceptor(ClockInterceptor()).addInterceptor(AuthInterceptor()).build()
     private val refreshLock = Any()
 
-    private fun base(): HttpUrl = store.serverUrl()?.toHttpUrlOrNull() ?: throw AbsAuthException("Not signed in to Audiobookshelf")
+    private fun base(): HttpUrl = store.serverUrl()?.toHttpUrlOrNull() ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
 
     fun url(path: String, query: Map<String, String> = emptyMap()): HttpUrl {
         val b = base().newBuilder()
@@ -161,13 +161,13 @@ class AbsClient(
      * thread already replaced it, that newer token is returned without asking the server again.
      */
     fun refreshBlocking(stale: String?): AbsTokens = synchronized(refreshLock) {
-        val current = store.tokens() ?: throw AbsAuthException("Not signed in to Audiobookshelf")
+        val current = store.tokens() ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
         if (stale != null && current.accessToken != stale && !expiresSoon(current.accessToken)) return current
         val req = Request.Builder().url(url("auth/refresh")).header("x-refresh-token", current.refreshToken).post(EMPTY).build()
         plain.newCall(req).execute().use { resp ->
             if (resp.code == 401 || resp.code == 403) {
                 store.onAuthLost()
-                throw AbsAuthException("Your Audiobookshelf login expired. Sign in again in Settings")
+                throw AbsAuthException("Your podcasts & audiobooks sign-in expired. Sign in again in Settings")
             }
             if (!resp.isSuccessful) throw AbsHttpException(resp.code, excerpt(resp))
             val user = json.decodeFromString(AbsLoginResponse.serializer(), resp.body!!.string()).user
@@ -188,7 +188,7 @@ class AbsClient(
             val serverBase = store.serverUrl()?.toHttpUrlOrNull()
             // Only our own server ever sees the token.
             if (serverBase == null || request.url.host != serverBase.host || request.url.port != serverBase.port) return chain.proceed(request)
-            var tokens = store.tokens() ?: throw AbsAuthException("Not signed in to Audiobookshelf")
+            var tokens = store.tokens() ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
             if (expiresSoon(tokens.accessToken)) tokens = refreshBlocking(tokens.accessToken)
             val response = chain.proceed(request.withToken(tokens.accessToken))
             if (response.code != 401) return response

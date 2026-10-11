@@ -144,12 +144,14 @@ private class AppActions(
     override fun playNext(songIds: List<String>) {
         haptic(HapticFeedbackType.Confirm)
         c.player.playNext(songIds)
+        if (c.player.state.value.spoken != null) return showMessage(SPOKEN_QUEUE_MESSAGE)
         showUndo(if (songIds.size == 1) "Playing next" else "${songIds.size} songs will play next") { c.player.removeQueued(songIds) }
     }
 
     override fun addToQueue(songIds: List<String>) {
         haptic(HapticFeedbackType.Confirm)
         c.player.addToQueue(songIds)
+        if (c.player.state.value.spoken != null) return showMessage(SPOKEN_QUEUE_MESSAGE)
         showUndo(if (songIds.size == 1) "Added to the queue" else "Added ${songIds.size} songs to the queue") { c.player.removeQueued(songIds) }
     }
 
@@ -275,6 +277,9 @@ private class AppActions(
     }
 }
 
+/** Songs queued while a podcast or audiobook plays wait in the music queue it set aside. */
+private const val SPOKEN_QUEUE_MESSAGE = "Added to your music queue. It'll play when you go back to music"
+
 private val TABS = listOf(
     Triple("home", "Home", Icons.Default.Home),
     Triple("search", "Search", Icons.Default.Search),
@@ -318,6 +323,16 @@ fun AppRoot() {
     val preview by c.preview.current.collectAsStateWithLifecycle()
     val getMusic = im.flume.hearth.ui.components.rememberGetMusic(c, actions)
     LaunchedEffect(Unit) { c.preview.messages.collect { actions.showMessage(it) } }
+    // An episode or book picked up from where another phone (or the web) left it: say so, and offer
+    // to go back to where this phone was.
+    LaunchedEffect(Unit) {
+        c.spoken.resumeNotices.collect { n ->
+            actions.showUndo(n.message) {
+                val now = c.player.state.value.spoken
+                if (now?.libraryItemId == n.libraryItemId && now.episodeId == n.episodeId) c.player.seekSpoken((n.fromSec * 1000).toLong())
+            }
+        }
+    }
 
     // The tab you're "in" is the last tab page on the back stack, even when deep inside an album.
     val backStack by nav.currentBackStack.collectAsStateWithLifecycle()
@@ -357,6 +372,7 @@ fun AppRoot() {
         im.flume.hearth.ui.components.LocalRequests provides requestsByKey,
         im.flume.hearth.ui.components.LocalPreview provides preview,
         im.flume.hearth.ui.components.LocalGetMusic provides getMusic,
+        im.flume.hearth.ui.screens.LocalSpokenNow provides playerState.spoken,
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
@@ -408,6 +424,8 @@ fun AppRoot() {
                         screen("mix/{index}") { MixScreen(it.arguments!!.getString("index")!!.toInt()) }
                         screen("stats/{key}") { StatsScreen(it.arguments!!.getString("key")!!) }
                         screen("playlist-edit/{id}") { PlaylistEditScreen(it.arguments!!.getString("id")!!) }
+                        screen("podcast/{id}") { im.flume.hearth.ui.screens.PodcastScreen(it.arguments!!.getString("id")!!) }
+                        screen("book/{id}") { im.flume.hearth.ui.screens.BookScreen(it.arguments!!.getString("id")!!) }
                     }
                 }
             }

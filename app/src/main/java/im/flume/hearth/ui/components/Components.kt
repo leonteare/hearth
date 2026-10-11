@@ -135,10 +135,12 @@ fun CoverArt(
     requestSize: Int = 300,
     /** Album / playlist / artist name, shown as initials on a coloured tile when there's no artwork. */
     fallback: String? = null,
+    /** Artwork from elsewhere (a podcast or audiobook cover), used instead of [coverArt]. */
+    url: String? = null,
 ) {
     val actions = LocalActions.current
     val m = (if (size != null) modifier.size(size) else modifier).clip(RoundedCornerShape(corner)).background(SurfaceHigh)
-    val url = actions.coverUrl(coverArt, requestSize)
+    val url = url ?: actions.coverUrl(coverArt, requestSize)
     if (url == null) {
         Box(m) { Placeholder(fallback) }
         return
@@ -183,6 +185,8 @@ fun ActionSheet(
     subtitle: String? = null,
     coverArt: String? = null,
     fallback: String? = subtitle,
+    /** Artwork from elsewhere (podcast / audiobook covers), used instead of [coverArt]. */
+    coverUrl: String? = null,
     /** False for plain text headers, e.g. "Sort by". */
     showCover: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
@@ -196,7 +200,7 @@ fun ActionSheet(
         if (title != null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (showCover) {
-                    CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback)
+                    CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback, url = coverUrl)
                     Spacer(Modifier.width(14.dp))
                 }
                 Column(Modifier.weight(1f)) {

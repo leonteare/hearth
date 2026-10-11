@@ -379,15 +379,10 @@ class PlaybackService : MediaSessionService() {
         if (songs.isEmpty()) return@withLock
         val items = songs.map { it.toMediaItem(manual = true) }
         if (spokenNow != null) {
-            // Songs can't join a spoken-word queue: they start a music queue (the old one is dropped).
-            exitSpoken()
-            store.clearMusic()
-            context = emptyList(); pending = ArrayDeque(); sourceLabel = ""
-            player.setMediaItems(items)
-            player.prepare()
-            player.play()
+            // Songs can't join a spoken-word queue, and shouldn't cut the episode off: they go into the
+            // music queue set aside for "Back to music" (or start one), where they play when you go back.
+            store.saveMusic(QueuePlanner.insertIntoSaved(store.loadMusic(), songs.map { it.id }, next))
             publishExtras()
-            saveQueue()
             return@withLock
         }
         if (player.mediaItemCount == 0) {

@@ -69,4 +69,25 @@ object QueuePlanner {
         while (i < windowSize && isManual(i)) i++
         return i
     }
+
+    /**
+     * "Play next" / "Add to queue" while a podcast or audiobook plays: the songs go into the music queue
+     * that was set aside (after its current song, or after the hand-queued ones), or start a new one if
+     * there wasn't one. "Back to music" then plays them.
+     */
+    fun insertIntoSaved(saved: SavedQueue?, songIds: List<String>, next: Boolean): SavedQueue {
+        if (saved == null || saved.window.isEmpty()) {
+            return SavedQueue(
+                window = songIds, manual = songIds.map { true }, index = 0, positionMs = 0,
+                pending = emptyList(), context = emptyList(), shuffled = false, label = "", repeatMode = 0,
+            )
+        }
+        val manual = List(saved.window.size) { saved.manual.getOrElse(it) { false } }
+        val current = saved.index.coerceIn(0, saved.window.lastIndex)
+        val at = if (next) current + 1 else addToQueueIndex(current, { manual[it] }, saved.window.size)
+        return saved.copy(
+            window = saved.window.take(at) + songIds + saved.window.drop(at),
+            manual = manual.take(at) + songIds.map { true } + manual.drop(at),
+        )
+    }
 }

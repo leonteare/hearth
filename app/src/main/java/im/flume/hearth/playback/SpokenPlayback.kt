@@ -183,7 +183,7 @@ class SpokenDataSource(
             file != null -> fileFactory.createDataSource() to dataSpec.buildUpon().setUri(Uri.fromFile(file)).build()
             cannotStream() -> throw SongDataSource.OfflineException("$itemId/$ino")
             else -> {
-                val url = remoteUrl(itemId, ino) ?: throw IOException("Not signed in to Audiobookshelf")
+                val url = remoteUrl(itemId, ino) ?: throw IOException("Not signed in to podcasts & audiobooks")
                 httpFactory.createDataSource() to dataSpec.buildUpon().setUri(url).build()
             }
         }
