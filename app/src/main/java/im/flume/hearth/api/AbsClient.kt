@@ -21,7 +21,9 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.MultipartBody
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
@@ -356,6 +358,57 @@ class AbsClient(
         call<Unit>(Request.Builder().url(url("api/podcasts/$libraryItemId/checknew")).build(), null)
     }
 
+    /** Asks the server to look through a library for new or changed books (admins only). Returns before the scan ends. */
+    suspend fun scanLibrary(libraryId: String) {
+        send<Unit>("POST", "api/libraries/$libraryId/scan", JsonObject(emptyMap()), null)
+    }
+
+    /**
+     * Uploads a book's audio files into a library folder, as Audiobookshelf's own upload page does: the
+     * server saves them in "<folder>/<author>/<title>" and finds the book at its next scan. [onProgress]
+     * gets the bytes sent so far (it can go back if the request is sent again after a token refresh).
+     */
+    suspend fun uploadBook(
+        libraryId: String,
+        folderId: String,
+        title: String,
+        author: String?,
+        files: List<AbsUploadFile>,
+        onProgress: (Long) -> Unit = {},
+    ) = withContext(Dispatchers.IO) {
+        val sent = LongArray(files.size)
+        val form = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("title", title)
+            .apply { author?.takeIf { it.isNotBlank() }?.let { addFormDataPart("author", it) } }
+            .addFormDataPart("library", libraryId)
+            .addFormDataPart("folder", folderId)
+        files.forEachIndexed { i, f ->
+            form.addFormDataPart(i.toString(), f.name, object : RequestBody() {
+                override fun contentType() = (f.mimeType ?: "application/octet-stream").toMediaType()
+                override fun contentLength() = f.size.takeIf { it > 0 } ?: -1L
+                override fun writeTo(sink: okio.BufferedSink) {
+                    sent[i] = 0
+                    f.open().use { input ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            sink.write(buf, 0, n)
+                            sent[i] += n
+                            onProgress(sent.sum())
+                        }
+                    }
+                }
+            })
+        }
+        // A big book takes a while to send, and the server answers only once every file is saved.
+        val client = http.newBuilder().writeTimeout(5, java.util.concurrent.TimeUnit.MINUTES).readTimeout(10, java.util.concurrent.TimeUnit.MINUTES).build()
+        client.newCall(Request.Builder().url(url("api/upload")).post(form.build()).build()).execute().use { resp ->
+            if (resp.code == 403) throw AbsException("Your account isn't allowed to upload to the server")
+            if (!resp.isSuccessful) throw AbsHttpException(resp.code, excerpt(resp))
+        }
+    }
+
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
         private val EMPTY = ByteArray(0).toRequestBody(null)
@@ -367,6 +420,9 @@ class AbsClient(
         }
     }
 }
+
+/** One file to upload: its name on the server, size in bytes (0 if unknown) and how to read it. */
+class AbsUploadFile(val name: String, val size: Long, val mimeType: String?, val open: () -> java.io.InputStream)
 
 /** Mirrors Audiobookshelf's sanitizeFilename, so a podcast lands in the folder its own app would pick. */
 object PodcastPaths {

@@ -134,7 +134,8 @@ class PlaybackService : MediaSessionService() {
             remoteUrl = { item, ino -> runCatching { c.spoken.api.fileUrl(item, ino) }.getOrNull() },
             cannotStream = { c.network.cannotStream },
         )
-        val routedFactory = SchemeRoutingDataSourceFactory(songFactory, mapOf(SpokenMedia.SCHEME to spokenFactory))
+        // Audiobooks from a folder on the phone play straight from their content:// URIs.
+        val routedFactory = SchemeRoutingDataSourceFactory(songFactory, mapOf(SpokenMedia.SCHEME to spokenFactory, "content" to androidx.media3.datasource.DefaultDataSource.Factory(this)))
         tracker = ListeningTracker(c.spoken.progress)
         // An offline failure is final for that song: don't retry it, so playback moves on at once.
         val loadErrors = object : DefaultLoadErrorHandlingPolicy() {
@@ -176,7 +177,7 @@ class PlaybackService : MediaSessionService() {
             .setCallback(SessionCallback())
             .setSessionActivity(openApp)
             // Artwork URIs are token-free hearth-cover:// / abs-cover:// links; this resolves them in the app.
-            .setBitmapLoader(CoverBitmapLoader(this, c.api, scope) { id -> c.spoken.api.coverUrl(id, 1000) })
+            .setBitmapLoader(CoverBitmapLoader(this, c.api, scope) { id -> c.spoken.coverUrl(id, 1000) })
             .build()
 
         setMediaNotificationProvider(
@@ -227,6 +228,11 @@ class PlaybackService : MediaSessionService() {
     /** The episode's or book's audio files as player items, with its timeline. Null if it can't be played. */
     private suspend fun loadSpoken(itemId: String, episodeId: String?): Pair<SpokenNow, List<MediaItem>>? {
         val dao = c.db.spoken()
+        if (im.flume.hearth.spoken.LocalBookIds.isLocal(itemId)) {
+            val (book, files, chapters) = c.spoken.local.playable(itemId) ?: return null
+            val timeline = SpokenTimeline(files.map { TimelineTrack(it.fileIndex.toString(), it.durationSec) }, chapters)
+            return SpokenNow(itemId, null, "", book.title, book.author.orEmpty(), timeline) to SpokenMedia.localBookItems(book, files)
+        }
         if (episodeId != null) {
             val row = dao.episodeOnce(episodeId) ?: run { runCatching { c.spoken.fetchItem(itemId) }; dao.episodeOnce(episodeId) } ?: return null
             val items = SpokenMedia.episodeItems(row).takeIf { it.isNotEmpty() } ?: return null
@@ -506,6 +512,7 @@ class PlaybackService : MediaSessionService() {
     private fun isOnPhone(id: String): Boolean {
         if (id.startsWith("abs:")) {
             val item = (0 until player.mediaItemCount).map(player::getMediaItemAt).firstOrNull { it.mediaId == id } ?: return false
+            if (item.localConfiguration?.uri?.scheme == "content") return true // a book from a folder on the phone
             return item.localConfiguration?.uri?.let(SpokenMedia::parse)?.let { (itemId, ino) -> c.spoken.downloads.localFile(itemId, ino) } != null
         }
         return c.downloads.isDownloaded(id) || cachedBitrate(id) != null

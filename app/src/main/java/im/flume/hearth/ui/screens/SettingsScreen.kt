@@ -473,6 +473,7 @@ private fun PodcastsAndAudiobooksSettings() {
             if (v) scope.launch { c.spoken.refresh(force = true) }
         }
     }
+    PhoneAudiobookFolders()
 
     if (confirmSignOut) {
         AlertDialog(

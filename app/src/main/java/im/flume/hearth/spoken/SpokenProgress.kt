@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -64,6 +65,8 @@ class SpokenProgress(
     private val scope: CoroutineScope,
 ) {
     private val dao = db.spoken()
+    /** Books from a folder on the phone: progress stays on the phone (see [LocalBookIds]). */
+    private val localDao = db.localBooks()
     private val json = Json { ignoreUnknownKeys = true }
     private val flushLock = Mutex()
     private val writeLock = Mutex()
@@ -80,9 +83,45 @@ class SpokenProgress(
 
     fun serverNow(): Long = api.clock.serverNow()
 
-    fun progressFlow(libraryItemId: String, episodeId: String?): Flow<SpokenProgressEntity?> = dao.progressFlow(libraryItemId, episodeId.orEmpty())
+    fun progressFlow(libraryItemId: String, episodeId: String?): Flow<SpokenProgressEntity?> =
+        if (LocalBookIds.isLocal(libraryItemId)) localDao.progressFlow(libraryItemId).map { it?.asSpoken() }
+        else dao.progressFlow(libraryItemId, episodeId.orEmpty())
 
-    suspend fun local(libraryItemId: String, episodeId: String?): SpokenProgressEntity? = dao.progress(libraryItemId, episodeId.orEmpty())
+    suspend fun local(libraryItemId: String, episodeId: String?): SpokenProgressEntity? =
+        if (LocalBookIds.isLocal(libraryItemId)) localDao.progress(libraryItemId)?.asSpoken()
+        else dao.progress(libraryItemId, episodeId.orEmpty())
+
+    private fun LocalBookProgressEntity.asSpoken() =
+        SpokenProgressEntity(bookId, "", positionSec, durationSec, finished, updatedAt, finishedAt, dirty = false, markedUnplayed = false)
+
+    /** Progress on a phone book, for carrying over to the server when it's uploaded. */
+    suspend fun localBookSnapshot(bookId: String): ProgressSnapshot? =
+        localDao.progress(bookId)?.let { ProgressSnapshot(it.positionSec, it.durationSec, it.finished, it.updatedAt, it.finishedAt) }
+
+    /**
+     * Saves [p] as this user's progress on a server item and queues it for the server. Used when a
+     * phone book was uploaded and its listening carries over to the server's copy.
+     */
+    suspend fun adopt(libraryItemId: String, p: ProgressSnapshot) {
+        writeLock.withLock {
+            dao.upsertProgress(SpokenProgressEntity(libraryItemId, "", p.currentTime, p.duration, p.isFinished, p.lastUpdate, p.finishedAt, dirty = true, markedUnplayed = false))
+            enqueueProgress(libraryItemId, "", p)
+        }
+        flushSoon()
+    }
+
+    /** Saves progress on a phone book (no server involved). */
+    private suspend fun recordLocal(bookId: String, positionSec: Double, durationSec: Double, finished: Boolean?) = writeLock.withLock {
+        val old = localDao.progress(bookId)
+        val now = serverNow()
+        val isFinished = finished ?: (old?.finished == true || ProgressMerge.reachedEnd(positionSec, durationSec))
+        localDao.upsertProgress(
+            LocalBookProgressEntity(
+                bookId, positionSec = positionSec, durationSec = durationSec.takeIf { it > 0 } ?: old?.durationSec ?: 0.0,
+                finished = isFinished, finishedAt = if (isFinished) old?.finishedAt ?: now else null, updatedAt = now,
+            )
+        )
+    }
 
     private fun SpokenProgressEntity.snapshot() = ProgressSnapshot(currentTime, duration, isFinished, lastUpdate, finishedAt)
 
@@ -94,6 +133,10 @@ class SpokenProgress(
      * finished. Emits a [ResumeNotice] when the server's position is newer and far from ours.
      */
     suspend fun resolveStart(libraryItemId: String, episodeId: String?, title: String, online: Boolean): StartPoint {
+        if (LocalBookIds.isLocal(libraryItemId)) {
+            val p = localDao.progress(libraryItemId) ?: return StartPoint(0.0, false, null)
+            return StartPoint(if (p.finished) 0.0 else p.positionSec, p.finished, null)
+        }
         val ep = episodeId.orEmpty()
         val server: AbsMediaProgress? = if (online && store.account.value?.needsSignIn == false) {
             withTimeoutOrNull(3_000) { runCatching { api.progress(libraryItemId, episodeId) }.getOrNull() }
@@ -139,7 +182,11 @@ class SpokenProgress(
      * Saves the position heard on this phone (every few seconds while playing, and on pause/stop).
      * Reaching the end marks it finished, which is sent to the server straight away.
      */
-    suspend fun record(libraryItemId: String, episodeId: String?, positionSec: Double, durationSec: Double) = writeLock.withLock {
+    suspend fun record(libraryItemId: String, episodeId: String?, positionSec: Double, durationSec: Double) {
+        if (LocalBookIds.isLocal(libraryItemId)) recordLocal(libraryItemId, positionSec, durationSec, null) else recordServer(libraryItemId, episodeId, positionSec, durationSec)
+    }
+
+    private suspend fun recordServer(libraryItemId: String, episodeId: String?, positionSec: Double, durationSec: Double) = writeLock.withLock {
         val ep = episodeId.orEmpty()
         val old = dao.progress(libraryItemId, ep)
         val now = serverNow()
@@ -162,6 +209,11 @@ class SpokenProgress(
 
     /** Explicit "mark as finished" / "mark as unplayed" from the UI. */
     suspend fun setFinished(libraryItemId: String, episodeId: String?, finished: Boolean, durationSec: Double) {
+        if (LocalBookIds.isLocal(libraryItemId)) {
+            val old = localDao.progress(libraryItemId)
+            recordLocal(libraryItemId, if (finished) old?.positionSec ?: 0.0 else 0.0, durationSec, finished)
+            return
+        }
         writeLock.withLock {
             val ep = episodeId.orEmpty()
             val old = dao.progress(libraryItemId, ep)
@@ -182,6 +234,7 @@ class SpokenProgress(
 
     /** Queues (or updates) the listening session being recorded on this phone. */
     suspend fun recordSession(session: LocalSessionPayload.Session, finished: Boolean) {
+        if (LocalBookIds.isLocal(session.libraryItemId)) return // the server doesn't know this book
         val user = store.account.value?.userId ?: return
         if (session.timeListening < 1.0) return // nothing heard yet: nothing for the stats
         val payload = LocalSessionPayload.build(session, finished, deviceInfo())

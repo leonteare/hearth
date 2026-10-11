@@ -11,6 +11,8 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import im.flume.hearth.spoken.BookEntity
 import im.flume.hearth.spoken.EpisodeRow
+import im.flume.hearth.spoken.LocalBookEntity
+import im.flume.hearth.spoken.LocalBookFileEntity
 import im.flume.hearth.spoken.LocalSessionPayload
 import im.flume.hearth.spoken.SpokenProgress
 import im.flume.hearth.spoken.SpokenTimeline
@@ -57,10 +59,10 @@ object SpokenMedia {
 
     private fun item(
         libraryItemId: String, episodeId: String?, index: Int, ino: String, title: String, artist: String?, album: String?,
-        durationMs: Long, startMs: Long, totalMs: Long, mediaType: Int,
+        durationMs: Long, startMs: Long, totalMs: Long, mediaType: Int, uri: Uri = uriFor(libraryItemId, ino),
     ): MediaItem = MediaItem.Builder()
         .setMediaId(mediaId(libraryItemId, episodeId, index))
-        .setUri(uriFor(libraryItemId, ino))
+        .setUri(uri)
         .setMediaMetadata(
             MediaMetadata.Builder()
                 .setTitle(title)
@@ -88,6 +90,17 @@ object SpokenMedia {
         val ino = row.episode.ino ?: return emptyList()
         val ms = (row.episode.durationSec * 1000).toLong()
         return listOf(item(row.episode.libraryItemId, row.episode.id, 0, ino, row.episode.title, row.podcastTitle, row.podcastTitle, ms, 0, ms, MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE))
+    }
+
+    /** A book from a folder on the phone: its files play straight from their content:// URIs. */
+    fun localBookItems(book: LocalBookEntity, files: List<LocalBookFileEntity>): List<MediaItem> {
+        val timeline = SpokenTimeline(files.map { TimelineTrack(it.fileIndex.toString(), it.durationSec) })
+        val totalMs = (timeline.durationSec * 1000).toLong()
+        return files.mapIndexed { i, f ->
+            val title = if (files.size > 1) "${book.title} (${i + 1}/${files.size})" else book.title
+            item(book.id, null, i, f.fileIndex.toString(), title, book.author, book.title, (f.durationSec * 1000).toLong(), (timeline.starts[i] * 1000).toLong(), totalMs,
+                MediaMetadata.MEDIA_TYPE_AUDIO_BOOK_CHAPTER, uri = Uri.parse(f.uri))
+        }
     }
 
     fun bookItems(book: BookEntity, tracks: List<TrackEntity>): List<MediaItem> {
