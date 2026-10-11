@@ -70,9 +70,13 @@ class RibbonRenderer : VisualiserRenderer() {
                 val u = i / (points - 1f)
                 val wave = a.waveform[(u * (a.waveform.size - 1)).toInt()]
                 val band = a.bands[((kotlin.math.abs(u - 0.5f) * 2f) * 44f).toInt().coerceAtMost(a.bands.size - 1)]
-                val swell = sin(u * PI.toFloat() * (1.5f + r * 0.7f) + f.time * (0.5f + r * 0.23f) + r * 1.3f)
-                val target = (wave * 0.55f * (1f - r * 0.18f) + swell * (0.12f + band * 0.6f + a.bass * 0.15f)) *
-                    sin(u * PI.toFloat()).pow(1.3f)
+                val t = f.time
+                // Idle motion: each ribbon drifts on its own two slow waves, so they're alive in silence.
+                val idle = 0.34f * sin(u * PI.toFloat() * (1.2f + r * 0.55f) + t * (0.35f + r * 0.13f) + r * 1.7f) +
+                    0.13f * sin(u * PI.toFloat() * (3.1f + r * 0.9f) - t * (0.55f + r * 0.17f) + r * 0.6f)
+                val swell = sin(u * PI.toFloat() * (1.5f + r * 0.7f) + t * (0.5f + r * 0.23f) + r * 1.3f)
+                val audio = wave * 0.5f * (1f - r * 0.15f) + swell * (band * 0.55f + a.bass * 0.25f)
+                val target = (idle * (1f + a.level * 0.6f) + audio) * sin(u * PI.toFloat()).pow(1.3f)
                 ys[base + i] += (target - ys[base + i]) * k
             }
             path.rewind()
@@ -90,12 +94,12 @@ class RibbonRenderer : VisualiserRenderer() {
 
             val brush = brushes[r]!!
             val depthFade = 1f - r * 0.18f
-            val lift = 0.6f + 0.4f * a.level
-            drawPath(path, brush, alpha = 0.10f * depthFade * lift, style = glow, blendMode = BlendMode.Plus)
-            drawPath(path, brush, alpha = 0.30f * depthFade * lift, style = mid, blendMode = BlendMode.Plus)
+            val lift = 0.75f + 0.5f * a.level
+            drawPath(path, brush, alpha = 0.14f * depthFade * lift, style = glow, blendMode = BlendMode.Plus)
+            drawPath(path, brush, alpha = 0.35f * depthFade * lift, style = mid, blendMode = BlendMode.Plus)
             drawPath(path, brush, alpha = 0.95f * depthFade, style = core, blendMode = BlendMode.Plus)
             withTransform({ scale(1f, -1f, pivot = Offset(w / 2, cy)) }) {
-                drawPath(path, brush, alpha = 0.07f * depthFade * lift, style = glow, blendMode = BlendMode.Plus)
+                drawPath(path, brush, alpha = 0.09f * depthFade * lift, style = glow, blendMode = BlendMode.Plus)
                 drawPath(path, brush, alpha = 0.40f * depthFade, style = core, blendMode = BlendMode.Plus)
             }
         }

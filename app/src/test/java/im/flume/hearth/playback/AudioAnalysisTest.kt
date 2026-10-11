@@ -119,6 +119,40 @@ class AudioAnalysisTest {
     }
 
     @Test
+    fun autoGainLiftsQuietSignalsSlowlyAndNeverCuts() {
+        val g = AutoGain(target = 0.8f, maxGain = 2.5f)
+        // A loud signal: no boost, and never a cut.
+        repeat(120) { g.update(0.95f, 1 / 60f) }
+        assertEquals(1f, g.gain)
+        // Goes quiet: the boost creeps up over seconds, not at once.
+        g.update(0.4f, 1 / 60f)
+        assertTrue(g.gain < 1.1f)
+        repeat(60 * 30) { g.update(0.4f, 1 / 60f) }
+        assertEquals(2f, g.gain, 0.05f)
+        // Near silence: clamped.
+        repeat(60 * 60) { g.update(0.01f, 1 / 60f) }
+        assertEquals(2.5f, g.gain)
+        // Loud again: back to unity quickly.
+        repeat(60) { g.update(0.9f, 1 / 60f) }
+        assertEquals(1f, g.gain)
+    }
+
+    @Test
+    fun quietTrackStillMovesTheBands() {
+        val loud = AudioPipeline()
+        val quiet = AudioPipeline()
+        val a = sine(200.0, 44_100, amp = 0.8f)
+        val b = sine(200.0, 44_100, amp = 0.05f)
+        repeat(60 * 20) { loud.update(a, 44_100, 1 / 60f); quiet.update(b, 44_100, 1 / 60f) }
+        val l = loud.frame.bands.max()
+        val q = quiet.frame.bands.max()
+        // The quiet one is lifted to the auto-gain target (0.8); the loud one is at the top already.
+        assertTrue("loud $l quiet $q", l > 0.9f && q > 0.7f)
+        assertTrue(quiet.frame.level > 0.4f)
+        assertTrue(quiet.frame.waveform.maxOf { abs(it) } > 0.3f)
+    }
+
+    @Test
     fun pipelineDecaysToZeroWhenPaused() {
         val p = AudioPipeline()
         val tone = sine(80.0, 44_100)

@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -124,14 +123,20 @@ half4 main(float2 fragCoord) {
     col = mix(col, k2, clamp(length(q) * 0.9 - 0.3, 0.0, 1.0));
     col = mix(col, k3, smoothstep(0.5, 0.9, r.y));
 
+    // Clouds: clearly lit even in silence (about half brightness at their cores); audio swells them.
+    float cloud = smoothstep(0.3, 0.8, f + 0.35 * length(r) - 0.1);
     float shimmer = noise(p * 10.0 + float2(iTime * 1.9, -iTime * 1.4));
-    float mask = smoothstep(0.2, 0.85, f + 0.3 * length(r) - 0.15);
-    float bright = 0.1 + 1.35 * f * f + uBass * 0.5 + uBeat * 0.22 + uTreble * 0.45 * shimmer * mask;
-    col *= bright * (0.18 + 0.82 * mask);
+    float rest = mix(0.10, 0.62, cloud) + 0.18 * cloud * cloud;
+    float swell = 1.0 + uBass * 0.55 + uBeat * 0.3 + uMid * 0.15;
+    float3 lit = col * rest * swell + col * (uTreble * 0.35 * shimmer * cloud);
+    // A soft tint of the first colour in the gaps, so it's never just black between clouds.
+    lit += k0 * 0.05 * (1.0 - cloud);
+    // Gentle tone curve: keeps colour in the highlights instead of clipping to white.
+    lit = lit / (1.0 + lit * 0.35) * 1.2;
 
     float2 v = fragCoord / iResolution - 0.5;
-    col *= 1.0 - dot(v, v) * 1.2;
-    return half4(half3(col), 1.0);
+    lit *= 1.0 - dot(v, v) * 0.9;
+    return half4(half3(clamp(lit, 0.0, 1.0)), 1.0);
 }
 """
     }
@@ -151,13 +156,13 @@ private class AuroraBlobs {
                 val col = pal.argb[i]
                 shaders[i] = RadialGradient(
                     0f, 0f, 1f,
-                    intArrayOf(withAlpha(col, 0.75f), withAlpha(col, 0.3f), withAlpha(col, 0f)),
-                    floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP,
+                    intArrayOf(withAlpha(col, 0.62f), withAlpha(col, 0.4f), withAlpha(col, 0.12f), withAlpha(col, 0f)),
+                    floatArrayOf(0f, 0.35f, 0.7f, 1f), Shader.TileMode.CLAMP,
                 )
             }
         }
         val a = f.audio
-        c.drawColor(0xFF000000.toInt())
+        c.drawColor(scaleArgb(pal.argb[0], 0.06f))
         val base = min(w, h) * (0.62f + a.bass * 0.25f + a.beat * 0.08f)
         val t = flow * 0.25f
         for (i in 0 until 6) {
@@ -165,7 +170,8 @@ private class AuroraBlobs {
             val y = h * (0.5f + 0.38f * cos(t * (0.5f + i * 0.11f) + i * 2.3f))
             val r = base * (0.8f + 0.25f * sin(t * 1.3f + i)) * (1f + a.treble * 0.15f * sin(flow * 7f + i))
             paint.shader = shaders[i % 4]
-            paint.alpha = (255 * (0.55f + 0.45f * max(a.level, 0.2f))).toInt().coerceIn(0, 255)
+            // Clearly visible at rest; louder music brightens them further.
+            paint.alpha = (255 * (0.72f + 0.28f * a.level + 0.15f * a.beat)).toInt().coerceIn(0, 255)
             c.save()
             c.translate(x, y)
             c.scale(r, r)

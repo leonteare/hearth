@@ -5,6 +5,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
+import kotlin.math.tanh
 
 /**
  * Tunnel '98: a low-poly tube of chequered quads rushing at the camera. It bends and twists with the
@@ -22,6 +23,8 @@ class TunnelRenderer : RetroRenderer() {
     private val sx = FloatArray((rings + 1) * segs)
     private val sy = FloatArray((rings + 1) * segs)
     private val depth = FloatArray(rings + 1)
+    private val wx = FloatArray((rings + 1) * segs)
+    private val wy = FloatArray((rings + 1) * segs)
     private var travel = 0f
     private var twist = 0f
     private var flash = 0f
@@ -36,7 +39,8 @@ class TunnelRenderer : RetroRenderer() {
         if (a.beatCount != lastBeat) { if (lastBeat >= 0) flash = 1f; lastBeat = a.beatCount }
         flash *= kotlin.math.exp(-dt * 6f)
 
-        c.drawColor(0xFF000000.toInt())
+        // Only ever seen through a seam: the walls cover the whole screen.
+        c.drawColor(scaleArgb(pal.argb[1], 0.12f))
         val cx = w / 2f
         val cy = h / 2f
         val focal = w * 0.75f
@@ -47,21 +51,41 @@ class TunnelRenderer : RetroRenderer() {
         val camBendY = bendY(travel, f.time)
         val zFar = rings * spacing
 
+        // Ring 0 can be at or behind the camera (it's about to pass); it's clipped to the near plane below.
         for (i in 0..rings) {
             val z = i * spacing - offset + 0.3f
             depth[i] = z
             val along = travel + z
-            val ox = bendX(along, f.time) - camBendX
-            val oy = bendY(along, f.time) - camBendY
+            // The tube's centre may swing, but never more than about half its radius from the line of
+            // sight: the camera always stays inside, and the walls always fill the screen.
+            val ox = MAX_SWAY * tanh((bendX(along, f.time) - camBendX) / MAX_SWAY)
+            val oy = MAX_SWAY * tanh((bendY(along, f.time) - camBendY) / MAX_SWAY)
             val band = a.bands[(i * 48 / rings).coerceAtMost(a.bands.size - 1)]
             val r = radius * (1f + band * 0.22f + (if (i < 4) a.beat * 0.12f else 0f))
             val rot = twist + z * (0.1f + a.bass * 0.15f)
             for (j in 0 until segs) {
                 val ang = rot + j * (2f * PI.toFloat() / segs)
-                val x = ox + cos(ang) * r
-                val y = oy + sin(ang) * r
-                sx[i * segs + j] = snapToGrid(cx + x / z * focal)
-                sy[i * segs + j] = snapToGrid(cy + y / z * focal)
+                wx[i * segs + j] = ox + cos(ang) * r
+                wy[i * segs + j] = oy + sin(ang) * r
+            }
+        }
+        // Near-plane clipping: a ring too close slides along the tube wall to exactly the near plane.
+        for (i in rings - 1 downTo 0) {
+            if (depth[i] >= NEAR) continue
+            val t = (NEAR - depth[i]) / (depth[i + 1] - depth[i])
+            for (j in 0 until segs) {
+                val k = i * segs + j
+                wx[k] += (wx[k + segs] - wx[k]) * t
+                wy[k] += (wy[k + segs] - wy[k]) * t
+            }
+            depth[i] = NEAR
+        }
+        for (i in 0..rings) {
+            val z = depth[i]
+            for (j in 0 until segs) {
+                val k = i * segs + j
+                sx[k] = snapToGrid(cx + wx[k] / z * focal)
+                sy[k] = snapToGrid(cy + wy[k] / z * focal)
             }
         }
 
@@ -99,6 +123,12 @@ class TunnelRenderer : RetroRenderer() {
         var s = 0f
         for (j in 0 until segs) s += coords[i * segs + j]
         return s / segs
+    }
+
+    private companion object {
+        const val NEAR = 0.12f
+        /** Furthest the tube's centre strays from the line of sight, as a fraction of its radius (1). */
+        const val MAX_SWAY = 0.5f
     }
 
     private fun bendX(along: Float, t: Float) = sin(along * 0.21f + t * 0.3f) * 1.4f + sin(along * 0.07f) * 0.8f

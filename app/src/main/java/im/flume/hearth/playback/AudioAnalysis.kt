@@ -223,6 +223,36 @@ class BeatDetector(
     }
 }
 
+/**
+ * Slow automatic gain for a 0..1 signal, so quietly mastered tracks move the visuals as much as loud
+ * ones. Follows the signal's running peak (up within [riseSec], down over [fallSec]) and returns
+ * the multiplier that lifts that peak to [target], clamped to 1..[maxGain] (never turns things down).
+ */
+class AutoGain(
+    private val target: Float,
+    private val maxGain: Float = 2.5f,
+    private val riseSec: Float = 0.3f,
+    private val fallSec: Float = 6f,
+    private val floor: Float = 0.05f,
+) {
+    private var peak = target
+    var gain = 1f
+        private set
+
+    fun reset() {
+        peak = target
+        gain = 1f
+    }
+
+    fun update(value: Float, dt: Float): Float {
+        val tau = if (value > peak) riseSec else fallSec
+        peak += (value - peak) * (1f - exp(-dt / tau))
+        peak = max(peak, floor)
+        gain = (target / peak).coerceIn(1f, maxGain)
+        return gain
+    }
+}
+
 /** What a visualiser draws from, refreshed every frame. All values 0..1 unless noted. */
 class AudioFrame(bandCount: Int = SpectrumAnalyzer.BAND_COUNT, waveSize: Int = WAVE_SIZE) {
     /** Log-spaced spectrum, bass first; fast attack, slow decay. */
@@ -252,6 +282,8 @@ class AudioFrame(bandCount: Int = SpectrumAnalyzer.BAND_COUNT, waveSize: Int = W
 class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer()) {
     val frame = AudioFrame(spectrum.bandCount)
     private val beats = BeatDetector()
+    private val bandGain = AutoGain(target = 0.8f)
+    private val levelGain = AutoGain(target = 0.75f)
     private var time = 0.0
     private var bassTo = 0
     private var midTo = 0
@@ -259,6 +291,8 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
 
     fun reset() {
         beats.reset()
+        bandGain.reset()
+        levelGain.reset()
         frame.bands.fill(0f)
         frame.waveform.fill(0f)
         frame.bass = 0f; frame.mid = 0f; frame.treble = 0f; frame.level = 0f; frame.beat = 0f
@@ -281,8 +315,15 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
         }
         var bass = 0f; var mid = 0f; var treble = 0f
         val n = f.bands.size
+        // Auto-gain only learns from live audio, so a pause doesn't wind it up.
+        var g = bandGain.gain
+        if (samples != null) {
+            var loudest = 0f
+            for (b in 0 until n) loudest = max(loudest, spectrum.bands[b])
+            g = bandGain.update(loudest, dt)
+        }
         for (b in 0 until n) {
-            val raw = if (samples != null) spectrum.bands[b] else 0f
+            val raw = if (samples != null) min(1f, spectrum.bands[b] * g) else 0f
             f.bands[b] = smooth(f.bands[b], raw, attack, release)
             when {
                 b < bassTo -> bass += raw
@@ -297,7 +338,9 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
         f.mid = smooth(f.mid, mid, attack, release)
         f.treble = smooth(f.treble, treble, attack, release)
         val rmsDb = if (samples != null) 20f * log10(spectrum.rms + 1e-6f) else -100f
-        f.level = smooth(f.level, ((rmsDb + 50f) / 44f).coerceIn(0f, 1f), attack, release)
+        val rawLevel = ((rmsDb + 50f) / 44f).coerceIn(0f, 1f)
+        val lg = if (samples != null) levelGain.update(rawLevel, dt) else levelGain.gain
+        f.level = smooth(f.level, min(1f, rawLevel * lg), attack, release)
 
         f.beat *= exp(-dt * 5f)
         if (beats.process(if (samples != null) spectrum.bassEnergy else 0f, time, dt)) {
@@ -324,7 +367,8 @@ class AudioPipeline(private val spectrum: SpectrumAnalyzer = SpectrumAnalyzer())
         }
         var peak = 0f
         for (i in 0 until span) peak = max(peak, abs(samples[start + i]))
-        val gain = loudness / max(peak, 0.2f)
+        // Normalised to the peak, so quiet tracks still draw a full-size shape (scaled by the gained level).
+        val gain = loudness / max(peak, 0.02f)
         for (j in out.indices) {
             val v = samples[start + j * WAVE_STEP] * gain
             out[j] += (v - out[j]) * 0.6f
