@@ -161,6 +161,7 @@ fun SearchScreen() {
         val wanted = tabRequests.searchFilter ?: return@LaunchedEffect
         tabRequests.searchFilter = null
         filter = wanted
+        query = "" // a fresh search, not whatever was typed last time
         focus.requestFocus()
         keyboard?.show()
     }
@@ -674,7 +675,7 @@ fun LibraryScreen() {
                             sortedBooks.isEmpty() -> item {
                                 LibraryEmpty(
                                     "No audiobooks yet",
-                                    if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on the server show up here. Pull down to check again.",
+                                    if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on your server show up here. You can also add a folder of audiobooks on this phone in Settings → Storage.",
                                     "Search",
                                 ) { actions.openSearchTab(SearchFilter.BOOKS) }
                             }
@@ -685,8 +686,8 @@ fun LibraryScreen() {
                 item {
                     Text(
                         when (tab) {
-                            LibraryTab.PODCASTS -> if (spokenAccount == null) "" else "Following ${plural(followed.size, "podcast")} • pull down to refresh"
-                            LibraryTab.AUDIOBOOKS -> if (spokenAccount == null) "" else "${plural(books.size, "audiobook")} on the server • pull down to refresh"
+                            LibraryTab.PODCASTS -> if (spokenAccount == null || followed.isEmpty()) "" else "Following ${plural(followed.size, "podcast")} • pull down to refresh"
+                            LibraryTab.AUDIOBOOKS -> if (spokenAccount == null || books.isEmpty()) "" else "${plural(books.size, "audiobook")} on the server • pull down to refresh"
                             else -> "${plural(songCount, "song")} on the server • pull down to refresh"
                         },
                         color = TextSecondary,
