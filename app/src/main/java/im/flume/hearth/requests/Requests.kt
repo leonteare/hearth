@@ -120,8 +120,11 @@ class RequestsRepository(
     private var catalog: Pair<String, RequestMatching.LocalCatalog>? = null
     @Volatile private var catalogVersion = 0
 
+    /** Changes whenever the library does (a sync, or requested music arriving). */
+    private fun catalogKey() = "${session.lastSyncAt}:$catalogVersion"
+
     private suspend fun localCatalog(): RequestMatching.LocalCatalog = withContext(Dispatchers.Default) {
-        val key = "${session.lastSyncAt}:$catalogVersion"
+        val key = catalogKey()
         catalog?.takeIf { it.first == key }?.second
             ?: RequestMatching.LocalCatalog(db.library().allSongsOnce(), db.library().allAlbumsOnce(), db.library().allArtistsOnce()).also { catalog = key to it }
     }
@@ -134,16 +137,21 @@ class RequestsRepository(
         // Artists the server has are shown from the library (their page fills in what's missing).
         val artists = filtered.artists.filter { cat.localArtist(it.name) == null }
         return TidalSearchResults(filtered.tracks.take(5), filtered.albums.take(5), artists.take(3))
-            .also { synchronized(searchCache) { searchCache[query.lowercase()] = System.currentTimeMillis() to it } }
+            .also { synchronized(searchCache) { searchCache[query.lowercase()] = Triple(System.currentTimeMillis(), catalogKey(), it) } }
     }
 
-    /** Recent Tidal searches (5 minutes), so retyping or going back shows results instantly. */
-    private val searchCache = object : LinkedHashMap<String, Pair<Long, TidalSearchResults>>(32, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, TidalSearchResults>>?) = size > 30
+    /**
+     * Recent searches (5 minutes), so retyping or going back shows results instantly. Each is tied to
+     * the library as it was: once music arrives or a sync runs, it's searched again, so something that
+     * just landed shows as yours instead of still "not on your server".
+     */
+    private val searchCache = object : LinkedHashMap<String, Triple<Long, String, TidalSearchResults>>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Triple<Long, String, TidalSearchResults>>?) = size > 30
     }
 
     fun cachedTidalSearch(query: String): TidalSearchResults? = synchronized(searchCache) {
-        searchCache[query.lowercase()]?.takeIf { System.currentTimeMillis() - it.first < 5 * 60_000 }?.second
+        searchCache[query.lowercase()]
+            ?.takeIf { System.currentTimeMillis() - it.first < 5 * 60_000 && it.second == catalogKey() }?.third
     }
 
     /** A cheap call that opens (and keeps alive) the connection to Tidarr, and caches the country code. */
@@ -507,6 +515,7 @@ class RequestsRepository(
             }
         }
         catalogVersion++
+        library.invalidateSearchIndex() // so it shows up in Search straight away
         dao.upsert(
             r.copy(
                 status = RequestStatus.DONE, errorMessage = null, matchedIds = matched.joinToString(","),

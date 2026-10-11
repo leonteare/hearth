@@ -93,6 +93,9 @@ class LibraryRepository(
 
     private var index: Pair<Long, SearchIndex>? = null
 
+    /** Forgets the search index, e.g. when requested music has just been added to the library. */
+    fun invalidateSearchIndex() { index = null }
+
     /** Search index over the local library, rebuilt after each sync. */
     suspend fun searchIndex(syncedAt: Long): SearchIndex {
         index?.takeIf { it.first == syncedAt }?.let { return it.second }
