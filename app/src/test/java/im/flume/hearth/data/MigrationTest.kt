@@ -146,4 +146,20 @@ class MigrationTest {
         // Every existing table is unchanged.
         v9.forEach { assertEquals(it, createSql(9, it), createSql(10, it)) }
     }
+
+    @Test
+    fun `migration 10 to 11 adds the phone book details and keeps current names as the files' own`() {
+        val before = columns(createSql(10, "local_books"))
+        val after = columns(createSql(11, "local_books"))
+        val prefix = "ALTER TABLE local_books ADD COLUMN "
+        val added = AppDatabase.MIGRATION_10_11_SQL.filter { it.startsWith(prefix) }.associate { stmt ->
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ").trim('`') to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        assertTrue(AppDatabase.MIGRATION_10_11_SQL.contains("UPDATE local_books SET fileTitle = title, fileAuthor = author"))
+        val tables = entities(10).map { it["tableName"]!!.jsonPrimitive.content }
+        assertEquals(tables.toSet(), entities(11).map { it["tableName"]!!.jsonPrimitive.content }.toSet())
+        tables.filter { it != "local_books" }.forEach { assertEquals(it, createSql(10, it), createSql(11, it)) }
+    }
 }

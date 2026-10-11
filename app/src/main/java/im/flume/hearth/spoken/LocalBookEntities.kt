@@ -1,5 +1,6 @@
 package im.flume.hearth.spoken
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Entity
@@ -38,9 +39,30 @@ data class LocalBookEntity(
     /** [LocalUploadState] name while adding to the server or after it failed; null otherwise. */
     val uploadState: String?,
     val uploadError: String?,
+    /** What the files themselves call the book, so "Use the file's own name" can go back to it. */
+    val fileTitle: String? = null,
+    val fileAuthor: String? = null,
+    // Details found online (see LocalBookDetails); null until a match is applied.
+    val narrator: String? = null,
+    val description: String? = null,
+    val publishedYear: String? = null,
+    val series: String? = null,
+    /** [LocalMatchState] name, or null while the book has its file names. */
+    val matchState: String? = null,
+    /** Where the details came from, e.g. "audible.uk:B00GFCRTPI". */
+    val matchSource: String? = null,
+    /** When the server was last asked about this book; 0 = never, so it's looked up once. */
+    @ColumnInfo(defaultValue = "0") val matchCheckedAt: Long = 0,
 )
 
 enum class LocalUploadState { UPLOADING, WAITING_FOR_SERVER, FAILED }
+
+/**
+ * Whose details a phone book shows. AUTO: found and applied without asking (the page offers "Not
+ * right?"). CONFIRMED: the user picked them. DECLINED: the user went back to the file's own name.
+ * Rescans keep AUTO and CONFIRMED details; the server is never asked again about CONFIRMED or DECLINED books.
+ */
+enum class LocalMatchState { AUTO, CONFIRMED, DECLINED }
 
 /** One audio file of a phone book, in play order. [uri] is its content:// document URI. */
 @Entity(tableName = "local_book_files", primaryKeys = ["bookId", "fileIndex"])
@@ -77,8 +99,8 @@ data class LocalBookRow(
     /** As a server book row, so the player and "Continue listening" can show it like any other book. */
     fun toBookRow(): BookRow = BookRow(
         BookEntity(
-            id = book.id, libraryId = "", title = book.title, subtitle = null, author = book.author, narrator = null, series = null,
-            description = null, publishedYear = null, durationSec = book.durationSec, sizeBytes = book.sizeBytes,
+            id = book.id, libraryId = "", title = book.title, subtitle = null, author = book.author, narrator = book.narrator, series = book.series,
+            description = book.description, publishedYear = book.publishedYear,durationSec = book.durationSec, sizeBytes = book.sizeBytes,
             numTracks = book.numFiles, numChapters = if (book.numFiles > 1) book.numFiles else 0, tags = "",
             addedAt = book.addedAt, updatedAt = book.scannedAt, detailsFetchedAt = book.scannedAt,
         ),
@@ -117,9 +139,7 @@ interface LocalBookDao {
         val current = booksIn(treeUri).associateBy { it.id }
         deleteFilesIn(treeUri)
         deleteBooksIn(treeUri)
-        insertBooks(books.map { b ->
-            current[b.id]?.let { c -> b.copy(hidden = c.hidden, serverItemId = c.serverItemId, uploadState = c.uploadState, uploadError = c.uploadError) } ?: b
-        })
+        insertBooks(books.map { b -> current[b.id]?.let { c -> LocalBookMerge.keepUserState(b, c) } ?: b })
         insertFiles(files)
     }
 
@@ -128,6 +148,20 @@ interface LocalBookDao {
         deleteFilesIn(treeUri)
         deleteBooksIn(treeUri)
     }
+
+    /** Books the server hasn't been asked about yet, oldest first. */
+    @Query("SELECT * FROM local_books WHERE matchCheckedAt = 0 AND matchState IS NULL AND hidden = 0 AND serverItemId IS NULL ORDER BY addedAt")
+    suspend fun notLookedUp(): List<LocalBookEntity>
+    @Query("UPDATE local_books SET matchCheckedAt = :at WHERE id = :id") suspend fun setMatchChecked(id: String, at: Long)
+    @Query(
+        """UPDATE local_books SET title = :title, author = :author, narrator = :narrator, description = :description,
+        publishedYear = :publishedYear, series = :series, coverPath = :coverPath, matchState = :matchState, matchSource = :matchSource,
+        matchCheckedAt = :checkedAt WHERE id = :id"""
+    )
+    suspend fun setDetails(
+        id: String, title: String, author: String?, narrator: String?, description: String?, publishedYear: String?, series: String?,
+        coverPath: String?, matchState: String?, matchSource: String?, checkedAt: Long,
+    )
 
     @Query("UPDATE local_books SET hidden = :hidden WHERE id = :id") suspend fun setHidden(id: String, hidden: Boolean)
     @Query("UPDATE local_books SET uploadState = :state, uploadError = :error WHERE id = :id") suspend fun setUpload(id: String, state: String?, error: String?)

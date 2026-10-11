@@ -76,7 +76,7 @@ class SpokenRepository(
     private val db: AppDatabase,
     http: OkHttpClient,
     session: SessionStore,
-    network: NetworkMonitor,
+    private val network: NetworkMonitor,
     private val scope: CoroutineScope,
 ) {
     val store = AbsAccountStore(context)
@@ -87,6 +87,8 @@ class SpokenRepository(
     val feeds = ShowFeeds(context, this, scope)
     /** Audiobooks from folders on this phone, which can be added to the server. */
     val local = LocalBooks(context, db, this, scope)
+    /** No network, or offline mode is on: nothing to ask the server. */
+    internal val offline: Boolean get() = network.cannotStream
     private val dao = db.spoken()
     private val syncLock = Mutex()
 

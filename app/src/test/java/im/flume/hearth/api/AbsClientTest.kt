@@ -272,4 +272,14 @@ class AbsClientTest {
         assertEquals("POST", req.method)
         assertEquals("/api/libraries/lib1/scan", req.path)
     }
+
+    @Test
+    fun `book details search asks one provider by title, signed in`() = runTest {
+        server.enqueue(MockResponse().setBody("""[{"title":"The Goldfinch","author":"Donna Tartt","duration":1945,"asin":"B00GFCRTPI"}]"""))
+        val results = client.searchBooks("Goldfinch", null, "audible.uk")
+        val req = server.takeRequest()
+        assertEquals("/api/search/books?title=Goldfinch&provider=audible.uk", req.path)
+        assertEquals("Bearer access-1", req.getHeader("Authorization"))
+        assertEquals("The Goldfinch", results.single().title)
+    }
 }

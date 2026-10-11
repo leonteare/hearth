@@ -297,6 +297,16 @@ class AbsClient(
     suspend fun searchPodcasts(term: String): List<AbsPodcastSearchResult> =
         get("api/search/podcast", ListSerializer(AbsPodcastSearchResult.serializer()), mapOf("term" to term))
 
+    /**
+     * Looks a book up with one of the server's metadata providers ("audible.uk", "audible", "google"…),
+     * as its own "Match" button does. Only the title (and author, if given) is sent.
+     */
+    suspend fun searchBooks(title: String, author: String?, provider: String): List<AbsBookSearchResult> =
+        get(
+            "api/search/books", ListSerializer(AbsBookSearchResult.serializer()),
+            buildMap { put("title", title); author?.takeIf { it.isNotBlank() }?.let { put("author", it) }; put("provider", provider) },
+        )
+
     suspend fun podcastFeed(feedUrl: String): AbsFeed =
         send("POST", "api/podcasts/feed", buildJsonObject { put("rssFeed", feedUrl) }, AbsFeedResponse.serializer())!!.podcast
 
