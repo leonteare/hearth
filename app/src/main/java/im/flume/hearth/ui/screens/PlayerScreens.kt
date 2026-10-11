@@ -158,7 +158,7 @@ private val PlayerUiState.coverArt: String? get() = current?.mediaMetadata?.extr
 
 /** Polls playback position while visible. */
 @Composable
-private fun rememberPosition(state: PlayerUiState): Long {
+internal fun rememberPosition(state: PlayerUiState): Long {
     val player = LocalContext.current.container.player
     var pos by remember { mutableLongStateOf(player.positionMs) }
     LaunchedEffect(state.current?.mediaId, state.isPlaying) {
@@ -175,8 +175,12 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     val c = LocalContext.current.container
     val player = c.player
     val meta = state.current?.mediaMetadata ?: return
-    val pos = rememberPosition(state)
-    val tint = lerp(rememberCoverColor(state.coverArt), Color.Black, 0.15f)
+    // A podcast episode or audiobook: its cover, −15 / +30 instead of previous / next, no swipe to skip.
+    val spoken = state.spoken
+    val spokenCover = spoken?.let { c.spokenCover(it.libraryItemId, 300) }
+    val pos = if (spoken != null) rememberSpokenPosition(state) else rememberPosition(state)
+    val durationMs = spoken?.durationMs ?: state.durationMs
+    val tint = lerp(rememberCoverColor(if (spoken != null) null else state.coverArt, imageUrl = spokenCover), Color.Black, 0.15f)
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val swipe = remember { Animatable(0f) }
@@ -188,8 +192,9 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             .clip(HearthShapes.Card)
             .background(tint)
             .clickable(onClick = onOpen)
-            // Swipe sideways to skip, like Spotify.
-            .pointerInput(Unit) {
+            // Swipe sideways to skip, like Spotify (songs only).
+            .pointerInput(spoken == null) {
+                if (spoken != null) return@pointerInput
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         scope.launch {
@@ -214,20 +219,29 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Same 4dp cover corner (HearthShapes.Cover) as list rows.
-            CoverArt(state.coverArt, 42.dp, corner = im.flume.hearth.ui.theme.Dimens.CoverCorner, requestSize = 150, fallback = meta.albumTitle?.toString())
+            CoverArt(
+                state.coverArt, 42.dp, corner = im.flume.hearth.ui.theme.Dimens.CoverCorner, requestSize = 150,
+                fallback = meta.albumTitle?.toString(), url = spokenCover,
+            )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(meta.title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                // A book's player items are its files ("Title (2/5)"); its album title is the book's own.
+                val title = if (spoken?.isBook == true) meta.albumTitle else meta.title
+                Text(title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 Text(meta.artist?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
             }
-            IconButton(onClick = { player.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
-            IconButton(onClick = { player.playPause() }) {
-                PlayPauseIcon(state.isPlaying, Modifier.size(30.dp))
+            if (spoken != null) {
+                SpokenMiniControls(state)
+            } else {
+                IconButton(onClick = { player.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
+                IconButton(onClick = { player.playPause() }) {
+                    PlayPauseIcon(state.isPlaying, Modifier.size(30.dp))
+                }
+                IconButton(onClick = { player.next() }) { Icon(Icons.Default.SkipNext, "Next") }
             }
-            IconButton(onClick = { player.next() }) { Icon(Icons.Default.SkipNext, "Next") }
         }
         LinearProgressIndicator(
-            progress = { if (state.durationMs > 0) (pos.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f },
+            progress = { if (durationMs > 0) (pos.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
             modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = 8.dp),
             color = Color.White,
             trackColor = Color.White.copy(alpha = 0.2f),
@@ -239,7 +253,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
 
 /** Play / pause glyph that crossfades between states and says what tapping it will do. */
 @Composable
-private fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
+internal fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
     Crossfade(isPlaying, animationSpec = tween(150), label = "playPause") { playing ->
         Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pause" else "Play", modifier)
     }
@@ -247,6 +261,10 @@ private fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
 
 @Composable
 fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () -> Unit, onOpenVisualiser: () -> Unit) {
+    state.spoken?.let { spoken ->
+        if (state.current != null) SpokenNowPlayingScreen(state, spoken, onClose, onOpenQueue)
+        return
+    }
     val c = LocalContext.current.container
     val current = state.current ?: return
     val songId = current.mediaId
@@ -570,12 +588,15 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
 
 /** "Stops in 23 min" / "Stops after this song" under the source label. */
 @Composable
-private fun SleepStatus(sleepAt: Long) {
+internal fun SleepStatus(sleepAt: Long) {
     if (sleepAt == 0L) return
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(sleepAt) { while (true) { now = System.currentTimeMillis(); delay(15_000) } }
-    val text = if (sleepAt == PlaybackService.SLEEP_END_OF_SONG) "Stops after this song"
-    else "Stops in ${((sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min"
+    val text = when (sleepAt) {
+        PlaybackService.SLEEP_END_OF_SONG -> if (LocalSpokenNow.current != null) "Stops at the end" else "Stops after this song"
+        PlaybackService.SLEEP_END_OF_CHAPTER -> "Stops at the end of this chapter"
+        else -> "Stops in ${((sleepAt - now) / 60_000 + 1).coerceAtLeast(1)} min"
+    }
     val accent = MaterialTheme.colorScheme.primary
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.Bedtime, null, tint = accent, modifier = Modifier.size(12.dp))
@@ -620,6 +641,7 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
     val actions = LocalActions.current
     val player = c.player
     val state by player.state.collectAsStateWithLifecycle()
+    state.spoken?.let { spoken -> return SpokenQueueScreen(state, spoken, onBack) }
     val upcoming = state.queue.drop(state.currentIndex + 1)
 
     // Local copy so drag-reordering is smooth; committed to the player when the drag ends.
