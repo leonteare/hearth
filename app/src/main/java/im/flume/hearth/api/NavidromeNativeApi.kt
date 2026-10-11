@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -65,10 +66,21 @@ class NavidromeNativeApi(
         authed { base -> Request.Builder().url("$base/api/playlist/$playlistId/image").delete() }
     }
 
+    /**
+     * Everyone with an account (admins only). Navidrome's Subsonic getUsers only ever returns the
+     * signed-in user, so sharing a playlist asks this API instead.
+     */
+    suspend fun userNames(): List<String> =
+        authed({ base -> Request.Builder().url("$base/api/user").get() }) { text ->
+            json.parseToJsonElement(text).jsonArray.mapNotNull { it.jsonObject["userName"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank) }
+        }
+
     fun forgetSession() { token = null }
 
+    private suspend fun authed(build: (serverUrl: String) -> Request.Builder) { authed(build) { } }
+
     /** Runs a request with the session token, logging in first (or again after a 401). */
-    private suspend fun authed(build: (serverUrl: String) -> Request.Builder) = withContext(Dispatchers.IO) {
+    private suspend fun <T> authed(build: (serverUrl: String) -> Request.Builder, parse: (String) -> T): T = withContext(Dispatchers.IO) {
         val creds = credentialsProvider() ?: throw IOException("Not logged in")
         for (attempt in 0..1) {
             val current = mutex.withLock {
@@ -82,7 +94,7 @@ class NavidromeNativeApi(
                 // Navidrome hands back a refreshed token on each call; keep it so the session doesn't lapse.
                 resp.header(AUTH_HEADER)?.removePrefix("Bearer ")?.takeIf { it.isNotBlank() }?.let { token = it }
                 when {
-                    resp.isSuccessful -> return@withContext
+                    resp.isSuccessful -> return@withContext parse(resp.body?.string().orEmpty())
                     resp.code == 401 && attempt == 0 -> token = null
                     resp.code == 413 -> throw IOException("That photo is too big")
                     else -> throw IOException("HTTP ${resp.code} from server")

@@ -73,4 +73,15 @@ class NavidromeNativeApiTest {
         assertEquals(675 to 1200, PhotoPrep.fit(2250, 4000))
         assertEquals(800 to 600, PhotoPrep.fit(800, 600))
     }
+
+    @Test
+    fun `every account on the server is listed, not just yours`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"token":"t1"}"""))
+        server.enqueue(MockResponse().setBody("""[{"id":"1","userName":"leon","isAdmin":true},{"id":"2","userName":"Sadie","isAdmin":true}]"""))
+        assertEquals(listOf("leon", "Sadie"), api.userNames())
+        server.takeRequest()
+        val list = server.takeRequest()
+        assertEquals("/api/user", list.path)
+        assertEquals("Bearer t1", list.getHeader("x-nd-authorization"))
+    }
 }

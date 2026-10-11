@@ -102,9 +102,12 @@ fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
     var typed by remember { mutableStateOf("") }
     var choosing by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        runCatching { c.api.users() }
-            .onSuccess { list -> users = list.map { it.username.lowercase() } }
-            .onFailure { users = emptyList(); listFailed = true } // Only admins can list accounts.
+        // Navidrome's own API lists every account (admins); its Subsonic one only ever lists you.
+        // Anyone who owns a playlist this phone can see has an account too.
+        val listed = runCatching { c.nativeApi.userNames() }.recoverCatching { c.api.users().map { it.username } }
+        val owners = runCatching { c.library.dao.playlistsOnce().mapNotNull { it.owner } }.getOrDefault(emptyList())
+        users = (listed.getOrDefault(emptyList()) + owners).map { it.lowercase() }.distinct()
+        listFailed = listed.isFailure && users.isNullOrEmpty() // Only admins can list accounts.
     }
     val names = (users.orEmpty() + sharing.members.keys + sharing.invites.keys)
         .filter { it.isNotBlank() && it != me && it != item.access.owner }
