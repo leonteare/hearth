@@ -3,6 +3,11 @@ package im.flume.hearth.ui.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import im.flume.hearth.ui.theme.SurfaceHigh
+import im.flume.hearth.ui.theme.HearthShapes
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -86,7 +91,7 @@ import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.playback.SpokenNowPlaying
 import im.flume.hearth.spoken.ChapterEntity
 import im.flume.hearth.spoken.ChapterMarks
-import im.flume.hearth.spoken.SPOKEN_SPEEDS
+import im.flume.hearth.spoken.SpokenSpeed
 import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenFormat
 import im.flume.hearth.spoken.SpokenKey
@@ -198,10 +203,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
     var speedSheet by remember { mutableStateOf(false) }
     var chapterSheet by remember { mutableStateOf(false) }
     var sleepSheet by remember { mutableStateOf(false) }
-    if (speedSheet) {
-        val current = SPOKEN_SPEEDS.minByOrNull { kotlin.math.abs(it - spoken.speed) } ?: 1f
-        ChoiceSheet(true, "Playback speed", SPOKEN_SPEEDS.map { it to SpokenFormat.speed(it) }, current, onDismiss = { speedSheet = false }) { player.setSpeed(it) }
-    }
+    if (speedSheet) SpeedSheet(spoken.speed, onDismiss = { speedSheet = false }) { player.setSpeed(it) }
     if (chapterSheet) ChaptersSheet(chapters, spoken, state, onDismiss = { chapterSheet = false })
     if (sleepSheet) SpokenSleepSheet(state.sleepAt, chapters.isNotEmpty(), spoken.isBook, onDismiss = { sleepSheet = false })
 
@@ -223,7 +225,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
             }
         }
         val controls: @Composable () -> Unit = {
-            SpokenControls(state, spoken, info, chapters, openPage, { speedSheet = true }, { chapterSheet = true }, { sleepSheet = true }, onOpenQueue)
+            SpokenControls(state, spoken, info, chapters, openPage, { speedSheet = true }, { chapterSheet = true }, onOpenQueue)
         }
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
             Row(dragToClose, verticalAlignment = Alignment.CenterVertically) {
@@ -263,7 +265,6 @@ private fun SpokenControls(
     openPage: () -> Unit,
     onSpeed: () -> Unit,
     onChapters: () -> Unit,
-    onSleep: () -> Unit,
     onOpenQueue: () -> Unit,
 ) {
     val player = LocalContext.current.container.player
@@ -355,11 +356,57 @@ private fun SpokenControls(
             Spacer(Modifier.width(64.dp))
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        IconButton(onClick = onSleep) {
-            Icon(Icons.Outlined.Bedtime, if (state.sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", tint = if (state.sleepAt != 0L) accent else Color.White)
+    // The sleep timer lives in the ⋮ menu; when it's on, the header says so.
+    if (!spoken.isBook) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Up next") }
         }
-        if (!spoken.isBook) IconButton(onClick = onOpenQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Up next") }
+    }
+}
+
+/** Any speed from 0.5× to 3×: drag, nudge by 0.05 or tap a common one. Changes are heard straight away. */
+@Composable
+private fun SpeedSheet(speed: Float, onDismiss: () -> Unit, onSpeed: (Float) -> Unit) {
+    var value by remember { mutableStateOf(SpokenSpeed.snap(speed)) }
+    fun set(v: Float) {
+        val snapped = SpokenSpeed.snap(v)
+        if (snapped != value) { value = snapped; onSpeed(snapped) }
+    }
+    ActionSheet(true, onDismiss, title = "Playback speed", showCover = false) {
+        Text(
+            SpokenFormat.speed(value), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { set(SpokenSpeed.step(value, up = false)) }, enabled = value > SpokenSpeed.MIN) {
+                Icon(Icons.Default.Remove, "Slower")
+            }
+            Slider(
+                value = value, onValueChange = { set(it) },
+                valueRange = SpokenSpeed.MIN..SpokenSpeed.MAX,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary),
+            )
+            IconButton(onClick = { set(SpokenSpeed.step(value, up = true)) }, enabled = value < SpokenSpeed.MAX) {
+                Icon(Icons.Default.Add, "Faster")
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SpokenSpeed.PRESETS.forEach { p ->
+                val on = kotlin.math.abs(p - value) < 0.001f
+                Box(
+                    Modifier.weight(1f).heightIn(min = 40.dp).clip(HearthShapes.Card)
+                        .background(if (on) MaterialTheme.colorScheme.primary else SurfaceHigh)
+                        .clickable(role = Role.Button) { set(p) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(SpokenFormat.speed(p), color = if (on) Color.Black else Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 

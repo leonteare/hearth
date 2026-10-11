@@ -1193,8 +1193,8 @@ class PlaybackService : MediaSessionService() {
         const val SLEEP_END_OF_CHAPTER = -2L
         const val SKIP_BACK_SEC = 15.0
         const val SKIP_FORWARD_SEC = 30.0
-        const val MIN_SPEED = 0.8f
-        const val MAX_SPEED = 2.0f
+        const val MIN_SPEED = im.flume.hearth.spoken.SpokenSpeed.MIN
+        const val MAX_SPEED = im.flume.hearth.spoken.SpokenSpeed.MAX
         const val ARG_SLEEP_MS = "sleepMs"
         const val EXTRA_SLEEP_AT = "sleepAt"
         const val SLEEP_END_OF_SONG = -1L

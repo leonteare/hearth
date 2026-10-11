@@ -122,7 +122,18 @@ object ChapterMarks {
 }
 
 /** The speeds offered in the player's speed sheet. */
-val SPOKEN_SPEEDS = listOf(0.8f, 1f, 1.1f, 1.2f, 1.25f, 1.5f, 1.75f, 2f)
+/** Playback speeds for podcasts and audiobooks: any value in 0.05 steps, plus quick picks. */
+object SpokenSpeed {
+    const val MIN = 0.5f
+    const val MAX = 3.0f
+    const val STEP = 0.05f
+    val PRESETS = listOf(0.8f, 1f, 1.2f, 1.5f, 1.75f, 2f)
+
+    /** The nearest 0.05 step, kept in range (so a slider never gives 1.3499999). */
+    fun snap(speed: Float): Float = (Math.round(speed.coerceIn(MIN, MAX) / STEP) * STEP).let { Math.round(it * 100) / 100f }.coerceIn(MIN, MAX)
+
+    fun step(speed: Float, up: Boolean): Float = snap(speed + if (up) STEP else -STEP)
+}
 
 /** Podcasts, episodes and books that match a search, from the phone's catalogue (instant, offline). */
 data class SpokenSearchResults(
