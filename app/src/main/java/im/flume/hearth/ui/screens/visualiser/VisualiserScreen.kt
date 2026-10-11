@@ -132,9 +132,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
             renderers.clear()
         }
     }
-    var toast by remember { mutableStateOf("") }
-    var toastKey by remember { mutableIntStateOf(0) }
-    var toastVisible by remember { mutableStateOf(false) }
     var controls by remember { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var picker by remember { mutableStateOf(false) }
@@ -144,8 +141,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
         outgoing = style
         style = next
         c.session.updateSettings { it.copy(visualiserStyle = next.id) }
-        toast = next.label
-        toastKey++
         scope.launch {
             fade.snapTo(0f)
             fade.animateTo(1f, tween(400))
@@ -225,12 +220,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
             controls = false
         }
     }
-    LaunchedEffect(toastKey) {
-        if (toastKey == 0) return@LaunchedEffect
-        toastVisible = true
-        delay(1300)
-        toastVisible = false
-    }
 
     // ---------------------------------------------------------------- layout
 
@@ -255,22 +244,6 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
         outgoing?.let { RenderLayer(renderer(it), frame, { tick }, { 1f }) }
         RenderLayer(renderer(style), frame, { tick }, { if (outgoing != null) fade.value else 1f })
 
-        AnimatedVisibility(
-            visible = toastVisible,
-            enter = fadeIn(tween(150)) + scaleIn(tween(150), initialScale = 0.9f),
-            exit = fadeOut(tween(300)) + scaleOut(tween(300), targetScale = 1.05f),
-            modifier = Modifier.align(Alignment.Center),
-        ) {
-            Text(
-                toast,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50))
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-            )
-        }
 
         AnimatedVisibility(visible = controls, enter = fadeIn(tween(200)), exit = fadeOut(tween(400))) {
             Controls(

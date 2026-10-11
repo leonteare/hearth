@@ -11,21 +11,21 @@ import kotlin.math.floor
 enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean) {
     PARTICLES("particles", "Particles", false),
     RIBBON("ribbon", "Ribbon", false),
+    SPHERE("sphere", "Sphere", false),
     MEMORY_CARD("memory-card", "Memory Card", true),
-    TUNNEL("tunnel", "Tunnel '98", true),
     GRID_RUNNER("grid-runner", "Grid Runner", true);
 
     fun create(): VisualiserRenderer = when (this) {
         PARTICLES -> ParticlesRenderer()
         RIBBON -> RibbonRenderer()
         MEMORY_CARD -> MemoryCardRenderer()
-        TUNNEL -> TunnelRenderer()
+        SPHERE -> SphereRenderer()
         GRID_RUNNER -> GridRunnerRenderer()
     }
 
     companion object {
         const val DEFAULT_ID = "memory-card"
-        /** Unknown or retired ids (Halo, Disc Player, Aurora) fall back to the default, Memory Card. */
+        /** Unknown or retired ids (Halo, Disc Player, Aurora, Tunnel '98) fall back to the default, Memory Card. */
         fun byId(id: String?): VisualiserStyle = entries.firstOrNull { it.id == id } ?: MEMORY_CARD
     }
 }
