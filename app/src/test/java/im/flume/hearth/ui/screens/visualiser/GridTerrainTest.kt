@@ -36,9 +36,10 @@ class GridTerrainTest {
     }
 
     @Test
-    fun scannerSitsAQuarterToAThirdIntoTheLand() {
+    fun scannerSitsCloseInFrontOfTheCamera() {
+        // Close enough that the hills it prints are big on screen as they rise, with room to see them come.
         val f = GridTerrain.SCAN_Z / GridTerrain.FAR_Z
-        assertTrue("$f", f in 0.25f..0.35f)
+        assertTrue("$f", f in 0.1f..0.2f)
         assertTrue(GridTerrain.ROW_MIN_Z < GridTerrain.SCAN_Z)
     }
 

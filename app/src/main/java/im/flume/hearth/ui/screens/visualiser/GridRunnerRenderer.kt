@@ -417,7 +417,7 @@ class GridRunnerRenderer : RetroRenderer() {
 /** Grid Runner's terrain maths, kept free of Android types for unit tests. */
 internal object GridTerrain {
     /** The scanner's distance ahead of the camera. */
-    const val SCAN_Z = 9f
+    const val SCAN_Z = 5f // close enough that the hills it prints are big on screen as they rise
     /** The far edge of the land (nearest row 1 ahead, 34 rows). */
     const val FAR_Z = 34f
     /** Rows nearer than this are drawn only as near-plane-clipped lines, never projected as points. */

@@ -36,10 +36,12 @@ class PipesRenderer : VisualiserRenderer() {
     private val sy = FloatArray(cells)
     private val sd = FloatArray(cells)
 
-    // Painter's order: segments bucketed by depth, far first.
+    // Painter's order: segments and corner balls bucketed by depth, far first. Items below
+    // maxSegments are segments; maxSegments + s is the corner ball at the start of segment s.
     private val bucketStart = IntArray(BUCKETS + 1)
-    private val bucketOf = IntArray(world.maxSegments)
-    private val order = IntArray(world.maxSegments)
+    private val bucketOf = IntArray(world.maxSegments * 2)
+    private val order = IntArray(world.maxSegments * 2)
+    private var itemCount = 0
 
     private val colours = IntArray(8)
     private var coloursFor = -1
@@ -141,9 +143,19 @@ class PipesRenderer : VisualiserRenderer() {
         val lowQuality = quality < 0.8f
 
         sortSegments(near, far)
-        val count = world.segCount
-        for (o in 0 until count) {
-            val s = order[o]
+        for (o in 0 until itemCount) {
+            val item = order[o]
+            if (item >= world.maxSegments) {
+                // A corner ball, sorted on its own just in front of the pieces it joins, so it never
+                // flickers behind one of them as the camera turns.
+                val s = item - world.maxSegments
+                val ca = world.segA[s]
+                val fog = (sd[ca] - near) / (far - near)
+                val shade = (1f - 0.55f * fog.coerceIn(0f, 1f)) * pulse
+                ball(sx[ca], sy[ca], radius / sd[ca], scaleArgb(colours[world.segColour[s] and 7], shade), fade, lowQuality)
+                continue
+            }
+            val s = item
             val ca = world.segA[s]
             val cb = world.segB[s]
             val grow = ((f.time - world.segBirth[s]) / GROW_TIME).coerceIn(0f, 1f)
@@ -157,7 +169,6 @@ class PipesRenderer : VisualiserRenderer() {
             val base = scaleArgb(colours[world.segColour[s] and 7], shade)
             val r = radius / ((depthA + depthB) * 0.5f)
             tube(ax, ay, bx, by, r, base, fade, lowQuality)
-            if (world.segJointA[s]) ball(ax, ay, radius / depthA, base, fade, lowQuality)
             if (world.segCapB[s] && grow >= 1f) ball(bx, by, radius / depthB, base, fade, lowQuality)
             else if (world.segCapB[s]) ball(bx, by, radius / depthB * 0.9f, base, fade, lowQuality)
         }
@@ -219,22 +230,38 @@ class PipesRenderer : VisualiserRenderer() {
         drawCircle(Color.White, radius = r * 0.16f, center = Offset(x + LIGHT_X * r * 0.42f, y + LIGHT_Y * r * 0.42f), alpha = alpha * 0.7f)
     }
 
-    /** Counting sort of the segments into depth buckets, far first: cheap and allocation-free. */
+    /**
+     * Counting sort of the segments and corner balls into depth buckets, far first: cheap and
+     * allocation-free. A ball is placed a little nearer than its corner so it lands over both pieces
+     * that meet there.
+     */
     private fun sortSegments(near: Float, far: Float) {
         val count = world.segCount
+        val joint = world.maxSegments
         bucketStart.fill(0)
+        fun bucket(d: Float) = (((far - d) / (far - near)) * BUCKETS).toInt().coerceIn(0, BUCKETS - 1)
         for (i in 0 until count) {
             val s = world.slot(i)
-            val d = (sd[world.segA[s]] + sd[world.segB[s]]) * 0.5f
-            val b = (((far - d) / (far - near)) * BUCKETS).toInt().coerceIn(0, BUCKETS - 1)
+            val b = bucket((sd[world.segA[s]] + sd[world.segB[s]]) * 0.5f)
             bucketOf[s] = b
             bucketStart[b + 1]++
+            if (world.segJointA[s]) {
+                val bj = (bucket(sd[world.segA[s]] - JOINT_BIAS) + 1).coerceAtMost(BUCKETS - 1)
+                bucketOf[joint + s] = bj
+                bucketStart[bj + 1]++
+            }
         }
         for (b in 0 until BUCKETS) bucketStart[b + 1] += bucketStart[b]
-        // Within a bucket, oldest first, so a pipe's newer segment lands over its older one.
+        itemCount = bucketStart[BUCKETS]
+        // Within a bucket, oldest first, so a pipe's newer segment lands over its older one; a ball
+        // comes after the segments in its bucket.
         for (i in 0 until count) {
             val s = world.slot(i)
             order[bucketStart[bucketOf[s]]++] = s
+        }
+        for (i in 0 until count) {
+            val s = world.slot(i)
+            if (world.segJointA[s]) order[bucketStart[bucketOf[joint + s]]++] = joint + s
         }
     }
 
@@ -318,6 +345,8 @@ class PipesRenderer : VisualiserRenderer() {
     }
 
     private companion object {
+        /** How much nearer than its corner a ball sorts, in world units (about half a tube). */
+        const val JOINT_BIAS = 0.05f
         const val N = 10
         /** Tube radius, in cells. */
         const val TUBE = 0.2f
