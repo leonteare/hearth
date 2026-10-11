@@ -22,7 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
@@ -50,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
-import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.Mix
 import im.flume.hearth.data.StatsPeriod
 import im.flume.hearth.data.PlaySource
@@ -63,7 +63,8 @@ import im.flume.hearth.ui.components.MediaCard
 import im.flume.hearth.ui.components.PageHeader
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.DownloadsColor
+import im.flume.hearth.ui.theme.AudiobooksColor
+import im.flume.hearth.ui.theme.PodcastsColor
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.LikedColor
 import im.flume.hearth.ui.theme.SurfaceHigh
@@ -80,11 +81,7 @@ fun HomeScreen() {
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     val sync by c.sync.state.collectAsStateWithLifecycle()
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(-1)
-    val localRecent by remember { dao.recentlyPlayedAlbums(12) }.collectAsStateWithLifecycle(emptyList())
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
-    val downloadCounts by remember { c.allDownloadCounts() }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
-    val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
-    val downloadsLabel = downloadsShortcutLabel(downloadCounts, coming)
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
     // Podcasts and audiobooks, once signed in: what you're part-way through, and new episodes of shows you follow.
@@ -93,11 +90,6 @@ fun HomeScreen() {
     val latestEpisodes by remember { c.spoken.latestEpisodes(50) }.collectAsStateWithLifecycle(emptyList())
     val newEpisodes = remember(latestEpisodes) { im.flume.hearth.spoken.SpokenLists.newEpisodes(latestEpisodes, 5) }
 
-    var serverRecent by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
-    LaunchedEffect(online, songCount > 0) {
-        if (online) serverRecent = runCatching { c.library.serverRecentAlbums(12) }.getOrDefault(emptyList())
-    }
-    val recent = serverRecent.ifEmpty { localRecent }
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
     LaunchedEffect(songCount > 0) { if (songCount > 0) mixes = runCatching { c.mixes.today(online) }.getOrDefault(emptyList()) }
 
@@ -127,17 +119,15 @@ fun HomeScreen() {
             item { Text("Library sync failed: ${f.message}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
         }
 
+        // Always the same four, so they're where your thumb expects. Downloads lives in Your Library.
         item {
             QuickGrid(
-                tiles = buildList {
-                    add(QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) })
-                    add(QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") })
-                    // Only while something is downloading or failed; finished downloads live in their albums and playlists.
-                    if (downloadsLabel != null) {
-                        add(QuickTile(downloadsLabel, Icons.Default.DownloadDone, DownloadsColor) { actions.open("downloads") })
-                    }
-                    recent.take(if (downloadsLabel != null) 3 else 4).forEach { a -> add(QuickTile(a.name, cover = a.coverArt) { actions.openAlbum(a.id) }) }
-                }
+                listOf(
+                    QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) },
+                    QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") },
+                    QuickTile("Podcasts", Icons.Default.Podcasts, PodcastsColor) { actions.openLibraryTab("PODCASTS") },
+                    QuickTile("Audiobooks", Icons.AutoMirrored.Filled.MenuBook, AudiobooksColor) { actions.openLibraryTab("AUDIOBOOKS") },
+                )
             )
         }
 
@@ -187,15 +177,15 @@ fun MixCover(mix: Mix, size: androidx.compose.ui.unit.Dp) {
 
 private data class QuickTile(
     val title: String,
-    val icon: ImageVector? = null,
-    val color: Color = SurfaceHigh,
-    val cover: String? = null,
+    val icon: ImageVector,
+    val color: Color,
     val onClick: () -> Unit,
 )
 
+/** A fixed two-by-two grid, the same on every screen size. */
 @Composable
 private fun QuickGrid(tiles: List<QuickTile>) {
-    val columns = gridColumns()
+    val columns = 2
     Column(Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -212,12 +202,8 @@ private fun QuickTileView(t: QuickTile, modifier: Modifier) {
         modifier.heightIn(min = 56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = t.onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (t.icon != null) {
-            Box(Modifier.size(56.dp).background(t.color), contentAlignment = Alignment.Center) {
-                Icon(t.icon, null, tint = if (t.color == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.onPrimary else Color.White)
-            }
-        } else {
-            CoverArt(t.cover, 56.dp, corner = 0.dp, requestSize = 150, fallback = t.title)
+        Box(Modifier.size(56.dp).background(t.color), contentAlignment = Alignment.Center) {
+            Icon(t.icon, null, tint = if (t.color == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.onPrimary else Color.White)
         }
         Text(
             t.title,

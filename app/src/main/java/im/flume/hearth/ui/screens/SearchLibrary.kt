@@ -4,15 +4,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.text.style.TextAlign
 import im.flume.hearth.data.YourLibrary
+import im.flume.hearth.data.LibraryOrder
+import im.flume.hearth.data.SearchFilter
+import im.flume.hearth.data.SearchHit
+import im.flume.hearth.data.SearchIndex
+import im.flume.hearth.data.SearchRanking
+import im.flume.hearth.ui.components.LocalTabRequests
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import im.flume.hearth.data.AlbumItem
 import im.flume.hearth.data.ArtistItem
 import im.flume.hearth.data.SongItem
@@ -87,7 +95,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,10 +134,8 @@ fun SearchScreen() {
     val dao = LocalContext.current.container.db.library()
     val actions = LocalActions.current
     var query by rememberSaveable { mutableStateOf("") }
-    var songs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
-    var albums by remember { mutableStateOf<List<AlbumEntity>>(emptyList()) }
-    var artists by remember { mutableStateOf<List<ArtistEntity>>(emptyList()) }
-    var closeMatches by remember { mutableStateOf(false) }
+    var filter by rememberSaveable { mutableStateOf(SearchFilter.ALL) }
+    var library by remember { mutableStateOf(SearchIndex.Results.EMPTY) }
     // True while the search index is being built (the first search after launch or a sync).
     var indexing by remember { mutableStateOf(false) }
     val c = LocalContext.current.container
@@ -138,25 +143,30 @@ fun SearchScreen() {
 
     val context = LocalContext.current
     val recentPrefs = remember { context.getSharedPreferences("search", android.content.Context.MODE_PRIVATE) }
-    var recent by remember { mutableStateOf(recentPrefs.getString("recent", "").orEmpty().split('\n').filter { it.isNotBlank() }) }
+    var recent by remember { mutableStateOf(recentPrefs.getString("recent", "").orEmpty().split('\n').filter { it.isNotBlank() }.take(RECENT_SEARCHES)) }
     fun saveRecent(q: String) {
         val t = q.trim().takeIf { it.length >= 2 } ?: return
         c.usage.track(im.flume.hearth.data.Usage.SEARCH)
-        recent = (listOf(t) + recent.filterNot { it.equals(t, ignoreCase = true) }).take(10)
+        recent = (listOf(t) + recent.filterNot { it.equals(t, ignoreCase = true) }).take(RECENT_SEARCHES)
         recentPrefs.edit().putString("recent", recent.joinToString("\n")).apply()
     }
-    // Searches that found something are remembered when you leave the page.
-    val latestQuery by rememberUpdatedState(query)
-    var hadSpokenResults by remember { mutableStateOf(false) }
-    val hadResults by rememberUpdatedState(songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty() || hadSpokenResults)
-    DisposableEffect(Unit) { onDispose { if (hadResults) saveRecent(latestQuery) } }
 
     val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     val gridColumns = gridColumns()
     LaunchedEffect(Unit) { focus.requestFocus() }
+    // Opened from elsewhere (Your Library's "Find a podcast"): that filter, ready to type.
+    val tabRequests = LocalTabRequests.current
+    LaunchedEffect(tabRequests.searchFilter) {
+        val wanted = tabRequests.searchFilter ?: return@LaunchedEffect
+        tabRequests.searchFilter = null
+        filter = wanted
+        focus.requestFocus()
+        keyboard?.show()
+    }
 
     // Music that isn't on the server is fetched separately, so the library's results never wait on it,
-    // then shown in the same sections, after the library's. If it can't be reached, it just isn't shown.
+    // then ranked into the same list. If it can't be reached, it just isn't shown.
     val settings by c.session.settings.collectAsStateWithLifecycle()
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     var remote by remember { mutableStateOf<im.flume.hearth.api.TidalSearchResults?>(null) }
@@ -179,9 +189,8 @@ fun SearchScreen() {
             null
         }
     }
-    val sections = remember(songs, albums, artists, remote) { im.flume.hearth.data.Availability.mergeSearch(songs, albums, artists, remote) }
 
-    // Podcasts, episodes and audiobooks from the phone's catalogue (instant, offline), after the music.
+    // Podcasts, episodes and audiobooks from the phone's catalogue (instant, offline).
     val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
     val spokenPodcasts by remember { c.spoken.podcasts() }.collectAsStateWithLifecycle(emptyList())
     val spokenBooks by remember { c.spoken.books() }.collectAsStateWithLifecycle(emptyList())
@@ -193,7 +202,6 @@ fun SearchScreen() {
         delay(120)
         val episodes = spokenEpisodes ?: c.spoken.allEpisodes().also { spokenEpisodes = it }
         spoken = withContext(Dispatchers.Default) { im.flume.hearth.spoken.SpokenSearch.search(q, spokenPodcasts, episodes, spokenBooks) }
-        hadSpokenResults = !spoken.isEmpty
     }
     // Podcasts that aren't on the server yet, from the podcast directory (online only, after a pause in typing).
     var directory by remember { mutableStateOf<List<im.flume.hearth.api.AbsPodcastSearchResult>>(emptyList()) }
@@ -216,19 +224,24 @@ fun SearchScreen() {
 
     LaunchedEffect(query) {
         val q = query.trim()
-        if (q.isEmpty()) {
-            songs = emptyList(); albums = emptyList(); artists = emptyList(); return@LaunchedEffect
-        }
+        if (q.isEmpty()) { library = SearchIndex.Results.EMPTY; return@LaunchedEffect }
         delay(120)
         // Scanning ~7k songs is too slow for the main thread; a new keystroke cancels this anyway.
         indexing = true
         val index = try { c.library.searchIndex(c.session.lastSyncAt) } finally { indexing = false }
-        val r = withContext(Dispatchers.Default) { index.search(q) }
-        artists = r.artists
-        albums = r.albums
-        songs = r.songs
-        closeMatches = r.fuzzy
+        library = withContext(Dispatchers.Default) { index.search(q) }
     }
+
+    // Everything in one list, best match first, whatever kind it is.
+    val hits = remember(query, library, remote, spoken, directory) { SearchRanking.merge(query, library, remote, spoken, directory) }
+    val shown = remember(hits, filter) { SearchRanking.filter(hits, filter) }
+    // Tapping a song plays the songs shown, in this order, from that one.
+    val shownSongIds = remember(shown) { shown.mapNotNull { ((it as? SearchHit.Song)?.item as? SongItem.Owned)?.song?.id } }
+
+    // Searches that found something are remembered when you leave the page.
+    val latestQuery by rememberUpdatedState(query)
+    val hadResults by rememberUpdatedState(hits.isNotEmpty())
+    DisposableEffect(Unit) { onDispose { if (hadResults) saveRecent(latestQuery) } }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Search")
@@ -257,8 +270,9 @@ fun SearchScreen() {
                 decorationBox = { inner ->
                     if (query.isEmpty()) {
                         Text(
-                            if (spokenAccount != null) "Songs, artists, albums or podcasts" else "Songs, artists or albums",
+                            searchHint(filter, spokenAccount != null),
                             color = SearchFieldHint, style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                     inner()
@@ -270,8 +284,9 @@ fun SearchScreen() {
                 Spacer(Modifier.width(12.dp))
             }
         }
+        SearchFilterChips(filter) { filter = it }
 
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
             if (query.isBlank()) {
                 if (recent.isNotEmpty()) {
                     item {
@@ -282,7 +297,7 @@ fun SearchScreen() {
                             }) { Text("Clear", color = TextSecondary) }
                         }
                     }
-                    items(recent, key = { "r:$it" }) { r ->
+                    items(recent.take(RECENT_SEARCHES), key = { "r:$it" }) { r ->
                         Row(
                             Modifier.fillMaxWidth().clickable { query = r }.padding(horizontal = Dimens.Gutter, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -291,15 +306,6 @@ fun SearchScreen() {
                             Spacer(Modifier.width(16.dp))
                             Text(r, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                    }
-                }
-                // The Library tab only shows what you saved; the whole server is one tap away here.
-                item { SectionHeader("Browse everything") }
-                item {
-                    Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BrowseTile("Artists", Icons.Default.Person, Modifier.weight(1f)) { actions.open("browse/artists") }
-                        BrowseTile("Albums", Icons.Default.Album, Modifier.weight(1f)) { actions.open("browse/albums") }
-                        BrowseTile("Songs", Icons.Default.MusicNote, Modifier.weight(1f)) { actions.open("browse/songs") }
                     }
                 }
                 if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
@@ -326,8 +332,8 @@ fun SearchScreen() {
                         }
                     }
                 }
-                if (closeMatches && (artists.isNotEmpty() || albums.isNotEmpty() || songs.isNotEmpty())) {
-                    item {
+                if (library.fuzzy && !library.isEmpty) {
+                    item(key = "close") {
                         Text(
                             "No exact matches. Showing close matches.",
                             color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
@@ -335,66 +341,29 @@ fun SearchScreen() {
                         )
                     }
                 }
-                if (sections.artists.isNotEmpty()) {
-                    item(key = "h-artists") { SectionHeader("Artists") }
-                    items(sections.artists, key = { "ar:${it.key}" }) { a ->
-                        Column(Modifier.animateItem()) {
-                            when (a) {
-                                is ArtistItem.Owned -> ArtistRow(a.artist)
-                                is ArtistItem.Missing -> MissingArtistRow(a.artist) { actions.openArtist(remoteArtistId(a.artist.id)) }
-                            }
+                items(shown, key = { it.key }) { hit ->
+                    Column(Modifier.animateItem()) {
+                        SearchHitRow(hit, spokenPodcasts, spokenAccount?.username) { songId ->
+                            actions.play(PlaySource(PlaySource.Kind.SONGS, label = "Search", songIds = shownSongIds), startSongId = songId)
                         }
                     }
                 }
-                if (sections.albums.isNotEmpty()) {
-                    item(key = "h-albums") { SectionHeader("Albums") }
-                    items(sections.albums, key = { "al:${it.key}" }) { a ->
-                        Column(Modifier.animateItem()) {
-                            when (a) {
-                                is AlbumItem.Owned -> AlbumListRow(a.album)
-                                is AlbumItem.Missing -> MissingAlbumRow(a.album) { actions.openAlbum(remoteAlbumId(a.album.id)) }
-                            }
+                val lookingForPodcasts = directoryLoading && (filter == SearchFilter.ALL || filter == SearchFilter.PODCASTS)
+                if (lookingForPodcasts) {
+                    item(key = "directory-loading") {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Looking for more podcasts…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
-                if (sections.songs.isNotEmpty()) {
-                    item(key = "h-songs") { SectionHeader("Songs") }
-                    items(sections.songs, key = { it.key }) { s ->
-                        Column(Modifier.animateItem()) {
-                            when (s) {
-                                is SongItem.Owned -> SongRow(s.song, onClick = {
-                                    actions.play(PlaySource(PlaySource.Kind.SONGS, label = "Search", songIds = songs.map { it.id }), startSongId = s.song.id)
-                                })
-                                is SongItem.Missing -> MissingSongRow(s.track)
-                            }
-                        }
-                    }
-                }
-                if (spoken.podcasts.isNotEmpty()) {
-                    item(key = "h-podcasts") { SectionHeader("Podcasts") }
-                    items(spoken.podcasts, key = { "pod:${it.id}" }) { p -> PodcastListRow(p, modifier = Modifier.animateItem()) }
-                }
-                if (spoken.episodes.isNotEmpty()) {
-                    item(key = "h-episodes") { SectionHeader("Episodes") }
-                    items(spoken.episodes, key = { "ep:${it.episode.id}" }) { e -> EpisodeListRow(e, Modifier.animateItem(), showCover = true, withShow = true) }
-                }
-                if (spoken.books.isNotEmpty()) {
-                    item(key = "h-books") { SectionHeader("Audiobooks") }
-                    items(spoken.books, key = { "book:${it.book.id}" }) { b -> BookListRow(b, Modifier.animateItem()) }
-                }
-                if (!indexing && sections.isEmpty && spoken.isEmpty && directory.isEmpty() && !directoryLoading) {
-                    item {
-                        Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
-                    }
-                }
-                if (directory.isNotEmpty() || directoryLoading) {
-                    item(key = "h-directory") {
-                        SectionHeader("Find podcasts") {
-                            if (directoryLoading) CircularProgressIndicator(Modifier.padding(end = 12.dp).size(18.dp), strokeWidth = 2.dp)
-                        }
-                    }
-                    items(directory, key = { "dir:${it.feedUrl}" }) { r ->
-                        DirectoryRow(r, spokenPodcasts, spokenAccount?.username, Modifier.animateItem())
+                if (!indexing && !directoryLoading && shown.isEmpty()) {
+                    item(key = "none") {
+                        Text(
+                            if (hits.isEmpty()) "No results for \"$query\"" else "No ${filter.label.lowercase()} for \"$query\"",
+                            color = TextSecondary, modifier = Modifier.padding(16.dp),
+                        )
                     }
                 }
             }
@@ -402,15 +371,79 @@ fun SearchScreen() {
     }
 }
 
+/** Recent searches kept on the landing page; more than a few just pushes genres off the screen. */
+private const val RECENT_SEARCHES = 4
+
+private fun searchHint(filter: SearchFilter, spoken: Boolean): String = when (filter) {
+    SearchFilter.ARTISTS -> "Artists"
+    SearchFilter.ALBUMS -> "Albums"
+    SearchFilter.SONGS -> "Songs"
+    SearchFilter.PODCASTS -> "Podcasts and episodes"
+    SearchFilter.BOOKS -> "Audiobooks"
+    SearchFilter.ALL -> if (spoken) "Songs, artists, albums or podcasts" else "Songs, artists or albums"
+}
+
+/**
+ * All · Artists · Albums · Songs · Podcasts · Books, all six side by side at equal width. Small
+ * enough to fit a 360dp phone without scrolling, so every filter is always one tap away.
+ */
 @Composable
-private fun BrowseTile(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+private fun SearchFilterChips(selected: SearchFilter, onSelect: (SearchFilter) -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
     Row(
-        modifier.heightIn(min = 56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = onClick).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(12.dp))
-        Text(title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        SearchFilter.entries.forEach { f ->
+            val on = f == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .heightIn(min = 32.dp)
+                    .clip(HearthShapes.Chip)
+                    .background(if (on) accent else SurfaceHigh)
+                    .selectable(selected = on, role = Role.Tab, onClick = { onSelect(f) }),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    f.label,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    color = if (on) MaterialTheme.colorScheme.onPrimary else Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
+/** One row of Search's list, in the same row the rest of the app uses for that kind of thing. */
+@Composable
+private fun SearchHitRow(
+    hit: SearchHit,
+    podcasts: List<im.flume.hearth.spoken.PodcastEntity>,
+    username: String?,
+    playSong: (String) -> Unit,
+) {
+    val actions = LocalActions.current
+    when (hit) {
+        is SearchHit.Artist -> when (val a = hit.item) {
+            is ArtistItem.Owned -> ArtistRow(a.artist)
+            is ArtistItem.Missing -> MissingArtistRow(a.artist) { actions.openArtist(remoteArtistId(a.artist.id)) }
+        }
+        is SearchHit.Album -> when (val a = hit.item) {
+            is AlbumItem.Owned -> AlbumListRow(a.album)
+            is AlbumItem.Missing -> MissingAlbumRow(a.album) { actions.openAlbum(remoteAlbumId(a.album.id)) }
+        }
+        is SearchHit.Song -> when (val s = hit.item) {
+            is SongItem.Owned -> SongRow(s.song, onClick = { playSong(s.song.id) }, subtitle = "Song • ${s.song.artist}")
+            is SongItem.Missing -> MissingSongRow(s.track, subtitle = "Song • ${s.track.artist}")
+        }
+        is SearchHit.Podcast -> PodcastListRow(hit.podcast)
+        is SearchHit.DirectoryPodcast -> DirectoryRow(hit.result, podcasts, username)
+        is SearchHit.Episode -> EpisodeListRow(hit.row, showCover = true, withShow = true, label = "Episode")
+        is SearchHit.Book -> BookListRow(hit.row)
     }
 }
 
@@ -436,24 +469,18 @@ fun AlbumListRow(a: AlbumEntity) {
     )
 }
 
+/** Your Library's tabs; [Actions.openLibraryTab] names one by its [name]. */
 private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums"), PODCASTS("Podcasts"), AUDIOBOOKS("Audiobooks") }
 
 private val ARTIST_SORTS = listOf("A–Z", "Most albums")
 private val ALBUM_SORTS = listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
 
-private fun sortArtists(artists: List<ArtistEntity>, sort: Int) =
-    if (sort == 1) artists.sortedByDescending { it.albumCount } else artists
+private fun sortArtists(artists: List<ArtistEntity>, sort: Int) = LibraryOrder.artists(artists, sort)
 
-private fun sortAlbums(albums: List<AlbumEntity>, sort: Int) = when (sort) {
-    1 -> albums.sortedByDescending { it.created }
-    2 -> albums.sortedWith(compareBy({ it.artist.lowercase().removePrefix("the ") }, { it.year ?: 0 }))
-    3 -> albums.sortedByDescending { it.playCount }
-    4 -> albums.sortedByDescending { it.year ?: 0 }
-    else -> albums
-}
+private fun sortAlbums(albums: List<AlbumEntity>, sort: Int) = LibraryOrder.albums(albums, sort)
 
 @Composable
-private fun SortMenu(options: List<String>, sort: Int, onSort: (Int) -> Unit) {
+internal fun SortMenu(options: List<String>, sort: Int, onSort: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) {
         Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
@@ -470,6 +497,17 @@ fun LibraryScreen() {
     val dao = c.db.library()
     val actions = LocalActions.current
     var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
+    val tabsState = rememberLazyListState()
+    // Opened on a given tab (Home's Podcasts and Audiobooks tiles).
+    val tabRequests = LocalTabRequests.current
+    LaunchedEffect(tabRequests.libraryTab) {
+        val wanted = tabRequests.libraryTab ?: return@LaunchedEffect
+        tabRequests.libraryTab = null
+        LibraryTab.entries.firstOrNull { it.name == wanted }?.let {
+            tab = it
+            tabsState.animateScrollToItem(it.ordinal)
+        }
+    }
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     // Yours, ones you've joined, and invites waiting for an answer. Other people's playlists stay hidden.
     val playlists = remember(playlistItems) { PlaylistRules.visible(playlistItems) }
@@ -491,7 +529,9 @@ fun LibraryScreen() {
     // Podcasts you follow and the server's audiobooks (each person follows their own shows).
     val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
     val spokenSyncing by c.spoken.syncing.collectAsStateWithLifecycle()
-    val followed by remember { c.spoken.followedPodcasts() }.collectAsStateWithLifecycle(emptyList())
+    // Null until loaded, so "No podcasts yet" doesn't flash up before the shows you follow.
+    val followedOrNull by remember { c.spoken.followedPodcasts() }.collectAsStateWithLifecycle(null)
+    val followed = followedOrNull.orEmpty()
     val latestEpisodes by remember { c.spoken.latestEpisodes(300) }.collectAsStateWithLifecycle(emptyList())
     val books by remember { c.spoken.books() }.collectAsStateWithLifecycle(emptyList())
     val newCounts = remember(latestEpisodes) { im.flume.hearth.spoken.SpokenLists.newCounts(latestEpisodes) }
@@ -527,7 +567,7 @@ fun LibraryScreen() {
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LazyRow(Modifier.weight(1f), contentPadding = PaddingValues(start = Dimens.Gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(Modifier.weight(1f), state = tabsState, contentPadding = PaddingValues(start = Dimens.Gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(LibraryTab.entries) { t ->
                     FilterChip(
                         selected = tab == t,
@@ -601,10 +641,19 @@ fun LibraryScreen() {
                         if (spokenAccount == null) {
                             item { SpokenSignInPrompt("podcasts") }
                         } else {
+                            // Nothing followed yet: say what the tab is for first, then how to start.
+                            if (followedOrNull?.isEmpty() == true) item(key = "no-podcasts") {
+                                LibraryEmpty(
+                                    "No podcasts yet",
+                                    "Search for a show to follow, or grab a single episode. New episodes from shows you follow " +
+                                        "download on Wi-Fi and leave your phone once you've finished them.",
+                                )
+                            }
+                            // The Search tab itself (not a page on top of this one), so Your Library still comes back here.
                             item(key = "add-podcast") {
                                 MediaRow(
                                     "Find a podcast", null,
-                                    onClick = { actions.open("search") },
+                                    onClick = { actions.openSearchTab(SearchFilter.PODCASTS) },
                                     cover = { IconTile(Icons.Default.Search, SurfaceHigh) },
                                 )
                             }
@@ -614,13 +663,6 @@ fun LibraryScreen() {
                                     onClick = importOpml,
                                     cover = { IconTile(Icons.Default.UploadFile, SurfaceHigh) },
                                 )
-                            }
-                            if (sortedPodcasts.isEmpty()) item {
-                                LibraryEmpty(
-                                    "No podcasts yet",
-                                    "Search for a show and tap Follow. New episodes then show up on Home and download on Wi-Fi.",
-                                    "Find a podcast",
-                                ) { actions.open("search") }
                             }
                             items(sortedPodcasts, key = { "pod:${it.id}" }) { PodcastListRow(it, newCounts[it.id] ?: 0) }
                         }
@@ -634,7 +676,7 @@ fun LibraryScreen() {
                                     "No audiobooks yet",
                                     if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on the server show up here. Pull down to check again.",
                                     "Search",
-                                ) { actions.open("search") }
+                                ) { actions.openSearchTab(SearchFilter.BOOKS) }
                             }
                         }
                         if (spokenAccount != null) items(sortedBooks, key = { "book:${it.book.id}" }) { BookListRow(it) }
@@ -677,13 +719,15 @@ private fun PlaylistListRow(item: PlaylistItem) {
 }
 
 @Composable
-private fun LibraryEmpty(title: String, body: String, button: String, onBrowse: () -> Unit) {
+private fun LibraryEmpty(title: String, body: String, button: String? = null, onBrowse: () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text(body, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onBrowse) { Text(button) }
+        if (button != null) {
+            Spacer(Modifier.height(12.dp))
+            TextButton(onClick = onBrowse) { Text(button) }
+        }
     }
 }
 

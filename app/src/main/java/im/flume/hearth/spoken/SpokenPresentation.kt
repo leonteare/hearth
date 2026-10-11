@@ -1,7 +1,9 @@
 package im.flume.hearth.spoken
 
 import im.flume.hearth.api.AbsPodcastSearchResult
+import im.flume.hearth.data.Scored
 import im.flume.hearth.data.SearchIndex
+import im.flume.hearth.data.SearchMatch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -124,11 +126,14 @@ val SPOKEN_SPEEDS = listOf(0.8f, 1f, 1.1f, 1.2f, 1.25f, 1.5f, 1.75f, 2f)
 
 /** Podcasts, episodes and books that match a search, from the phone's catalogue (instant, offline). */
 data class SpokenSearchResults(
-    val podcasts: List<PodcastEntity> = emptyList(),
-    val episodes: List<EpisodeRow> = emptyList(),
-    val books: List<BookRow> = emptyList(),
+    val podcastHits: List<Scored<PodcastEntity>> = emptyList(),
+    val episodeHits: List<Scored<EpisodeRow>> = emptyList(),
+    val bookHits: List<Scored<BookRow>> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = podcasts.isEmpty() && episodes.isEmpty() && books.isEmpty()
+    val podcasts: List<PodcastEntity> get() = podcastHits.map { it.item }
+    val episodes: List<EpisodeRow> get() = episodeHits.map { it.item }
+    val books: List<BookRow> get() = bookHits.map { it.item }
+    val isEmpty: Boolean get() = podcastHits.isEmpty() && episodeHits.isEmpty() && bookHits.isEmpty()
 }
 
 object SpokenSearch {
@@ -137,7 +142,8 @@ object SpokenSearch {
     /**
      * Every word of [query] must appear in the title or the show / author (accents, case and a leading
      * "the" ignored, like music search). Titles that are or start with the query come first, then the
-     * newest. Shows are searched across every podcast on the server, not only followed ones.
+     * newest. Shows are searched across every podcast on the server, not only followed ones. Scored on
+     * the same scale as music ([SearchMatch]), so Search can rank them in one list.
      */
     fun search(
         query: String,
@@ -148,32 +154,22 @@ object SpokenSearch {
         episodeLimit: Int = 10,
         bookLimit: Int = 5,
     ): SpokenSearchResults {
-        val q = SearchIndex.norm(query)
-        if (q.isBlank()) return SpokenSearchResults()
-        val tokens = q.split(' ').filter { it.isNotBlank() }
+        val q = SearchMatch.Query(query)
+        if (q.isBlank) return SpokenSearchResults()
         return SpokenSearchResults(
-            podcasts = match(podcasts.map { Entry(it, SearchIndex.norm(it.title), SearchIndex.norm(it.author.orEmpty()), it.addedAt) }, q, tokens, podcastLimit),
-            episodes = match(episodes.map { Entry(it, SearchIndex.norm(it.episode.title), SearchIndex.norm(it.podcastTitle), it.episode.publishedAt) }, q, tokens, episodeLimit),
-            books = match(
+            podcastHits = match(podcasts.map { Entry(it, SearchIndex.norm(it.title), SearchIndex.norm(it.author.orEmpty()), it.addedAt) }, q, podcastLimit),
+            episodeHits = match(episodes.map { Entry(it, SearchIndex.norm(it.episode.title), SearchIndex.norm(it.podcastTitle), it.episode.publishedAt) }, q, episodeLimit),
+            bookHits = match(
                 books.map { b -> Entry(b, SearchIndex.norm(b.book.title), SearchIndex.norm(listOfNotNull(b.book.author, b.book.narrator, b.book.series).joinToString(" ")), b.book.addedAt) },
-                q, tokens, bookLimit,
+                q, bookLimit,
             ),
         )
     }
 
-    private fun <T> match(entries: List<Entry<T>>, q: String, tokens: List<String>, limit: Int): List<T> =
-        entries.mapNotNull { e ->
-            val all = "${e.primary} ${e.secondary}"
-            if (!tokens.all { all.contains(it) }) return@mapNotNull null
-            val rank = when {
-                e.primary == q -> 0
-                e.primary.startsWith(q) -> 1
-                e.primary.contains(q) -> 2
-                else -> 3
-            }
-            Triple(e, rank, e.recency)
-        }.sortedWith(compareBy<Triple<Entry<T>, Int, Long>> { it.second }.thenByDescending { it.third })
-            .take(limit).map { it.first.item }
+    private fun <T> match(entries: List<Entry<T>>, q: SearchMatch.Query, limit: Int): List<Scored<T>> =
+        entries.mapNotNull { e -> SearchMatch.exact(q, e.primary, e.secondary).takeIf { it > SearchMatch.NONE }?.let { e to it } }
+            .sortedWith(compareByDescending<Pair<Entry<T>, Int>> { it.second }.thenByDescending { it.first.recency })
+            .take(limit).map { Scored(it.first.item, it.second) }
 }
 
 /** A podcast feed address, compared loosely (scheme, trailing slash and case don't matter). */

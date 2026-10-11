@@ -175,6 +175,8 @@ fun EpisodeListRow(
     withShow: Boolean = false,
     playButton: Boolean = false,
     showGoToShow: Boolean = withShow,
+    /** Put before the usual line (Search's "Episode"), so it reads apart from songs and shows. */
+    label: String? = null,
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -220,7 +222,7 @@ fun EpisodeListRow(
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
-                    SpokenFormat.episodeLine(row, withShow = withShow),
+                    listOfNotNull(label, SpokenFormat.episodeLine(row, withShow = withShow)).joinToString(" • "),
                     maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -695,7 +697,7 @@ fun DirectoryRow(r: im.flume.hearth.api.AbsPodcastSearchResult, library: List<Po
     var busy by remember(r.feedUrl) { mutableStateOf(false) }
     MediaRow(
         r.title,
-        listOfNotNull(r.artistName?.takeIf { it.isNotBlank() }, r.trackCount?.takeIf { it > 0 }?.let { im.flume.hearth.ui.components.plural(it, "episode") }).joinToString(" • ").ifEmpty { null },
+        listOfNotNull("Podcast", r.artistName?.takeIf { it.isNotBlank() }, r.trackCount?.takeIf { it > 0 }?.let { im.flume.hearth.ui.components.plural(it, "episode") }).joinToString(" • ").ifEmpty { null },
         // On the server: its page. Not yet: the feed's page, where any episode can be fetched.
         onClick = existing?.let { e -> { actions.open(podcastRoute(e.id)) } } ?: r.feedUrl?.let { f -> { actions.open(podcastFeedRoute(f)) } },
         modifier = modifier,

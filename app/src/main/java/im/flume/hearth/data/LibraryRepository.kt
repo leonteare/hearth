@@ -18,7 +18,10 @@ data class PlaySource(
     val id: String? = null,
     val label: String = "",
     val songIds: List<String> = emptyList(),
-    /** For [Kind.ALL]: every song in this order (All songs' sort) instead of the plain library order. */
+    /**
+     * For [Kind.ALL]: every song in this order (All songs' sort) instead of the plain library order.
+     * For [Kind.LIKED]: Liked Songs' sort.
+     */
     val order: SongOrder? = null,
 ) {
     enum class Kind { ALL, MY_LIBRARY, ALBUM, ARTIST, PLAYLIST, GENRE, LIKED, DOWNLOADS, SONGS }
@@ -84,7 +87,8 @@ class LibraryRepository(
             PlaySource.Kind.ARTIST -> dao.artistSongsOnce(source.id!!)
             PlaySource.Kind.PLAYLIST -> dao.playlistSongsOnce(source.id!!)
             PlaySource.Kind.GENRE -> dao.genreSongsOnce(source.id!!)
-            PlaySource.Kind.LIKED -> dao.starredSongsOnce()
+            // In the order Liked Songs shows them, so tapping a song plays on down the list.
+            PlaySource.Kind.LIKED -> dao.starredSongsOnce().let { source.order?.sort(it) ?: it }
             PlaySource.Kind.DOWNLOADS -> dao.downloadedSongsOnce()
             PlaySource.Kind.SONGS -> songsByIds(source.songIds)
         }
@@ -316,14 +320,19 @@ class LibraryRepository(
 
 /** All songs' sort orders. The screen and the service sort the same way, so only the order is sent. */
 enum class SongOrder {
-    /** As the database lists them (by title). */
+    /** By title, ignoring case (the order All songs already comes in from the database). */
     TITLE,
     ARTIST,
     RECENT,
-    PLAYS;
+    PLAYS,
+    /** By album, then disc and track: Liked Songs' "Album" sort (not on All songs' menu). */
+    ALBUM;
 
     fun sort(songs: List<SongEntity>): List<SongEntity> = when (this) {
-        TITLE -> songs
+        TITLE -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::title))
+        ALBUM -> songs.sortedWith(
+            compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::album).thenBy { it.disc }.thenBy { it.track }
+        )
         ARTIST -> songs.sortedWith(
             compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track }
         )
@@ -334,6 +343,33 @@ enum class SongOrder {
     companion object {
         /** The All songs sort menu position (see SONG_SORTS). */
         fun fromMenu(index: Int): SongOrder = entries.getOrElse(index) { TITLE }
+
+        /** Liked Songs' sort menu, in order. There's no "recently liked": the server's like dates aren't kept. */
+        val LIKED = listOf(TITLE to "Title A–Z", ARTIST to "Artist", ALBUM to "Album")
+
+        /** The Liked Songs sort menu position; anything unknown is Title A–Z. */
+        fun liked(index: Int): SongOrder = LIKED.getOrNull(index)?.first ?: TITLE
+    }
+}
+
+/** The A–Z orders and sort menus of Your Library and the Browse pages. Pure, so it's unit tested. */
+object LibraryOrder {
+    /** Sorting name for A–Z: ignores case, accents and a leading "The", so "The Beatles" sits under B. */
+    fun nameKey(name: String): String = SearchIndex.norm(name).ifEmpty { name.lowercase() }
+
+    private fun <T> byName(name: (T) -> String): Comparator<T> = compareBy<T> { nameKey(name(it)) }.thenBy { name(it) }
+
+    /** Menu: A–Z, Most albums. */
+    fun artists(artists: List<ArtistEntity>, sort: Int): List<ArtistEntity> =
+        if (sort == 1) artists.sortedByDescending { it.albumCount } else artists.sortedWith(byName { it.name })
+
+    /** Menu: A–Z, Recently added, Artist, Most played, Year. */
+    fun albums(albums: List<AlbumEntity>, sort: Int): List<AlbumEntity> = when (sort) {
+        1 -> albums.sortedByDescending { it.created }
+        2 -> albums.sortedWith(compareBy<AlbumEntity> { nameKey(it.artist) }.thenBy { it.year ?: 0 })
+        3 -> albums.sortedByDescending { it.playCount }
+        4 -> albums.sortedByDescending { it.year ?: 0 }
+        else -> albums.sortedWith(byName { it.name })
     }
 }
 

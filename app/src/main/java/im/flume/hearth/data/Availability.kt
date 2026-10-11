@@ -40,15 +40,6 @@ sealed interface ArtistItem {
     data class Missing(val artist: TidalArtist) : ArtistItem { override val key get() = "t:${artist.id}" }
 }
 
-/** Search results: the library's first, then what isn't on the server yet. */
-data class SearchSections(
-    val artists: List<ArtistItem> = emptyList(),
-    val albums: List<AlbumItem> = emptyList(),
-    val songs: List<SongItem> = emptyList(),
-) {
-    val isEmpty: Boolean get() = artists.isEmpty() && albums.isEmpty() && songs.isEmpty()
-}
-
 /** An artist's releases: albums, then singles and EPs, owned and missing together. */
 data class Discography(val albums: List<AlbumItem>, val singles: List<AlbumItem>)
 
@@ -58,28 +49,26 @@ object Availability {
         norm(a) == norm(b) || baseTitle(a).let { it.isNotEmpty() && it == baseTitle(b) }
 
     /**
-     * Appends [remote] results (already filtered against the whole server) to the library's, dropping
-     * any that still look like one of the library results shown (same title and artist, or same name).
+     * The [remote] search results (already filtered against the whole server) that aren't among the
+     * library results shown: drops any that still look like one of them (same title and artist, or
+     * same name), and remote duplicates of each other.
      */
-    fun mergeSearch(
+    fun notInLibrary(
         songs: List<SongEntity>,
         albums: List<AlbumEntity>,
         artists: List<ArtistEntity>,
         remote: TidalSearchResults?,
-    ): SearchSections {
-        val r = remote ?: TidalSearchResults()
+    ): TidalSearchResults {
+        val r = remote ?: return TidalSearchResults()
         val artistNames = artists.map { norm(it.name) }.toSet()
-        val missingTracks = r.tracks
-            .filterNot { t -> songs.any { s -> norm(s.title) == norm(t.displayTitle) && artistMatches(t.artists, s.artist) } }
-            .distinctBy { norm(it.displayTitle) + "|" + norm(it.artist) }
-        val missingAlbums = r.albums
-            .filterNot { a -> albums.any { l -> sameRelease(l.name, a.title) && artistMatches(a.artists, l.artist) } }
-            .distinctBy { baseTitle(it.title) + "|" + norm(it.artist) }
-        val missingArtists = r.artists.filterNot { norm(it.name) in artistNames }.distinctBy { norm(it.name) }
-        return SearchSections(
-            artists = artists.map { ArtistItem.Owned(it) } + missingArtists.map { ArtistItem.Missing(it) },
-            albums = albums.map { AlbumItem.Owned(it) } + missingAlbums.map { AlbumItem.Missing(it) },
-            songs = songs.map { SongItem.Owned(it) } + missingTracks.map { SongItem.Missing(it) },
+        return TidalSearchResults(
+            tracks = r.tracks
+                .filterNot { t -> songs.any { s -> norm(s.title) == norm(t.displayTitle) && artistMatches(t.artists, s.artist) } }
+                .distinctBy { norm(it.displayTitle) + "|" + norm(it.artist) },
+            albums = r.albums
+                .filterNot { a -> albums.any { l -> sameRelease(l.name, a.title) && artistMatches(a.artists, l.artist) } }
+                .distinctBy { baseTitle(it.title) + "|" + norm(it.artist) },
+            artists = r.artists.filterNot { norm(it.name) in artistNames }.distinctBy { norm(it.name) },
         )
     }
 
