@@ -419,7 +419,10 @@ fun rememberOpmlImport(): () -> Unit {
 /** Expandable description: three lines, tap for the rest. */
 @Composable
 internal fun Description(text: String?) {
-    val clean = text?.trim()?.takeIf { it.isNotEmpty() } ?: return
+    // Feeds send HTML (or plain text with entities like &amp;): show it as text.
+    val clean = remember(text) {
+        text?.let { androidx.core.text.HtmlCompat.fromHtml(it, androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim() }
+    }?.takeIf { it.isNotEmpty() } ?: return
     var expanded by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().clickable { expanded = !expanded }.animateContentSize()

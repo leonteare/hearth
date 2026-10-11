@@ -248,6 +248,7 @@ class SpokenRepository(
                     return "This podcast is no longer on the server"
                 }
                 val tags = item.media.tags
+                val wasFollowing = FollowTags.isFollowing(tags, user)
                 // Already unfollowed and marked: leave the marker's time alone.
                 val alreadyDone = !follow && !FollowTags.isFollowing(tags, user) && (FollowTags.followers(tags).isNotEmpty() || tags.any(FollowTags::isUnfollowedMarker))
                 val next = if (alreadyDone) tags else FollowTags.nextTags(tags, user, follow, api.clock.serverNow())
@@ -260,6 +261,9 @@ class SpokenRepository(
                 dao.setPodcastTags(podcastId, check.joinToString("\n"))
                 if (FollowTags.isFollowing(check, user) == follow) {
                     if (follow) {
+                        // A show already on the server (an episode picked from its page, or followed before)
+                        // gets its newest episodes too, as a newly added one does.
+                        if (!wasFollowing) runCatching { fetchNewestOnServer(item, NEWEST_ON_FOLLOW) }
                         downloads.onFollowed(podcastId)
                         dao.podcastOnce(podcastId)?.let { downloads.planAutoDownloads(listOf(it)) }
                     } else {
@@ -273,6 +277,16 @@ class SpokenRepository(
             before?.let { dao.setPodcastTags(podcastId, it.tags) }
             return userMessage(e)
         }
+    }
+
+    /** Has the server fetch the show's newest [count] episodes that it doesn't already have. */
+    private suspend fun fetchNewestOnServer(item: AbsLibraryItem, count: Int) {
+        val feedUrl = item.media.metadata.feedUrl ?: return
+        val newest = FeedParse.episodes(api.podcastFeed(feedUrl).episodes).sortedByDescending { it.first.publishedAt }.take(count)
+        val onServer = item.media.episodes.orEmpty().map { ServerEpisodeRef(it.id, it.enclosure?.url, it.guid, it.title, it.publishedAt ?: it.addedAt) }
+        val have = FeedMatch.match(newest.map { it.first }, onServer)
+        val missing = newest.filter { it.first.key !in have }.map { it.second }
+        if (missing.isNotEmpty()) api.downloadEpisodesOnServer(item.id, JsonArray(missing))
     }
 
     private fun rememberIntent(podcastId: String, user: String, follow: Boolean) =
@@ -316,7 +330,7 @@ class SpokenRepository(
      * [follow], follows it. A new show gets its newest [downloadLatest] episodes fetched by the server
      * right away, so there's something to play. Returns the podcast's id.
      */
-    suspend fun addPodcast(feedUrl: String, directoryEntry: AbsPodcastSearchResult? = null, follow: Boolean = true, downloadLatest: Int = 3): Result<String> = runCatching {
+    suspend fun addPodcast(feedUrl: String, directoryEntry: AbsPodcastSearchResult? = null, follow: Boolean = true, downloadLatest: Int = NEWEST_ON_FOLLOW): Result<String> = runCatching {
         val user = username ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
         findByFeed(feedUrl)?.let { existing ->
             if (follow) setFollowing(existing.id, true)?.let { throw IllegalStateException(it) }
@@ -506,6 +520,8 @@ class SpokenRepository(
 
     companion object {
         const val SYNC_WORK = "abs-sync"
+        /** How many of a show's latest episodes the server fetches when it's followed. */
+        const val NEWEST_ON_FOLLOW = 3
     }
 }
 

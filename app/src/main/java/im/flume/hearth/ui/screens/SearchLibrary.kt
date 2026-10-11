@@ -382,7 +382,7 @@ fun SearchScreen() {
                     item(key = "h-books") { SectionHeader("Audiobooks") }
                     items(spoken.books, key = { "book:${it.book.id}" }) { b -> BookListRow(b, Modifier.animateItem()) }
                 }
-                if (!indexing && sections.isEmpty && spoken.isEmpty) {
+                if (!indexing && sections.isEmpty && spoken.isEmpty && directory.isEmpty() && !directoryLoading) {
                     item {
                         Text("No results for \"$query\"", color = TextSecondary, modifier = Modifier.padding(16.dp))
                     }
