@@ -126,6 +126,22 @@ class RequestsRepository(
         val raw = tidarr.search(query, limit = 15)
         val filtered = localCatalog().filter(raw)
         return TidalSearchResults(filtered.tracks.take(5), filtered.albums.take(5), filtered.artists.take(3))
+            .also { synchronized(searchCache) { searchCache[query.lowercase()] = System.currentTimeMillis() to it } }
+    }
+
+    /** Recent Tidal searches (5 minutes), so retyping or going back shows results instantly. */
+    private val searchCache = object : LinkedHashMap<String, Pair<Long, TidalSearchResults>>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, TidalSearchResults>>?) = size > 30
+    }
+
+    fun cachedTidalSearch(query: String): TidalSearchResults? = synchronized(searchCache) {
+        searchCache[query.lowercase()]?.takeIf { System.currentTimeMillis() - it.first < 5 * 60_000 }?.second
+    }
+
+    /** A cheap call that opens (and keeps alive) the connection to Tidarr, and caches the country code. */
+    suspend fun warmUp() {
+        tidarr.isAuthActive()
+        tidarr.countryCode()
     }
 
     /** A Tidal artist's page, with what of it is already on the server. Throws (safe message) if Tidarr can't be reached. */

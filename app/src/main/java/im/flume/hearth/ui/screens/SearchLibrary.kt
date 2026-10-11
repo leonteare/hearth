@@ -152,11 +152,18 @@ fun SearchScreen() {
     val requestsByKey = remember(requestList) { requestList.associateBy { "${it.type}:${it.tidalId}" } }
     val requester = rememberTidalRequester()
     var tidal by remember { mutableStateOf<TidalSearchState>(TidalSearchState.Hidden) }
+    // Open the connection to Tidarr as soon as Search opens, so the first search doesn't pay for it.
+    LaunchedEffect(settings.tidalSearchEnabled, online) {
+        if (settings.tidalSearchEnabled && online) runCatching { withContext(Dispatchers.IO) { c.requests.warmUp() } }
+    }
     LaunchedEffect(query, online, settings.tidalSearchEnabled) {
         val q = query.trim()
         if (!settings.tidalSearchEnabled || !online || q.length < 2) { tidal = TidalSearchState.Hidden; return@LaunchedEffect }
-        delay(400)
-        tidal = TidalSearchState.Loading
+        // Recently seen searches come back instantly; otherwise wait for a short pause in typing.
+        c.requests.cachedTidalSearch(q)?.let { tidal = TidalSearchState.Results(it); return@LaunchedEffect }
+        delay(200)
+        // Keep the previous results on screen while the new ones load, so the page doesn't jump.
+        if (tidal !is TidalSearchState.Results) tidal = TidalSearchState.Loading
         tidal = try {
             TidalSearchState.Results(withContext(Dispatchers.IO) { c.requests.searchTidal(q) })
         } catch (e: kotlinx.coroutines.CancellationException) {
