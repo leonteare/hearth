@@ -15,7 +15,9 @@ import kotlin.math.min
  *
  * [wrap] puts a thin layer around the player's audio sink (see PlaybackService). Every PCM buffer
  * going in arrives with its presentation time; while [active] (a visualiser is on screen) it's mixed
- * to mono into a [TimedRing] indexed by that time. The same layer notes the sink's own playback
+ * to mono into a [TimedRing] indexed by that time. A second ring alongside holds the stereo difference
+ * (side, (L − R) / 2) at the same times, for the one style that draws left against right; the
+ * analysis below only ever reads the mono ring. The same layer notes the sink's own playback
  * position whenever the player asks for it, which already accounts for the AudioTrack's buffer and
  * the output's latency (Bluetooth included, via the track's timestamps).
  *
@@ -26,6 +28,8 @@ import kotlin.math.min
 @OptIn(UnstableApi::class)
 object AudioAnalyzer {
     private val ring = TimedRing()
+    /** (L − R) / 2 for every sample in [ring], same indexing; silence for mono sources. */
+    private val sideRing = TimedRing()
 
     /** True while a visualiser is open. Read by the playback thread for every buffer. */
     @Volatile var active = false
@@ -55,6 +59,7 @@ object AudioAnalyzer {
         lastAnalyzeNanos = 0L
         lastUs = C.TIME_UNSET
         ring.discontinuity()
+        sideRing.discontinuity()
         active = true
     }
 
@@ -104,6 +109,16 @@ object AudioAnalyzer {
         return pipeline.frame
     }
 
+    /**
+     * Copies the stereo audio of the moment the last [analyze] showed into [out]: its last
+     * [StereoWindow.size] sample pairs as mid and side. UI thread, after [analyze]. When there's
+     * nothing to show (paused, seeking, not written yet) [StereoWindow.valid] is false.
+     */
+    fun readStereo(out: StereoWindow) {
+        val t = lastUs
+        out.valid = t != C.TIME_UNSET && ring.read(t, out.mid) && sideRing.read(t, out.side)
+    }
+
     private val HOP_US = (BeatTracker.HOP_SEC * 1e6).toLong()
 
     private class TapSink(sink: AudioSink) : ForwardingAudioSink(sink) {
@@ -143,15 +158,20 @@ object AudioAnalyzer {
             super.flush()
             lastBuffer = null
             ring.discontinuity()
+            sideRing.discontinuity()
         }
 
         override fun reset() {
             super.reset()
             lastBuffer = null
             ring.discontinuity()
+            sideRing.discontinuity()
         }
 
-        /** Mixes the buffer to mono into the ring. Reads by absolute index: the buffer isn't disturbed. */
+        /**
+         * Mixes the buffer to mono into the ring, and writes the first two channels' difference into
+         * the side ring. Reads by absolute index: the buffer isn't disturbed.
+         */
         private fun copy(b: ByteBuffer, ptsUs: Long) {
             val enc = encoding
             val bytes = when (enc) {
@@ -164,27 +184,44 @@ object AudioAnalyzer {
             val frames = b.remaining() / (bytes * ch)
             if (frames <= 0) return
             ring.beginChunk(ptsUs, rate)
+            sideRing.beginChunk(ptsUs, rate)
             var p = b.position()
             val scale = 1f / ch
             // PCM in the sink is little-endian (native order on Android).
             for (n in 0 until frames) {
                 var sum = 0f
+                var side = 0f
                 for (c in 0 until ch) {
-                    sum += when (enc) {
+                    val v = when (enc) {
                         C.ENCODING_PCM_16BIT -> ((b.get(p).toInt() and 0xFF) or (b.get(p + 1).toInt() shl 8)) / 32768f
                         C.ENCODING_PCM_FLOAT -> Float.fromBits(int32(b, p))
                         C.ENCODING_PCM_32BIT -> int32(b, p) / 2147483648f
                         else -> ((b.get(p).toInt() and 0xFF) or ((b.get(p + 1).toInt() and 0xFF) shl 8) or (b.get(p + 2).toInt() shl 16)) / 8388608f
                     }
+                    sum += v
+                    if (c == 0) side += v else if (c == 1) side -= v
                     p += bytes
                 }
                 ring.put(sum * scale)
+                sideRing.put(if (ch >= 2) side * 0.5f else 0f)
             }
             ring.commit()
+            sideRing.commit()
         }
 
         private fun int32(b: ByteBuffer, p: Int): Int =
             (b.get(p).toInt() and 0xFF) or ((b.get(p + 1).toInt() and 0xFF) shl 8) or
                 ((b.get(p + 2).toInt() and 0xFF) shl 16) or (b.get(p + 3).toInt() shl 24)
     }
+}
+
+/**
+ * The last moments of stereo audio, as mid ((L + R) / 2) and side ((L − R) / 2), oldest first, so
+ * L = mid + side and R = mid − side. Filled in place each frame by [AudioAnalyzer.readStereo].
+ */
+class StereoWindow(val size: Int = 2048) {
+    val mid = FloatArray(size)
+    val side = FloatArray(size)
+    /** False when there was no audio to read this frame (paused, just seeked); the arrays are stale. */
+    var valid = false
 }

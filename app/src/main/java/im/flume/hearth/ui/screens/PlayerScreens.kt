@@ -130,6 +130,8 @@ import im.flume.hearth.playback.QueueEntry
 import im.flume.hearth.playback.isManual
 import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.CoverPrefetcher
+import im.flume.hearth.ui.components.PlayerCoverArt
 import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.components.LocalActions
@@ -156,6 +158,11 @@ import kotlin.math.roundToInt
 
 private val PlayerUiState.coverArt: String? get() = current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
 
+/** Cover sizes asked of the server by the players; the prefetch asks for the same so caches match. */
+private const val MINI_COVER_SIZE = 150
+private const val MINI_SPOKEN_COVER_SIZE = 300
+private const val NOW_PLAYING_COVER_SIZE = 900
+
 /** Polls playback position while visible. */
 @Composable
 internal fun rememberPosition(state: PlayerUiState): Long {
@@ -177,7 +184,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     val meta = state.current?.mediaMetadata ?: return
     // A podcast episode or audiobook: its cover, −15 / +30 instead of previous / next, no swipe to skip.
     val spoken = state.spoken
-    val spokenCover = spoken?.let { c.spokenCover(it.libraryItemId, 300) }
+    val spokenCover = spoken?.let { c.spokenCover(it.libraryItemId, MINI_SPOKEN_COVER_SIZE) }
     val pos = if (spoken != null) rememberSpokenPosition(state) else rememberPosition(state)
     val durationMs = spoken?.durationMs ?: state.durationMs
     val tint = lerp(rememberCoverColor(if (spoken != null) null else state.coverArt, imageUrl = spokenCover), Color.Black, 0.15f)
@@ -219,9 +226,10 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Same 4dp cover corner (HearthShapes.Cover) as list rows.
-            CoverArt(
-                state.coverArt, 42.dp, corner = im.flume.hearth.ui.theme.Dimens.CoverCorner, requestSize = 150,
+            PlayerCoverArt(
+                state.coverArt, 42.dp, corner = im.flume.hearth.ui.theme.Dimens.CoverCorner, requestSize = MINI_COVER_SIZE,
                 fallback = meta.albumTitle?.toString(), url = spokenCover,
+                onPixelSize = { if (spoken != null) CoverPrefetcher.noteSpoken(MINI_SPOKEN_COVER_SIZE, it) else CoverPrefetcher.noteSong(MINI_COVER_SIZE, it) },
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
@@ -334,15 +342,16 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
                         if (lyricsShown) {
                             LyricsView(song, state, Modifier.fillMaxSize())
                         } else {
-                            CoverArt(
+                            PlayerCoverArt(
                                 state.coverArt, null,
                                 Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).graphicsLayer {
                                     translationX = coverSwipe.value
                                     rotationZ = coverSwipe.value / 60f
                                     alpha = 1f - (kotlin.math.abs(coverSwipe.value) / (skipAt * 4)).coerceAtMost(0.5f)
                                 },
-                                corner = im.flume.hearth.ui.theme.Dimens.CardCorner, requestSize = 900,
+                                corner = im.flume.hearth.ui.theme.Dimens.CardCorner, requestSize = NOW_PLAYING_COVER_SIZE,
                                 fallback = current.mediaMetadata.albumTitle?.toString(),
+                                onPixelSize = { CoverPrefetcher.noteSong(NOW_PLAYING_COVER_SIZE, it) },
                             )
                         }
                     }

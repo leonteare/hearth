@@ -181,6 +181,9 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                         frame.time += dt
                         frame.isPlaying = playing
                         frame.audio = AudioAnalyzer.analyze(playing)
+                        if (renderer(style).usesStereo || outgoing?.let { renderer(it).usesStereo } == true) {
+                            AudioAnalyzer.readStereo(frame.stereo)
+                        }
                         frame.positionMs = c.player.positionMs
                         frame.palette.step(dt)
                         // Running late for a couple of seconds (outside a crossfade): draw less.
