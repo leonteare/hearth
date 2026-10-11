@@ -254,3 +254,24 @@ data class AbsLocalSyncResponse(val results: List<AbsLocalSyncResult> = emptyLis
 
 @Serializable
 data class AbsLocalSyncResult(val id: String, val success: Boolean = false, val progressSynced: Boolean = false, val error: String? = null)
+
+/**
+ * One result of the server's book details search (Audible, Google Books…). Year, length and series
+ * come back in different shapes from different providers, so they're read loosely. [duration] is in minutes.
+ */
+@Serializable
+data class AbsBookSearchResult(
+    val title: String? = null,
+    val subtitle: String? = null,
+    val author: String? = null,
+    val narrator: String? = null,
+    val publishedYear: JsonElement? = null,
+    val description: String? = null,
+    val descriptionPlain: String? = null,
+    val cover: String? = null,
+    val isbn: String? = null,
+    val asin: String? = null,
+    val series: JsonElement? = null,
+    val duration: JsonElement? = null,
+    val abridged: JsonElement? = null,
+)

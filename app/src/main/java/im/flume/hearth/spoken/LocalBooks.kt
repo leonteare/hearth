@@ -64,6 +64,8 @@ class LocalBooks(
     private val prefs = context.getSharedPreferences("local-books", Context.MODE_PRIVATE)
     private val coversDir = File(context.filesDir, "local-covers")
     private val scanLock = Mutex()
+    /** Proper titles, authors and covers from the server's book search, for badly named files. */
+    val details = LocalBookDetails(context, dao, spoken, coversDir, scope)
 
     private val _folders = MutableStateFlow(readFolders())
     val folders: StateFlow<List<LocalFolder>> = _folders.asStateFlow()
@@ -152,6 +154,7 @@ class LocalBooks(
             _scanning.value = false
             _scanProblem.value = problem
         }
+        details.lookUpNew()
         _folders.value.sumOf { dao.booksIn(it.uri).count { b -> !b.hidden && b.serverItemId == null } }
     }
 
@@ -183,7 +186,8 @@ class LocalBooks(
             }.mapIndexed { i, r -> r.copy(fileIndex = i) }
             if (rows.isEmpty()) continue
             val firstChanged = old == null || oldFiles[id]?.firstOrNull()?.let { it.uri != rows.first().uri || it.lastModified != rows.first().lastModified } != false
-            val (title, author) = if (!firstChanged && old != null) old.title to old.author else {
+            // What the files call the book. Details found online are kept over this when the folder is saved (LocalBookMerge).
+            val (title, author) = if (!firstChanged && old != null) (old.fileTitle ?: old.title) to (if (old.fileTitle != null) old.fileAuthor else old.author) else {
                 LocalBookNaming.describe(g, tags ?: readFile(Uri.parse(rows.first().uri))?.tags)
             }
             val cover = saveCover(id, g.cover, Uri.parse(rows.first().uri), refresh = firstChanged || (g.cover != null && g.cover.lastModified > (old?.scannedAt ?: 0)))
@@ -194,6 +198,7 @@ class LocalBooks(
                 coverPath = cover, addedAt = old?.addedAt ?: now, scannedAt = now,
                 hidden = old?.hidden ?: false, serverItemId = old?.serverItemId,
                 uploadState = old?.uploadState, uploadError = old?.uploadError,
+                fileTitle = title, fileAuthor = author,
             )
             files += rows
         }

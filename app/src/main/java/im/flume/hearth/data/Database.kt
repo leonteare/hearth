@@ -350,7 +350,7 @@ class Converters {
         im.flume.hearth.spoken.LocalBookEntity::class, im.flume.hearth.spoken.LocalBookFileEntity::class,
         im.flume.hearth.spoken.LocalBookProgressEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -475,10 +475,33 @@ abstract class AppDatabase : RoomDatabase() {
             "CREATE TABLE IF NOT EXISTS `local_book_progress` (`bookId` TEXT NOT NULL, `positionSec` REAL NOT NULL, `durationSec` REAL NOT NULL, `finished` INTEGER NOT NULL, `finishedAt` INTEGER, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`bookId`))",
         )
 
+        /**
+         * Phone books get details found online (narrator, description…) and remember what their files
+         * said, so a match can be undone. Existing books start with their current names as the files' own.
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_10_11_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_10_11_SQL = listOf(
+            "ALTER TABLE local_books ADD COLUMN `fileTitle` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `fileAuthor` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `narrator` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `description` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `publishedYear` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `series` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `matchState` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `matchSource` TEXT",
+            "ALTER TABLE local_books ADD COLUMN `matchCheckedAt` INTEGER NOT NULL DEFAULT 0",
+            "UPDATE local_books SET fileTitle = title, fileAuthor = author",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .build()
     }
 }

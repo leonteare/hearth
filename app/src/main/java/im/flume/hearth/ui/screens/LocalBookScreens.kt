@@ -49,7 +49,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import im.flume.hearth.container
+import im.flume.hearth.spoken.BookCandidate
+import im.flume.hearth.spoken.BookMatch
+import im.flume.hearth.spoken.LocalBookEntity
+import im.flume.hearth.spoken.LocalMatchState
+import im.flume.hearth.ui.theme.Accent
+import im.flume.hearth.util.userMessage
+import kotlinx.coroutines.CancellationException
 import im.flume.hearth.spoken.LocalBookRow
 import im.flume.hearth.spoken.LocalUploadState
 import im.flume.hearth.spoken.SpokenFormat
@@ -193,6 +214,7 @@ fun LocalBookScreen(id: String) {
     var loaded by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var confirmUpload by remember { mutableStateOf(false) }
+    var findDetails by remember { mutableStateOf(false) }
     LaunchedEffect(id) { kotlinx.coroutines.delay(300); loaded = true }
 
     val r = row
@@ -246,8 +268,10 @@ fun LocalBookScreen(id: String) {
             dismissButton = { TextButton(onClick = { confirmUpload = false }) { Text("Cancel") } },
         )
     }
+    FindDetailsSheet(findDetails, b, signedIn = account != null && account?.needsSignIn != true) { findDetails = false }
     ActionSheet(menu, { menu = false }, title = b.title, subtitle = b.author, showCover = false) {
         if (!busy) MenuItem("Add to server", Icons.Outlined.CloudUpload) { menu = false; confirmUpload = true }
+        MenuItem("Find details", Icons.Default.Search) { menu = false; findDetails = true }
         if (r.finished || started) {
             MenuItem("Mark as not started", Icons.Outlined.RadioButtonUnchecked) { menu = false; c.appScope.launch { c.spoken.markFinished(id, null, false) } }
         }
@@ -269,7 +293,10 @@ fun LocalBookScreen(id: String) {
         item(key = "header") {
             SpokenHeader(
                 c.spokenCover(id, 600), b.title,
-                listOfNotNull(b.author, listOfNotNull("On this phone", SpokenFormat.length(b.durationSec).ifEmpty { null }).joinToString(" • ")),
+                listOfNotNull(
+                    b.author, b.narrator?.let { "Read by $it" }, b.series,
+                    listOfNotNull("On this phone", SpokenFormat.length(b.durationSec).ifEmpty { null }, b.publishedYear).joinToString(" • "),
+                ),
             )
         }
         item(key = "progress") {
@@ -309,6 +336,8 @@ fun LocalBookScreen(id: String) {
             }
         }
         item(key = "upload") { UploadStatus(uploadState, b.uploadError, uploads[id], onRetry = { startUpload() }) }
+        item(key = "details") { DetailsSource(b.matchState, b.matchSource) { findDetails = true } }
+        if (!b.description.isNullOrBlank()) item(key = "description") { Description(b.description) }
         if (chapters.isNotEmpty()) {
             item(key = "chapters-head") { SectionHeader("Chapters") }
             itemsIndexed(chapters, key = { _, ch -> "ch:${ch.chapterIndex}" }) { i, ch ->
@@ -344,6 +373,127 @@ private fun UploadStatus(state: LocalUploadState?, error: String?, progress: Flo
             LocalUploadState.FAILED -> {
                 Text("Couldn't add it to the server: ${error ?: "something went wrong"}", color = Destructive, style = MaterialTheme.typography.bodyMedium)
                 TextButton(onClick = onRetry) { Text("Try again") }
+            }
+        }
+    }
+}
+
+/**
+ * Under the play button: where the book's details came from, with a way to change them ("Not
+ * right?"), or "Find details" when the files' own names are in use.
+ */
+@Composable
+private fun DetailsSource(matchState: String?, matchSource: String?, onOpen: () -> Unit) {
+    val matched = matchState == LocalMatchState.AUTO.name || matchState == LocalMatchState.CONFIRMED.name
+    if (!matched) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) { TextButton(onClick = onOpen) { Text("Find details") } }
+        return
+    }
+    val action = if (matchState == LocalMatchState.AUTO.name) "Not right?" else "Change"
+    val accent = Accent
+    Text(
+        buildAnnotatedString {
+            append("Details from ${BookMatch.providerName(matchSource)} · ")
+            withStyle(SpanStyle(color = accent, fontWeight = FontWeight.Bold)) { append(action) }
+        },
+        color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = Dimens.Gutter, vertical = 10.dp),
+    )
+}
+
+/**
+ * Pick the right book from the server's search (Audible), search again with other words, or go back
+ * to the file's own name. Opens on the results found when the book was scanned, if any.
+ */
+@Composable
+private fun FindDetailsSheet(open: Boolean, book: LocalBookEntity, signedIn: Boolean, onDismiss: () -> Unit) {
+    if (!open) return
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val details = c.spoken.local.details
+    val scope = rememberCoroutineScope()
+    var query by remember { mutableStateOf(BookMatch.query(book.fileTitle ?: book.title, book.fileAuthor).title) }
+    var candidates by remember { mutableStateOf<List<BookCandidate>?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    fun search() {
+        if (query.isBlank() || searching) return
+        keyboard?.hide()
+        scope.launch {
+            searching = true; error = null
+            try {
+                candidates = details.searchAgain(book.id, query.trim())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = "Couldn't search: ${userMessage(e)}"
+            } finally {
+                searching = false
+            }
+        }
+    }
+
+    LaunchedEffect(book.id) {
+        val saved = details.saved(book.id)
+        if (saved != null) { query = saved.title; candidates = saved.candidates }
+        else if (signedIn) search()
+    }
+
+    ActionSheet(true, onDismiss, title = "Find details", subtitle = book.fileTitle ?: book.title, showCover = false) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            if (!signedIn) {
+                Text(
+                    "Sign in to podcasts & audiobooks in Settings to look up a book's details.",
+                    color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+                )
+            } else {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = query, onValueChange = { query = it }, singleLine = true, label = { Text("Title") },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { search() }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(enabled = !searching && query.isNotBlank(), onClick = { search() }) { Text("Search again") }
+                }
+                val problem = error
+                when {
+                    searching -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 12.dp))
+                    problem != null -> Text(problem, color = Destructive, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp))
+                    candidates?.isEmpty() == true -> Text(
+                        "Nothing found. Try fewer words, or the title as it's printed on the cover.",
+                        color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                candidates.orEmpty().forEach { cand ->
+                    val current = book.matchSource != null && cand.source == book.matchSource
+                    MediaRow(
+                        cand.title,
+                        listOfNotNull(cand.author, cand.narrator?.let { "Read by $it" }, SpokenFormat.length(cand.durationSec).ifEmpty { null }, cand.publishedYear)
+                            .joinToString(" • ").ifEmpty { null },
+                        onClick = {
+                            onDismiss()
+                            c.appScope.launch { details.choose(book.id, cand) }
+                            actions.showMessage("Using the details of \"${cand.title}\"")
+                        },
+                        coverUrl = cand.cover,
+                        fallback = cand.title,
+                        trailing = if (current) { { Icon(Icons.Default.Check, "In use", tint = Accent, modifier = Modifier.padding(end = 12.dp)) } } else null,
+                    )
+                }
+            }
+            val matched = book.matchState == LocalMatchState.AUTO.name || book.matchState == LocalMatchState.CONFIRMED.name
+            if (matched) {
+                MenuItem("Use the file's own name", Icons.Default.History) {
+                    onDismiss()
+                    c.appScope.launch { details.useFileNames(book.id) }
+                    actions.showMessage("Back to \"${book.fileTitle ?: book.title}\"")
+                }
             }
         }
     }
