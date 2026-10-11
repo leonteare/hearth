@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -322,18 +324,45 @@ class LocalBooks(
 
     fun book(id: String): Flow<LocalBookRow?> = dao.book(id)
 
-    /** One chapter per file for a book of several files, with times on the whole book. */
-    fun chapters(id: String): Flow<List<ChapterEntity>> = dao.filesFlow(id).map { files -> chapterRows(id, files) }
+    /**
+     * The book's chapters, with times on the whole book: the chapters stored inside its files (a lone
+     * .m4b usually has them), otherwise one per file for a book of several files.
+     */
+    fun chapters(id: String): Flow<List<ChapterEntity>> = dao.filesFlow(id).map { files -> chapterRows(id, files) }.flowOn(Dispatchers.IO)
 
     private fun chapterRows(id: String, files: List<LocalBookFileEntity>): List<ChapterEntity> =
-        LocalBookNaming.chapters(files.map { it.durationSec }, LocalBookNaming.chapterTitles(files.map { it.relPath.substringAfterLast('/') }, files.map { it.title }))
-            .mapIndexed { i, ch -> ChapterEntity(id, "", i, ch.startSec, ch.endSec, ch.title) }
+        EmbeddedChapters.timeline(
+            files.map { it.durationSec },
+            LocalBookNaming.chapterTitles(files.map { it.relPath.substringAfterLast('/') }, files.map { it.title }),
+            files.map { embeddedChapters(it) },
+        ).mapIndexed { i, ch -> ChapterEntity(id, "", i, ch.startSec, ch.endSec, ch.title) }
+
+    /**
+     * Chapters stored inside a file, kept by file and modified time: read when first needed rather than
+     * saved with the scan, so books scanned earlier get them too, and a changed file is read again.
+     */
+    private val embedded = ConcurrentHashMap<String, List<EmbeddedChapter>>()
+
+    private fun embeddedChapters(f: LocalBookFileEntity): List<EmbeddedChapter> {
+        if (!EmbeddedChapters.mayHaveChapters(f.relPath)) return emptyList()
+        val key = "${f.uri}|${f.lastModified}"
+        embedded[key]?.let { return it }
+        return try {
+            val pfd = context.contentResolver.openFileDescriptor(Uri.parse(f.uri), "r") ?: return emptyList()
+            ParcelFileDescriptor.AutoCloseInputStream(pfd).use { s -> EmbeddedChapters.read(f.relPath, FileChannelSource(s.channel)) }
+                .also { embedded[key] = it }
+        } catch (e: Exception) {
+            logHandledError(context, "local books: read chapters", e)
+            emptyList()
+        }
+    }
 
     /** The book and its files, for the player. Null if it isn't on the phone. */
     suspend fun playable(id: String): Triple<LocalBookEntity, List<LocalBookFileEntity>, List<TimelineChapter>>? {
         val book = dao.bookOnce(id) ?: return null
         val files = dao.files(id).takeIf { it.isNotEmpty() } ?: return null
-        return Triple(book, files, chapterRows(id, files).map { TimelineChapter(it.startSec, it.endSec, it.title) })
+        val chapters = withContext(Dispatchers.IO) { chapterRows(id, files) }
+        return Triple(book, files, chapters.map { TimelineChapter(it.startSec, it.endSec, it.title) })
     }
 
     /** The cover as a file URL Coil can load, or null when the book has none. */
