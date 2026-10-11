@@ -314,6 +314,7 @@ fun AppRoot() {
     actions.closeOverlays = { visualiserOpen = false; queueOpen = false; nowPlayingOpen = false }
 
     val playerState by c.player.state.collectAsStateWithLifecycle()
+    im.flume.hearth.ui.components.PrefetchPlayerCovers(playerState)
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     val downloads by c.downloads.states.collectAsStateWithLifecycle(emptyMap())
     val rowContext = RowContext(playerState.current?.mediaId, online, downloads)

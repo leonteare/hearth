@@ -79,7 +79,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
 import coil3.compose.SubcomposeAsyncImage
+import coil3.memory.MemoryCache
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.PlaySource
@@ -152,6 +158,52 @@ fun CoverArt(
         modifier = m,
         error = { Placeholder(fallback) },
         loading = { Placeholder(null) },
+    )
+}
+
+/**
+ * The cover in the mini player and Now Playing. On a skip the previous cover stays up until the new
+ * one is ready and then fades across in 150 ms, rather than flashing an empty tile. List rows keep
+ * [CoverArt], where a row's cover never changes in place. [onPixelSize] reports the drawn size, so
+ * [CoverPrefetcher] can load upcoming covers at exactly this size.
+ */
+@Composable
+fun PlayerCoverArt(
+    coverArt: String?,
+    size: Dp?,
+    modifier: Modifier = Modifier,
+    corner: Dp = Dimens.CoverCorner,
+    requestSize: Int = 300,
+    fallback: String? = null,
+    url: String? = null,
+    onPixelSize: (IntSize) -> Unit = {},
+) {
+    val actions = LocalActions.current
+    val context = LocalContext.current
+    // The memory-cache key of the cover on screen now, used as the next one's placeholder.
+    var showing by remember { mutableStateOf<MemoryCache.Key?>(null) }
+    val m = (if (size != null) modifier.size(size) else modifier)
+        .onSizeChanged(onPixelSize)
+        .clip(RoundedCornerShape(corner))
+        .background(SurfaceHigh)
+    val data = url ?: actions.coverUrl(coverArt, requestSize)
+    if (data == null) {
+        Box(m) { Placeholder(fallback) }
+        return
+    }
+    // Built once per cover, with whatever was showing at that moment as its placeholder.
+    val request = remember(data) {
+        ImageRequest.Builder(context).data(data).placeholderMemoryCacheKey(showing).crossfade(150).build()
+    }
+    SubcomposeAsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = m,
+        error = { Placeholder(fallback) },
+        // With nothing shown before (the player just opened), the usual blank tile while it loads.
+        loading = if (request.placeholderMemoryCacheKey != null) null else { _ -> Placeholder(null) },
+        onSuccess = { showing = it.result.memoryCacheKey },
     )
 }
 
