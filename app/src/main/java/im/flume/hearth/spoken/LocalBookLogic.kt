@@ -20,6 +20,32 @@ object LocalBookIds {
     }
 }
 
+/** What adding a folder does, given the folders already added (all as [LocalFolders.key]s). */
+data class FolderPlan(val add: Boolean, val replaces: List<String>, val coveredBy: String?)
+
+/**
+ * Picked folders can overlap (a folder and one inside it), which would list every book in both twice.
+ * Folders are compared by storage and path: "primary:Audiobooks" holds "primary:Audiobooks/Sadie".
+ */
+object LocalFolders {
+    fun key(authority: String?, documentId: String): String = "${authority.orEmpty()}|$documentId"
+
+    fun isInside(child: String, parent: String): Boolean {
+        if (child == parent) return false
+        val (ca, cp) = child.split('|', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        val (pa, pp) = parent.split('|', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        if (ca != pa) return false
+        // A storage root is "primary:"; anything under it starts with that.
+        return if (pp.endsWith(":")) cp.startsWith(pp) else cp.startsWith("$pp/")
+    }
+
+    fun planAdd(new: String, existing: List<String>): FolderPlan {
+        if (new in existing) return FolderPlan(add = false, replaces = emptyList(), coveredBy = new)
+        existing.firstOrNull { isInside(new, it) }?.let { return FolderPlan(add = false, replaces = emptyList(), coveredBy = it) }
+        return FolderPlan(add = true, replaces = existing.filter { isInside(it, new) }, coveredBy = null)
+    }
+}
+
 /** A file found in a picked folder. [relPath] is "/"-separated, relative to the picked folder. */
 data class LocalFileEntry(val relPath: String, val uri: String, val size: Long, val lastModified: Long) {
     val name: String get() = relPath.substringAfterLast('/')

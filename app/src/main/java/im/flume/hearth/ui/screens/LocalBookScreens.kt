@@ -82,8 +82,7 @@ fun PhoneAudiobookFolders() {
     var confirmRemove by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            local.addFolder(uri)
-            actions.showMessage("Looking for audiobooks in that folder…")
+            actions.showMessage(local.addFolder(uri))
         }
     }
 

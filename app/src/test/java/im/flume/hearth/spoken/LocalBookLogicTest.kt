@@ -179,4 +179,19 @@ class LocalBookLogicTest {
         )
         assertNull(LocalBookScan.scanProblem("Books", 3, emptyList()))
     }
+
+    @Test
+    fun `overlapping folders are noticed`() {
+        val books = LocalFolders.key("ext", "primary:Audiobooks")
+        val sadie = LocalFolders.key("ext", "primary:Audiobooks/Sadie")
+        val root = LocalFolders.key("ext", "primary:")
+        val other = LocalFolders.key("ext", "primary:Audiobooks2")
+        assertTrue(LocalFolders.isInside(sadie, books))
+        assertTrue(LocalFolders.isInside(books, root))
+        assertFalse(LocalFolders.isInside(other, books))
+        assertFalse(LocalFolders.isInside(sadie, LocalFolders.key("drive", "primary:Audiobooks")))
+        assertEquals(FolderPlan(false, emptyList(), books), LocalFolders.planAdd(sadie, listOf(books)))
+        assertEquals(FolderPlan(false, emptyList(), books), LocalFolders.planAdd(books, listOf(books)))
+        assertEquals(FolderPlan(true, listOf(sadie), null), LocalFolders.planAdd(books, listOf(sadie, other)))
+    }
 }

@@ -112,12 +112,30 @@ class LocalBooks(
         DocumentsContract.getTreeDocumentId(Uri.parse(uri)).substringAfterLast(':').substringAfterLast('/').ifEmpty { "Phone storage" }
     }.getOrDefault("Folder")
 
-    /** Keeps access to a folder from the system picker and scans it. */
-    fun addFolder(uri: Uri) {
+    private fun treeKey(uri: String): String? = runCatching {
+        Uri.parse(uri).let { LocalFolders.key(it.authority, DocumentsContract.getTreeDocumentId(it)) }
+    }.getOrNull()
+
+    private fun fileKey(uri: String): String? = runCatching {
+        Uri.parse(uri).let { LocalFolders.key(it.authority, DocumentsContract.getDocumentId(it)) }
+    }.getOrNull()
+
+    /**
+     * Keeps access to a folder from the system picker and scans it. A folder already inside one you've
+     * added isn't added again; one that holds folders you've added takes their place. Returns what to tell you.
+     */
+    fun addFolder(uri: Uri): String {
+        val current = _folders.value.associateBy({ treeKey(it.uri) }, { it })
+        val newKey = treeKey(uri.toString()) ?: uri.toString()
+        val plan = LocalFolders.planAdd(newKey, current.keys.filterNotNull())
+        if (!plan.add) return "That folder is already included in \"${current[plan.coveredBy]?.name ?: "your folders"}\""
         runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             .onFailure { logHandledError(context, "local books: keep folder access", it) }
-        saveFolders(_folders.value.map { it.uri }.toSet() + uri.toString())
+        val replaced = plan.replaces.mapNotNull { current[it] }
+        replaced.forEach { removeFolder(it.uri) }
+        saveFolders(_folders.value.map { it.uri }.toSet() - replaced.map { it.uri }.toSet() + uri.toString())
         scope.launch { rescan() }
+        return "Looking for audiobooks in that folder…"
     }
 
     /** Forgets a folder: its books leave the list (files on the phone are untouched; progress is kept in case it comes back). */
@@ -137,9 +155,11 @@ class LocalBooks(
         _scanning.value = true
         var problem: String? = null
         try {
+            // A file reachable from two picked folders is listed once (from the first).
+            val claimed = HashSet<String>()
             for (folder in _folders.value) {
                 try {
-                    val report = scanFolder(folder.uri)
+                    val report = scanFolder(folder.uri, claimed)
                     problem = problem ?: LocalBookScan.scanProblem(folder.name, report.audioFiles, report.unreadable)
                 } catch (e: CancellationException) {
                     throw e
@@ -158,11 +178,14 @@ class LocalBooks(
     /** What a folder scan saw, so Settings can say why nothing turned up. */
     private class ScanReport(val audioFiles: Int, val unreadable: List<String>)
 
-    private suspend fun scanFolder(treeUri: String): ScanReport = withContext(Dispatchers.IO) {
+    private suspend fun scanFolder(treeUri: String, claimed: MutableSet<String>): ScanReport = withContext(Dispatchers.IO) {
         val tree = Uri.parse(treeUri)
         val entries = listTree(tree)
         val unreadable = ArrayList<String>()
-        val groups = LocalBookScan.group(entries)
+        val groups = LocalBookScan.group(entries).filter { g ->
+            val keys = g.files.map { fileKey(it.uri) ?: it.uri }
+            if (keys.any { it in claimed }) false else { claimed += keys; true }
+        }
         val oldBooks = dao.booksIn(treeUri).associateBy { it.id }
         val oldFiles = dao.filesIn(treeUri).groupBy { it.bookId }
         val now = System.currentTimeMillis()
