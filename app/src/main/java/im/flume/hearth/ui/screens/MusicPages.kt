@@ -22,6 +22,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material3.IconButton
+import im.flume.hearth.ui.components.ActionSheet
+import im.flume.hearth.ui.components.MenuItem
+import im.flume.hearth.ui.components.willDownload
+import im.flume.hearth.ui.components.willLike
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudDownload
@@ -167,6 +174,23 @@ fun AlbumScreen(id: String) {
     }
     val tracks = remember(songs, remote) { remote?.takeIf { songs.isNotEmpty() }?.let { Availability.albumTracks(songs, it.tracks) } }
     val missing = remember(tracks) { tracks.orEmpty().mapNotNull { (it as? SongItem.Missing)?.track } }
+    val requests = LocalRequests.current
+    // Missing songs not already on their way: saving or downloading the album gets them onto the server.
+    val waiting = missing.filterNot { isComing(requests[trackKey(it.id)]) }
+    val albumName = a?.name.orEmpty()
+    val getMissing = { message: String ->
+        if (waiting.isEmpty()) actions.showMessage("The missing songs are already on their way")
+        else get.getTracks(waiting, message)
+    }
+    var albumMenu by remember(id) { mutableStateOf(false) }
+    if (albumMenu) {
+        ActionSheet(true, onDismiss = { albumMenu = false }, title = albumName, subtitle = "${plural(missing.size, "song")} not on your server yet", showCover = false) {
+            MenuItem("Add missing songs to server", Icons.Outlined.CloudUpload) {
+                albumMenu = false
+                getMissing("Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server")
+            }
+        }
+    }
 
     CollectionScreen(
         title = a?.name ?: songs.firstOrNull()?.album.orEmpty(),
@@ -177,12 +201,21 @@ fun AlbumScreen(id: String) {
         pin = PinTarget(DownloadRepository.KIND_ALBUM, id),
         showTrackNumbers = true,
         saved = a?.starred,
-        onSavedChange = { actions.setAlbumSaved(id, it) },
+        onSavedChange = { save ->
+            actions.setAlbumSaved(id, save)
+            // Saving an album means wanting all of it: its missing songs go onto the server (not liked one by one).
+            if (save && waiting.isNotEmpty()) get.getTracks(waiting, "Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server")
+        },
+        // Downloading it means the whole album on the phone: the missing songs join it as they arrive.
+        onDownloaded = {
+            if (waiting.isNotEmpty()) get.getTracks(waiting, "Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server. They'll download with the album.")
+        },
+        headerActions = {
+            if (missing.isNotEmpty()) IconButton(onClick = { albumMenu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        },
         tracks = tracks?.takeIf { missing.isNotEmpty() },
         topContent = {
-            if (missing.isNotEmpty()) item(key = "get-rest") {
-                GetTheRest(missing, Modifier.animateItem()) { waiting -> get.getTracks(waiting, "the rest of \"${a?.name.orEmpty()}\"") }
-            }
+            if (missing.isNotEmpty()) item(key = "get-rest") { MissingNote(missing, Modifier.animateItem()) }
         },
         extraContent = {
             item { AlbumDetails(a, id, songs.size, songs.sumOf { it.durationSec.toLong() }) }
@@ -197,13 +230,13 @@ fun AlbumScreen(id: String) {
     )
 }
 
-/** "3 songs aren't on your server yet · Get the rest of this album", under an album's buttons. */
+/** "3 songs not on your server yet", under an album's buttons; saving or downloading the album gets them. */
 @Composable
-private fun GetTheRest(missing: List<TidalTrack>, modifier: Modifier = Modifier, onGet: (List<TidalTrack>) -> Unit) {
+private fun MissingNote(missing: List<TidalTrack>, modifier: Modifier = Modifier) {
     val requests = LocalRequests.current
     val waiting = missing.filterNot { isComing(requests[trackKey(it.id)]) }
     Row(
-        modifier.fillMaxWidth().padding(start = Dimens.Gutter, end = 8.dp, top = 4.dp),
+        modifier.fillMaxWidth().padding(start = Dimens.Gutter, end = 8.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Outlined.Cloud, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
@@ -213,13 +246,6 @@ private fun GetTheRest(missing: List<TidalTrack>, modifier: Modifier = Modifier,
             else "${plural(waiting.size, "song")} not on your server yet",
             color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
         )
-        if (waiting.isNotEmpty()) {
-            TextButton(onClick = { onGet(waiting) }) {
-                Icon(Icons.Outlined.CloudDownload, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Get the rest of this album")
-            }
-        }
     }
 }
 
@@ -262,8 +288,11 @@ private fun RemoteAlbumContent(view: RemoteAlbum) {
         songs = songs,
         source = source,
         showTrackNumbers = true,
-        saved = isComing(request),
+        saved = willLike(request),
         onSavedChange = { get.heartAlbum(album, request) },
+        headerActions = {
+            IconButton(onClick = { get.albumMenuFor = album }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        },
         tracks = tracks,
         remote = RemoteHeader(
             coverUuid = album.cover,
@@ -274,6 +303,8 @@ private fun RemoteAlbumContent(view: RemoteAlbum) {
             status = comingLabel(request) ?: "Not on your server yet",
             request = request,
             onPlay = { if (firstMissing != null) get.preview(firstMissing) else actions.play(source) },
+            toPhone = willDownload(request),
+            onDownload = { get.downloadAlbum(album, request) },
         ),
         extraContent = {
             album.artistId?.let { artistId ->

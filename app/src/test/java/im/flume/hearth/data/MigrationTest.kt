@@ -72,4 +72,22 @@ class MigrationTest {
         val tables = listOf("albums", "artists", "playlists", "playlist_songs", "downloads", "pinned", "play_history", "pending_scrobbles", "lyrics", "song_download_prefs")
         tables.forEach { assertEquals(it, createSql(5, it), createSql(6, it)) }
     }
+
+    @Test
+    fun `migration 6 to 7 adds the request wishes, defaulting to the old behaviour`() {
+        val before = columns(createSql(6, "requests"))
+        val after = columns(createSql(7, "requests"))
+        val prefix = "ALTER TABLE requests ADD COLUMN "
+        val added = AppDatabase.MIGRATION_6_7_SQL.associate { stmt ->
+            assertTrue(stmt.startsWith(prefix))
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ").trim('`') to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        assertEquals("INTEGER NOT NULL DEFAULT 1", added["like"])
+        assertEquals("INTEGER NOT NULL DEFAULT 1", added["toPhone"])
+        // Every other table is unchanged.
+        val tables = listOf("songs", "albums", "artists", "playlists", "playlist_songs", "downloads", "pinned", "play_history", "pending_scrobbles", "lyrics", "song_download_prefs")
+        tables.forEach { assertEquals(it, createSql(6, it), createSql(7, it)) }
+    }
 }

@@ -338,7 +338,7 @@ class Converters {
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
         SongDownloadPrefEntity::class, RequestEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -399,10 +399,22 @@ abstract class AppDatabase : RoomDatabase() {
             "CREATE TABLE IF NOT EXISTS `requests` (`tidalId` TEXT NOT NULL, `type` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `coverUuid` TEXT, `isrc` TEXT, `albumTitle` TEXT, `durationSec` INTEGER, `requestedAt` INTEGER NOT NULL, `requestedBy` TEXT NOT NULL, `status` TEXT NOT NULL, `errorMessage` TEXT, `matchedIds` TEXT, `updatedAt` INTEGER NOT NULL, `seenInQueue` INTEGER NOT NULL, `finishedAt` INTEGER, `lookupAttempts` INTEGER NOT NULL, PRIMARY KEY(`type`, `tidalId`))",
         )
 
+        /** What each request does when it arrives (like it, download it). Must match [RequestEntity] exactly. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_6_7_SQL.forEach(db::execSQL)
+            }
+        }
+
+        val MIGRATION_6_7_SQL = listOf(
+            "ALTER TABLE requests ADD COLUMN `like` INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE requests ADD COLUMN `toPhone` INTEGER NOT NULL DEFAULT 1",
+        )
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
     }
 }

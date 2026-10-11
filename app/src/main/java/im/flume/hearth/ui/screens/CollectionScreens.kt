@@ -139,6 +139,10 @@ data class RemoteHeader(
     val status: String,
     val request: RequestEntity?,
     val onPlay: () -> Unit,
+    /** True while it's on its way and will be downloaded to this phone. */
+    val toPhone: Boolean = false,
+    /** The download toggle: get it onto this phone (or take that back); null hides it. */
+    val onDownload: (() -> Unit)? = null,
 )
 
 /** Pin target for the download toggle: albums and playlists stay in sync; other lists are one-off downloads. */
@@ -171,6 +175,8 @@ fun CollectionScreen(
     tracks: List<SongItem>? = null,
     /** Music not on the server: artwork from the remote image server, a dimmed header and this status line. */
     remote: RemoteHeader? = null,
+    /** Called when the download toggle downloads the collection (not when it removes it). */
+    onDownloaded: () -> Unit = {},
 ) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
@@ -308,6 +314,7 @@ fun CollectionScreen(
                             pin != null -> {
                                 usage.track(im.flume.hearth.data.Usage.DOWNLOAD)
                                 c.downloads.pinAndDownload(pin.kind, pin.id, songs)
+                                onDownloaded()
                                 // Keeping an album offline means you want it; removing the download doesn't unsave it.
                                 if (saved == false) onSavedChange(true)
                             }
@@ -315,13 +322,14 @@ fun CollectionScreen(
                             else -> actions.download(songs)
                         }
                     }
+                    remote?.onDownload?.let { onDownload -> DownloadToggle(downloaded = remote.toPhone, progress = null, onClick = onDownload) }
                     if (saved != null) {
                         IconButton(onClick = { onSavedChange(!saved) }) {
                             Icon(
                                 if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 when {
-                                    remote != null && saved -> "Stop getting this album"
-                                    remote != null -> "Get this album"
+                                    remote != null && saved -> "Don't save it when it arrives"
+                                    remote != null -> "Save this album"
                                     saved -> "Remove from Your Library"
                                     else -> "Save to Your Library"
                                 },

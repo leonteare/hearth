@@ -28,6 +28,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.RequestEntity
+import im.flume.hearth.data.RequestIntent
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Favorite
 import im.flume.hearth.data.RequestStatus
 import im.flume.hearth.api.TidalType
 import im.flume.hearth.ui.components.AvailabilityIcon
@@ -215,7 +218,7 @@ private fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
     }
     MediaRow(
         title = r.title,
-        subtitle = listOfNotNull(comingLabel(r), what).joinToString(" · "),
+        subtitle = listOfNotNull(if (r.type == TidalType.ARTIST.api) comingLabel(r) else RequestIntent.stageLabel(r), what).joinToString(" · "),
         onClick = {
             when (r.type) {
                 TidalType.ALBUM.api -> actions.openAlbum(remoteAlbumId(r.tidalId))
@@ -232,6 +235,18 @@ private fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
         subtitleIcon = { AvailabilityIcon(r) },
         trailing = {
             if (failed) TextButton(onClick = { get.retry(r) }) { Text("Try again") }
+            // What it'll do when it arrives: ♡ liked (or saved), ⬇ downloaded to this phone.
+            if (!failed && r.type != TidalType.ARTIST.api) {
+                val album = r.type == TidalType.ALBUM.api
+                if (r.like) Icon(
+                    Icons.Default.Favorite, if (album) "Will be saved" else "Will be liked",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(16.dp),
+                )
+                if (r.toPhone) Icon(
+                    Icons.Outlined.ArrowCircleDown, "Will download to your phone",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(18.dp),
+                )
+            }
             IconButton(onClick = { get.requestMenu = r }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
         },
     )

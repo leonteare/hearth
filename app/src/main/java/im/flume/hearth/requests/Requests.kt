@@ -35,6 +35,7 @@ import im.flume.hearth.data.Availability
 import im.flume.hearth.data.ArtistEntity
 import im.flume.hearth.data.LibraryRepository
 import im.flume.hearth.data.RequestEntity
+import im.flume.hearth.data.RequestIntent
 import im.flume.hearth.data.RequestMatching
 import im.flume.hearth.data.RequestStatus
 import im.flume.hearth.data.RequestTracking
@@ -62,8 +63,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Music requested from Tidal through Tidarr. Tidarr downloads it into the folder Navidrome scans;
- * this follows each request through Tidarr's queue and Navidrome's scan, then likes and downloads
- * the result on the phone that asked. Polls every 20 s while the app is open, every 15 min otherwise.
+ * this follows each request through Tidarr's queue and Navidrome's scan, then (as asked) likes it,
+ * downloads it to the phone that asked, or just leaves it on the server. Polls every 20 s while the app is open, every 15 min otherwise.
  */
 class RequestsRepository(
     private val context: Context,
@@ -269,21 +270,40 @@ class RequestsRepository(
     )
 
     /** What happened when the user asked for something. */
-    enum class Outcome { REQUESTED, ALREADY_REQUESTED, ALREADY_ON_SERVER }
+    enum class Outcome {
+        REQUESTED,
+        /** On its way already, wanting all of this already. */
+        ALREADY_REQUESTED,
+        /** On its way already; what it does on arrival now includes this too. */
+        UPDATED,
+        ALREADY_ON_SERVER,
+    }
 
     /**
-     * Asks Tidarr for [draft] (made by [track], [album] or [artist]). Something already requested just
-     * keeps its status; a failed one is retried. Songs and albums the server turns out to have already
-     * are liked and downloaded straight away instead. Throws (with a safe message) if Tidarr can't be reached.
+     * Asks Tidarr for [draft] (made by [track], [album] or [artist]). Once it arrives it's liked (an
+     * album saved) if [like], and downloaded to this phone if [toPhone]; with neither it's just on the
+     * server. Something already on its way keeps going and gains these wishes; a failed one is
+     * retried with them. Songs and albums the server turns out to have already get them straight away
+     * instead. Throws (with a safe message) if Tidarr can't be reached.
      */
-    suspend fun request(draft: RequestEntity): Outcome {
-        val existing = dao.get(draft.type, draft.tidalId)
-        if (existing != null && mine(existing) && existing.status != RequestStatus.FAILED) return Outcome.ALREADY_REQUESTED
-        if (existing != null && mine(existing)) { retry(existing); return Outcome.REQUESTED }
+    suspend fun request(draft: RequestEntity, like: Boolean, toPhone: Boolean): Outcome {
+        val existing = dao.get(draft.type, draft.tidalId)?.takeIf(::mine)
+        if (existing != null && existing.status.active) {
+            val merged = RequestIntent.merge(existing, like, toPhone)
+            if (merged == existing) return Outcome.ALREADY_REQUESTED
+            dao.upsert(merged.copy(updatedAt = System.currentTimeMillis()))
+            return Outcome.UPDATED
+        }
+        if (existing != null && existing.status == RequestStatus.FAILED) {
+            retry(RequestIntent.merge(existing, like, toPhone))
+            return Outcome.REQUESTED
+        }
+        @Suppress("NAME_SHADOWING") val draft = draft.copy(like = like, toPhone = toPhone)
         if (draft.type != TidalType.ARTIST.api) {
             val found = runCatching { findOnServer(draft) }.getOrNull()
             if (found != null) {
-                complete(draft.copy(status = RequestStatus.ADDING), found, notify = false)
+                complete(draft.copy(status = RequestStatus.ADDING), found)
+                runCatching { downloads.refreshPinned() }
                 return Outcome.ALREADY_ON_SERVER
             }
         }
@@ -329,6 +349,24 @@ class RequestsRepository(
             runCatching { tidarr.remove(r.tidalId) }.onFailure { if (r.status != RequestStatus.FAILED) throw it }
         }
         dao.delete(r.type, r.tidalId)
+    }
+
+    /**
+     * Takes back part of what [r] would do on arrival (liking it, downloading it). Returns true when
+     * that left nothing for it to do, so the whole request was stopped as [cancel] does.
+     */
+    suspend fun dropIntent(r: RequestEntity, like: Boolean = false, toPhone: Boolean = false): Boolean {
+        val current = dao.get(r.type, r.tidalId) ?: r
+        val next = RequestIntent.without(current, dropLike = like, dropToPhone = toPhone)
+        if (next == null) { cancel(current); return true }
+        dao.upsert(next.copy(updatedAt = System.currentTimeMillis()))
+        return false
+    }
+
+    /** Keeps [r] coming to the server, but it won't be liked or downloaded when it arrives. */
+    suspend fun serverOnly(r: RequestEntity) {
+        val current = dao.get(r.type, r.tidalId) ?: r
+        dao.upsert(current.copy(like = false, toPhone = false, updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun clearFinished() = dao.clearDone()
@@ -410,11 +448,12 @@ class RequestsRepository(
 
         val adding = dao.active().filter { mine(it) && it.status == RequestStatus.ADDING }
         // Long overdue (e.g. scan status never answered): one last look, then it failed.
+        val arrived = mutableListOf<RequestIntent.Arrival>()
         for (r in adding.filter { RequestTracking.addingTimedOut(it, now) }) {
             val result = runCatching { findOnServer(r) }
             if (result.isFailure) continue
             val found = result.getOrNull()
-            if (found != null) complete(r, found, notify = true) else giveUp(r)
+            if (found != null) arrived += complete(r, found) else giveUp(r)
         }
         val due = adding.filter { !RequestTracking.addingTimedOut(it, now) && RequestTracking.lookupDue(it, now) }
         if (due.isNotEmpty() && awaitScanIdle()) {
@@ -422,10 +461,15 @@ class RequestsRepository(
                 val result = runCatching { findOnServer(r) }
                 if (result.isFailure) continue // server unreachable: not an attempt
                 val found = result.getOrNull()
-                if (found != null) { complete(r, found, notify = true); continue }
+                if (found != null) { arrived += complete(r, found); continue }
                 val next = r.copy(lookupAttempts = r.lookupAttempts + 1, updatedAt = System.currentTimeMillis())
                 if (RequestTracking.lookupExhausted(next)) giveUp(next) else dao.upsert(next)
             }
+        }
+        if (arrived.isNotEmpty()) {
+            // Downloaded albums, playlists and Liked Songs pick up what just arrived (e.g. the rest of an album).
+            runCatching { downloads.refreshPinned() }
+            RequestIntent.notifications(arrived).forEach(::notify)
         }
         dao.active().any(::mine)
     }
@@ -477,11 +521,15 @@ class RequestsRepository(
         }
     }
 
-    /** Puts what was found into the library, likes or saves it, downloads it, and marks the request done. */
-    private suspend fun complete(r: RequestEntity, found: Found, notify: Boolean) {
+    /**
+     * Puts what was found into the library, does what the request asked for on arrival (like or save
+     * it, download it to the phone; or nothing more), and marks the request done.
+     */
+    private suspend fun complete(r: RequestEntity, found: Found): RequestIntent.Arrival {
         val lib = db.library()
         val matched: List<String>
         var route: String? = null
+        val actions = RequestIntent.onArrival(TidalType.of(r.type), r.like, r.toPhone)
         when (found) {
             is Found.Songs -> {
                 lib.insertMissingSongs(found.songs)
@@ -489,18 +537,18 @@ class RequestsRepository(
                 found.songs.mapNotNull { it.albumId }.distinct().filter { lib.albumOnce(it) == null }.forEach { id ->
                     runCatching { api.album(id) }.getOrNull()?.let { lib.insertMissingAlbums(listOf(it.toEntity())) }
                 }
-                found.songs.forEach { s -> runCatching { library.setStarred(s.id, true) } }
+                if (RequestIntent.Action.LIKE_SONGS in actions) found.songs.forEach { s -> runCatching { library.setStarred(s.id, true) } }
                 applyFollowIntents(found.songs.map { it.artist to it.artistId })
-                downloads.download(library.songsByIds(found.songs.map { it.id }))
+                if (RequestIntent.Action.DOWNLOAD_SONGS in actions) downloads.download(library.songsByIds(found.songs.map { it.id }))
                 matched = found.songs.map { it.id }
                 route = found.songs.firstOrNull()?.albumId?.let { "album/${Uri.encode(it)}" }
             }
             is Found.Album -> {
                 lib.insertMissingSongs(found.songs)
                 lib.insertMissingAlbums(listOf(found.album))
-                runCatching { library.setAlbumSaved(found.album.id, true) }
+                if (RequestIntent.Action.SAVE_ALBUM in actions) runCatching { library.setAlbumSaved(found.album.id, true) }
                 applyFollowIntents(listOf(found.album.artist to found.album.artistId))
-                downloads.pinAndDownload(DownloadRepository.KIND_ALBUM, found.album.id, found.songs)
+                if (RequestIntent.Action.DOWNLOAD_ALBUM in actions) downloads.pinAndDownload(DownloadRepository.KIND_ALBUM, found.album.id, found.songs)
                 matched = listOf(found.album.id)
                 route = "album/${Uri.encode(found.album.id)}"
             }
@@ -522,10 +570,10 @@ class RequestsRepository(
                 updatedAt = System.currentTimeMillis(),
             )
         )
-        if (notify) {
-            val title = if (found is Found.Artist) "Added to the server: ${r.title}" else "Added to your phone: ${r.title}"
-            notifyDone(r, title, r.artist.takeIf { found !is Found.Artist }, route)
-        }
+        return RequestIntent.Arrival(
+            TidalType.of(r.type), r.title, r.artist, r.albumTitle.takeIf { r.type == TidalType.TRACK.api },
+            r.like, r.toPhone, route, "${r.type}:${r.tidalId}",
+        )
     }
 
     /**
@@ -538,14 +586,15 @@ class RequestsRepository(
         scope.launch { runCatching { sync.syncIfNeeded() } }
     }
 
-    private fun notifyDone(r: RequestEntity, title: String, text: String?, route: String?) {
+    private fun notify(note: RequestIntent.Note) {
+        val (title, text, route, key) = note
         runCatching {
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "New music", NotificationManager.IMPORTANCE_DEFAULT))
             val intent = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .putExtra(MainActivity.EXTRA_ROUTE, route ?: "downloads")
-            val id = "${r.type}:${r.tidalId}".hashCode()
+            val id = key.hashCode()
             val pending = PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val n = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)

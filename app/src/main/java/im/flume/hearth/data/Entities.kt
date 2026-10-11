@@ -216,4 +216,8 @@ data class RequestEntity(
     val finishedAt: Long?,
     /** How many times the server has been searched for it since it finished. */
     val lookupAttempts: Int,
+    /** On arrival: like the song, or save the album. Rows from before 2.6 did both of these. */
+    @ColumnInfo(defaultValue = "1") val like: Boolean = true,
+    /** On arrival: download it to this phone (songs one by one, an album as a downloaded album). */
+    @ColumnInfo(defaultValue = "1") val toPhone: Boolean = true,
 )
