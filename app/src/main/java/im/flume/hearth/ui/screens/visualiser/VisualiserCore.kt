@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.toArgb
 import im.flume.hearth.playback.AudioFrame
+import im.flume.hearth.playback.StereoWindow
 import kotlin.math.exp
 import kotlin.math.floor
 
@@ -13,11 +14,9 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
     RIBBON("ribbon", "Ribbon", false),
     SPHERE("sphere", "Sphere", false),
     UNKNOWN_PLEASURES("unknown-pleasures", "Unknown Pleasures", false),
-    MAGNETOSPHERE("magnetosphere", "Magnetosphere", false),
     MEMORY_CARD("memory-card", "Memory Card", true),
     GRID_RUNNER("grid-runner", "Grid Runner", true),
-    PIPES("pipes", "Pipes", true),
-    MYSTIFY("mystify", "Mystify", true);
+    SOUND_SCOPE("sound-scope", "Sound Scope", true);
 
     fun create(): VisualiserRenderer = when (this) {
         PARTICLES -> ParticlesRenderer()
@@ -25,15 +24,16 @@ enum class VisualiserStyle(val id: String, val label: String, val retro: Boolean
         MEMORY_CARD -> MemoryCardRenderer()
         SPHERE -> SphereRenderer()
         GRID_RUNNER -> GridRunnerRenderer()
-        PIPES -> PipesRenderer()
         UNKNOWN_PLEASURES -> UnknownPleasuresRenderer()
-        MAGNETOSPHERE -> MagnetosphereRenderer()
-        MYSTIFY -> MystifyRenderer()
+        SOUND_SCOPE -> SoundScopeRenderer()
     }
 
     companion object {
         const val DEFAULT_ID = "memory-card"
-        /** Unknown or retired ids (Halo, Disc Player, Aurora, Tunnel '98) fall back to the default, Memory Card. */
+        /**
+         * Unknown or retired ids (Halo, Disc Player, Aurora, Tunnel '98, Pipes, Mystify, Magnetosphere)
+         * fall back to the default, Memory Card, so a saved choice of a removed style still opens.
+         */
         fun byId(id: String?): VisualiserStyle = entries.firstOrNull { it.id == id } ?: MEMORY_CARD
     }
 }
@@ -47,6 +47,8 @@ class VisFrame {
     var time = 0f
     var dt = 1f / 60f
     var audio = AudioFrame()
+    /** Raw left/right audio at the playhead, only filled for styles that ask ([VisualiserRenderer.usesStereo]). */
+    val stereo = StereoWindow()
     val palette = VisPalette()
     var positionMs = 0L
     var durationMs = 0L
@@ -62,6 +64,9 @@ class VisFrame {
 abstract class VisualiserRenderer {
     /** 1 = full detail; lowered (to 0.5) when frames keep running late. */
     var quality = 1f
+
+    /** True for a style that draws the raw stereo samples, so the frame loop copies them only when needed. */
+    open val usesStereo: Boolean get() = false
 
     abstract fun draw(scope: DrawScope, f: VisFrame)
 
