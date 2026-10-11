@@ -16,7 +16,11 @@ import im.flume.hearth.data.SearchHit
 import im.flume.hearth.data.SearchIndex
 import im.flume.hearth.data.SearchRanking
 import im.flume.hearth.ui.components.LocalTabRequests
-import androidx.compose.foundation.lazy.rememberLazyListState
+import im.flume.hearth.ui.components.ActionSheet
+import im.flume.hearth.ui.components.MenuItem
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -60,7 +64,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -390,29 +393,45 @@ private fun searchHint(filter: SearchFilter, spoken: Boolean): String = when (fi
  */
 @Composable
 private fun SearchFilterChips(selected: SearchFilter, onSelect: (SearchFilter) -> Unit) {
+    EqualWidthChips(SearchFilter.entries, selected, { it.label }, MaterialTheme.typography.labelSmall, minHeight = 32.dp, onSelect)
+}
+
+/**
+ * Choices side by side at equal width across the page, so none of them ever scrolls off or hides
+ * under another control. Used for Search's filters and Your Library's Music · Podcasts · Audiobooks.
+ */
+@Composable
+private fun <T> EqualWidthChips(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    textStyle: TextStyle,
+    minHeight: Dp,
+    onSelect: (T) -> Unit,
+) {
     val accent = MaterialTheme.colorScheme.primary
     Row(
         Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SearchFilter.entries.forEach { f ->
+        options.forEach { f ->
             val on = f == selected
             Box(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = 32.dp)
+                    .heightIn(min = minHeight)
                     .clip(HearthShapes.Chip)
                     .background(if (on) accent else SurfaceHigh)
                     .selectable(selected = on, role = Role.Tab, onClick = { onSelect(f) }),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    f.label,
+                    label(f),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Clip,
                     color = if (on) MaterialTheme.colorScheme.onPrimary else Color.White,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = textStyle,
                 )
             }
         }
@@ -470,8 +489,8 @@ fun AlbumListRow(a: AlbumEntity) {
     )
 }
 
-/** Your Library's tabs; [Actions.openLibraryTab] names one by its [name]. */
-private enum class LibraryTab(val label: String) { PLAYLISTS("Playlists"), ARTISTS("Artists"), ALBUMS("Albums"), PODCASTS("Podcasts"), AUDIOBOOKS("Audiobooks") }
+/** Keeps your place in Your Library across rotation and process death, in the same form as the prefs. */
+private val LIBRARY_PLACE_SAVER = Saver<LibraryPlace, String>(save = { LibraryTabs.save(it) }, restore = { LibraryTabs.restore(it) })
 
 private val ARTIST_SORTS = listOf("A–Z", "Most albums")
 private val ALBUM_SORTS = listOf("A–Z", "Recently added", "Artist", "Most played", "Year")
@@ -481,12 +500,19 @@ private fun sortArtists(artists: List<ArtistEntity>, sort: Int) = LibraryOrder.a
 private fun sortAlbums(albums: List<AlbumEntity>, sort: Int) = LibraryOrder.albums(albums, sort)
 
 @Composable
-internal fun SortMenu(options: List<String>, sort: Int, onSort: (Int) -> Unit) {
+internal fun SortMenu(options: List<String>, sort: Int, modifier: Modifier = Modifier, onSort: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    TextButton(onClick = { open = true }) {
+    // Shortened with "…" rather than squeezing whatever sits beside it when space is tight.
+    TextButton(onClick = { open = true }, modifier = modifier) {
         Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(4.dp))
-        Text(options.getOrElse(sort) { options[0] }, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+        Text(
+            options.getOrElse(sort) { options[0] },
+            color = TextSecondary,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     ChoiceSheet(open, "Sort by", options.mapIndexed { i, label -> i to label }, sort, onDismiss = { open = false }, onPick = onSort)
 }
@@ -497,18 +523,25 @@ fun LibraryScreen() {
     val c = LocalContext.current.container
     val dao = c.db.library()
     val actions = LocalActions.current
-    var tab by rememberSaveable { mutableStateOf(LibraryTab.PLAYLISTS) }
-    val tabsState = rememberLazyListState()
+    val context = LocalContext.current
+    val sortPrefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
+    // Kept across app restarts too, so Your Library opens where you left it.
+    var place by rememberSaveable(stateSaver = LIBRARY_PLACE_SAVER) {
+        mutableStateOf(LibraryTabs.restore(sortPrefs.getString("place", null)))
+    }
+    fun goTo(next: LibraryPlace) {
+        place = next
+        sortPrefs.edit().putString("place", LibraryTabs.save(next)).apply()
+    }
+    val tab = place.tab
     // Opened on a given tab (Home's Podcasts and Audiobooks tiles).
     val tabRequests = LocalTabRequests.current
     LaunchedEffect(tabRequests.libraryTab) {
         val wanted = tabRequests.libraryTab ?: return@LaunchedEffect
         tabRequests.libraryTab = null
-        LibraryTab.entries.firstOrNull { it.name == wanted }?.let {
-            tab = it
-            tabsState.animateScrollToItem(it.ordinal)
-        }
+        goTo(LibraryTabs.open(place, wanted))
     }
+    var addPodcastsOpen by remember { mutableStateOf(false) }
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     // Yours, ones you've joined, and invites waiting for an answer. Other people's playlists stay hidden.
     val playlists = remember(playlistItems) { PlaylistRules.visible(playlistItems) }
@@ -517,8 +550,6 @@ fun LibraryScreen() {
     val artists by remember { combine(dao.artists(), dao.savedAlbums(), YourLibrary::artists) }.collectAsStateWithLifecycle(emptyList())
     val songCount by remember { dao.songCount() }.collectAsStateWithLifecycle(0)
     val sync by c.sync.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val sortPrefs = remember { context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE) }
     var sort by remember(tab) { mutableStateOf(sortPrefs.getInt("sort-${tab.name}", 0)) }
     val sortOptions = when (tab) {
         LibraryTab.PLAYLISTS -> listOf("A–Z", "Recently updated", "Most songs")
@@ -568,24 +599,55 @@ fun LibraryScreen() {
                 Icon(Icons.Default.Shuffle, "Shuffle your library", tint = MaterialTheme.colorScheme.primary)
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LazyRow(Modifier.weight(1f), state = tabsState, contentPadding = PaddingValues(start = Dimens.Gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(LibraryTab.entries) { t ->
-                    FilterChip(
-                        selected = tab == t,
-                        onClick = { tab = t },
-                        label = { Text(t.label) },
-                        shape = HearthShapes.Chip,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    )
+        EqualWidthChips(LibrarySection.entries, place.section, { it.label }, MaterialTheme.typography.labelLarge, minHeight = 36.dp) {
+            goTo(place.copy(section = it))
+        }
+        // Second row: Music's lists on the left, then the sort (and Podcasts' "+") on the right.
+        // The chips are measured first and the sort shortens itself, so nothing ever covers a chip.
+        // Same height on every section, so the list below doesn't jump when you switch.
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = Dimens.Gutter, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (place.section == LibrarySection.MUSIC) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LibraryTabs.musicTabs.forEach { t ->
+                        FilterChip(
+                            selected = tab == t,
+                            onClick = { goTo(LibraryTabs.goTo(place, t)) },
+                            label = { Text(t.label) },
+                            shape = HearthShapes.Chip,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                        )
+                    }
                 }
             }
-            SortMenu(sortOptions, sort) {
-                sort = it
-                sortPrefs.edit().putInt("sort-${tab.name}", it).apply()
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                if (tab == LibraryTab.PODCASTS && spokenAccount != null) {
+                    IconButton(onClick = { addPodcastsOpen = true }) {
+                        Icon(Icons.Default.Add, "Add podcasts", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                SortMenu(sortOptions, sort) {
+                    sort = it
+                    sortPrefs.edit().putInt("sort-${tab.name}", it).apply()
+                }
+            }
+        }
+        // Finding and importing shows live here rather than at the top of the list, so the shows
+        // you follow come first. With nothing followed yet, the list offers both inline instead.
+        ActionSheet(addPodcastsOpen, onDismiss = { addPodcastsOpen = false }, title = "Add podcasts", showCover = false) {
+            // The Search tab itself (not a page on top of this one), so Your Library still comes back here.
+            MenuItem("Find a podcast", Icons.Default.Search) {
+                addPodcastsOpen = false
+                actions.openSearchTab(SearchFilter.PODCASTS)
+            }
+            MenuItem("Import podcasts (OPML)", Icons.Default.UploadFile) {
+                addPodcastsOpen = false
+                importOpml()
             }
         }
         PullToRefreshBox(
@@ -644,27 +706,30 @@ fun LibraryScreen() {
                             item { SpokenSignInPrompt("podcasts") }
                         } else {
                             // Nothing followed yet: say what the tab is for first, then how to start.
-                            if (followedOrNull?.isEmpty() == true) item(key = "no-podcasts") {
-                                LibraryEmpty(
-                                    "No podcasts yet",
-                                    "Search for a show to follow, or grab a single episode. New episodes from shows you follow " +
-                                        "download on Wi-Fi and leave your phone once you've finished them.",
-                                )
-                            }
-                            // The Search tab itself (not a page on top of this one), so Your Library still comes back here.
-                            item(key = "add-podcast") {
-                                MediaRow(
-                                    "Find a podcast", null,
-                                    onClick = { actions.openSearchTab(SearchFilter.PODCASTS) },
-                                    cover = { IconTile(Icons.Default.Search, SurfaceHigh) },
-                                )
-                            }
-                            item(key = "import-opml") {
-                                MediaRow(
-                                    "Import podcasts (OPML)", "Bring the shows you follow from another app",
-                                    onClick = importOpml,
-                                    cover = { IconTile(Icons.Default.UploadFile, SurfaceHigh) },
-                                )
+                            // Once you follow something these move to the "+" above the list.
+                            if (followedOrNull?.isEmpty() == true) {
+                                item(key = "no-podcasts") {
+                                    LibraryEmpty(
+                                        "No podcasts yet",
+                                        "Search for a show to follow, or grab a single episode. New episodes from shows you follow " +
+                                            "download on Wi-Fi and leave your phone once you've finished them.",
+                                    )
+                                }
+                                // The Search tab itself (not a page on top of this one), so Your Library still comes back here.
+                                item(key = "add-podcast") {
+                                    MediaRow(
+                                        "Find a podcast", null,
+                                        onClick = { actions.openSearchTab(SearchFilter.PODCASTS) },
+                                        cover = { IconTile(Icons.Default.Search, SurfaceHigh) },
+                                    )
+                                }
+                                item(key = "import-opml") {
+                                    MediaRow(
+                                        "Import podcasts (OPML)", "Bring the shows you follow from another app",
+                                        onClick = importOpml,
+                                        cover = { IconTile(Icons.Default.UploadFile, SurfaceHigh) },
+                                    )
+                                }
                             }
                             items(sortedPodcasts, key = { "pod:${it.id}" }) { PodcastListRow(it, newCounts[it.id] ?: 0) }
                         }

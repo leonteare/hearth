@@ -124,8 +124,9 @@ interface Actions {
     /** Follows or unfollows an artist, which puts them in Your Library. */
     fun setArtistFollowed(artistId: String, followed: Boolean) {}
     /**
-     * Switches to the Your Library tab showing [tab] (a library tab name, e.g. "PODCASTS"), like
-     * tapping the tab itself, so tapping Your Library again doesn't land somewhere unexpected.
+     * Switches to the Your Library tab showing [tab] (a library tab name, e.g. "PODCASTS", or a Music
+     * list such as "ARTISTS", which opens Music on that list), like tapping the tab itself, so
+     * tapping Your Library again doesn't land somewhere unexpected.
      */
     fun openLibraryTab(tab: String) {}
     /** Switches to the Search tab with [filter] chosen and the keyboard up, ready to type. */
