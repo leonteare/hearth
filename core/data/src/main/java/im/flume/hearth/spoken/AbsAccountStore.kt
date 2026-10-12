@@ -141,3 +141,7 @@ class AbsAccountStore(context: Context) : AbsAuthStore {
         const val DEFAULT_SERVER_URL = "https://listen.home"
     }
 }
+
+/** A follow / unfollow this user made on this phone, kept for [FollowTags.heal]. */
+@Serializable
+data class FollowIntent(val podcastId: String, val username: String, val follow: Boolean, val at: Long)

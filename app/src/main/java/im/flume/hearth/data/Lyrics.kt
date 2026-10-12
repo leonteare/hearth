@@ -1,10 +1,5 @@
 package im.flume.hearth.data
 
-import androidx.room.Dao
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.Upsert
 import im.flume.hearth.api.LyricLine
 import im.flume.hearth.api.SubsonicClient
 import im.flume.hearth.api.SubsonicException
@@ -70,18 +65,6 @@ fun List<LyricRow>.currentIndex(positionMs: Long): Int {
 }
 
 const val MIN_INTRO_MS = 3_000L
-
-@Entity(tableName = "lyrics")
-data class LyricsEntity(@PrimaryKey val songId: String, val json: String, val fetchedAt: Long)
-
-@Dao
-interface LyricsDao {
-    @Query("SELECT * FROM lyrics WHERE songId = :songId")
-    suspend fun get(songId: String): LyricsEntity?
-
-    @Upsert
-    suspend fun put(item: LyricsEntity)
-}
 
 /**
  * Lyrics from Navidrome (embedded tags or .lrc / .txt files next to the music), kept in Room so

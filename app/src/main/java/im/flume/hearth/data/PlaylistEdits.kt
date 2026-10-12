@@ -1,14 +1,5 @@
 package im.flume.hearth.data
 
-import androidx.room.Embedded
-
-/** A playlist entry at its server [position]; [song] is null when this phone hasn't synced that song yet. */
-data class PlaylistEntry(
-    val position: Int,
-    val songId: String,
-    @Embedded val song: SongEntity?,
-)
-
 /**
  * Playlist edits that stay correct while the other phone edits the same playlist. Playlists may hold
  * the same song more than once, so an entry is identified by its song id plus which occurrence of

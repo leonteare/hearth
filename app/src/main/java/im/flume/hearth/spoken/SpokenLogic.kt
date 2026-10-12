@@ -164,10 +164,6 @@ object FollowTags {
     const val INTENT_TTL_MS = 3L * 24 * 3_600_000
 }
 
-/** A follow / unfollow this user made on this phone, kept for [FollowTags.heal]. */
-@Serializable
-data class FollowIntent(val podcastId: String, val username: String, val follow: Boolean, val at: Long)
-
 /** Episode facts the download planner needs. */
 data class EpisodeInfo(val id: String, val publishedAt: Long, val finished: Boolean, val started: Boolean)
 

@@ -1,6 +1,7 @@
 // Room queries for the music library: songs, albums, artists, playlists, play history and pending scrobbles.
 package im.flume.hearth.data
 
+import androidx.room.Embedded
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -245,3 +246,23 @@ interface LibraryDao {
     @Query("SELECT * FROM pending_scrobbles ORDER BY time") suspend fun pendingScrobbles(): List<PendingScrobbleEntity>
     @Query("DELETE FROM pending_scrobbles WHERE rowId = :rowId") suspend fun deletePendingScrobble(rowId: Long)
 }
+
+/** One counted play, joined with the song's details. */
+data class HistoryRow(
+    val songId: String,
+    val playedAt: Long,
+    val title: String,
+    val artist: String,
+    val artistId: String?,
+    val album: String,
+    val albumId: String?,
+    val durationSec: Int,
+    val coverArt: String?,
+)
+
+/** A playlist entry at its server [position]; [song] is null when this phone hasn't synced that song yet. */
+data class PlaylistEntry(
+    val position: Int,
+    val songId: String,
+    @Embedded val song: SongEntity?,
+)

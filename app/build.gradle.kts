@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
 }
 
 val versionProps = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
@@ -62,10 +61,6 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
-
 // A release APK/bundle must carry the real signing key: without keystore.properties, fail rather than
 // quietly sign with the debug key (which can't update the installed app). Debug builds are unaffected.
 val hasReleaseKey = keystoreProps.containsKey("storeFile")
@@ -81,6 +76,7 @@ tasks.configureEach {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:network"))
+    implementation(project(":core:data"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -95,9 +91,6 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.media3.datasource.okhttp)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
     implementation(libs.work.runtime)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

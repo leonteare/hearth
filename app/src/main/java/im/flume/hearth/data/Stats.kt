@@ -8,19 +8,6 @@ import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** One counted play, joined with the song's details. */
-data class HistoryRow(
-    val songId: String,
-    val playedAt: Long,
-    val title: String,
-    val artist: String,
-    val artistId: String?,
-    val album: String,
-    val albumId: String?,
-    val durationSec: Int,
-    val coverArt: String?,
-)
-
 data class Ranked(val id: String, val name: String, val detail: String, val coverArt: String?, val plays: Int)
 
 data class Stats(
