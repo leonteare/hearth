@@ -439,6 +439,9 @@ private fun SpokenPlayerMenu(state: PlayerUiState, spoken: SpokenNowPlaying, inf
             MenuItem(if (spoken.isBook) "Mark as finished" else "Mark as played", Icons.Outlined.CheckCircle) {
                 open = false
                 c.appScope.launch { c.spoken.markFinished(spoken.libraryItemId, spoken.episodeId, true) }
+                actions.showUndo(if (spoken.isBook) "Marked as finished" else "Marked as played") {
+                    c.spoken.markFinished(spoken.libraryItemId, spoken.episodeId, false)
+                }
             }
         }
         MenuItem(
