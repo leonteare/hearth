@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
@@ -38,8 +35,7 @@ import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.TopBar
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.flow.map
 
 /** How far back "Finished" reaches. */
@@ -101,7 +97,7 @@ fun DownloadsScreen() {
             title = { Text("Cancel all downloads?") },
             text = { Text("${plural(pending.size, "song")} still waiting or failed will be dropped. Songs that already finished stay on this phone.") },
             confirmButton = {
-                TextButton(onClick = { confirmCancelAll = false; c.downloads.cancelPending() }) { Text("Cancel all", color = Destructive) }
+                TextButton(onClick = { confirmCancelAll = false; c.downloads.cancelPending() }) { Text("Cancel all", color = HearthTheme.colors.destructive) }
             },
             dismissButton = { TextButton(onClick = { confirmCancelAll = false }) { Text("Keep downloading") } },
         )
@@ -109,7 +105,7 @@ fun DownloadsScreen() {
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Downloads")
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
             if (coming.isNotEmpty()) {
                 item(key = "c-head") { SectionHeader("Coming to your server") }
                 items(coming, key = { "c:${it.type}:${it.tidalId}" }) { r -> ComingRow(r, Modifier.animateItem()) }
@@ -117,7 +113,7 @@ fun DownloadsScreen() {
             if (pending.isEmpty() && coming.isEmpty() && spokenActive.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
-                        Icons.Outlined.ArrowCircleDown,
+                        HearthTheme.icons.download,
                         "No downloads in progress. Tap the download button on an album or playlist to keep it on your phone.",
                     )
                 }
@@ -156,7 +152,7 @@ fun DownloadsScreen() {
                             if (backingOff && !userPaused && !storageFull) {
                                 TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
                             }
-                            TextButton(onClick = { confirmCancelAll = true }) { Text("Cancel all", color = TextSecondary) }
+                            TextButton(onClick = { confirmCancelAll = true }) { Text("Cancel all", color = HearthTheme.colors.textSecondary) }
                         },
                     )
                 }
@@ -191,7 +187,7 @@ fun DownloadsScreen() {
                     }
                     if (spokenFailed.isNotEmpty()) {
                         item(key = "sf-retry") {
-                            TextButton(onClick = { c.spoken.downloads.retryFailed() }, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Try podcasts and audiobooks again") }
+                            TextButton(onClick = { c.spoken.downloads.retryFailed() }, modifier = Modifier.padding(horizontal = HearthTheme.spacing.s)) { Text("Try podcasts and audiobooks again") }
                         }
                         spokenRows("sf", spokenFailed)
                     }

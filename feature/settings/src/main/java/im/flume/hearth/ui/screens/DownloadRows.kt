@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -20,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,10 +34,8 @@ import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.comingLabel
 import im.flume.hearth.ui.components.remoteAlbumId
 import im.flume.hearth.ui.components.remoteArtistId
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -71,8 +64,8 @@ internal fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
         modifier = modifier,
         round = r.type == TidalType.ARTIST.api,
         cover = { RemoteCover(r.coverUuid, r.title) },
-        titleColor = Color.White.copy(alpha = NotOnServerAlpha),
-        subtitleColor = if (failed) Destructive else TextSecondary,
+        titleColor = HearthTheme.colors.text.copy(alpha = NotOnServerAlpha),
+        subtitleColor = if (failed) HearthTheme.colors.destructive else HearthTheme.colors.textSecondary,
         subtitleIcon = { AvailabilityIcon(r) },
         trailing = {
             if (failed) TextButton(onClick = { get.retry(r) }) { Text("Try again") }
@@ -80,15 +73,15 @@ internal fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
             if (!failed && r.type != TidalType.ARTIST.api) {
                 val album = r.type == TidalType.ALBUM.api
                 if (r.like) Icon(
-                    Icons.Default.Favorite, if (album) "Will be saved" else "Will be liked",
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(16.dp),
+                    HearthTheme.icons.likeOn, if (album) "Will be saved" else "Will be liked",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = HearthTheme.spacing.xxs).size(16.dp),
                 )
                 if (r.toPhone) Icon(
-                    Icons.Outlined.ArrowCircleDown, "Will download to your phone",
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(18.dp),
+                    HearthTheme.icons.download, "Will download to your phone",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = HearthTheme.spacing.xxs).size(18.dp),
                 )
             }
-            IconButton(onClick = { get.requestMenu = r }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+            IconButton(onClick = { get.requestMenu = r }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
         },
     )
 }
@@ -96,8 +89,8 @@ internal fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
 @Composable
 internal fun MoreLine(text: String) {
     Text(
-        text, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+        text, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
     )
 }
 
@@ -114,8 +107,8 @@ internal fun PendingSongRow(song: SongEntity, onClick: () -> Unit, modifier: Mod
         if (progress != null) {
             LinearProgressIndicator(
                 progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
-                trackColor = TextSecondary.copy(alpha = 0.25f),
+                modifier = Modifier.fillMaxWidth().padding(start = HearthTheme.spacing.gutter + HearthTheme.spacing.rowCover + HearthTheme.spacing.coverGap, end = HearthTheme.spacing.gutter).height(3.dp),
+                trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.25f),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )

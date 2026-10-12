@@ -24,14 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.spoken.AbsAccountStore
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -77,7 +75,7 @@ internal fun PodcastsAndAudiobooksAccount() {
     val syncing by c.spoken.syncing.collectAsStateWithLifecycle()
     if (a != null && !a.needsSignIn) {
         Info("Signed in as ${a.username}", a.serverUrl.removePrefix("https://").removePrefix("http://"))
-        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
             TextButton(enabled = !syncing, onClick = { scope.launch { c.spoken.refresh(force = true) } }) {
                 Text(if (syncing) "Refreshing…" else "Refresh now")
             }
@@ -92,23 +90,23 @@ internal fun PodcastsAndAudiobooksAccount() {
                     }
                 },
             ) { Text(if (busy) "Testing…" else "Test connection") }
-            TextButton(onClick = { confirmSignOut = true }) { Text("Sign out", color = Destructive) }
+            TextButton(onClick = { confirmSignOut = true }) { Text("Sign out", color = HearthTheme.colors.destructive) }
         }
     } else {
         Text(
             if (a?.needsSignIn == true) "Your sign-in for podcasts & audiobooks expired. Sign in again; nothing on this phone is lost."
             // The one place the server software is named, so you know which login it wants.
             else "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks. Each of you has your own, so progress and followed shows are yours.",
-            color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
         )
-        SpokenSignInForm(Modifier.padding(horizontal = 16.dp)) {
+        SpokenSignInForm(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) {
             actions.showMessage("Signed in. Your podcasts and audiobooks are on their way")
         }
     }
     (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed to refresh: $it" })?.let {
         Text(
-            it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            it, color = if (it.startsWith("Failed")) HearthTheme.colors.destructive else MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
         )
     }
 
@@ -122,7 +120,7 @@ internal fun PodcastsAndAudiobooksAccount() {
                 TextButton(onClick = {
                     confirmSignOut = false
                     scope.launch { c.spoken.signOut(); result = null }
-                }) { Text("Sign out", color = Destructive) }
+                }) { Text("Sign out", color = HearthTheme.colors.destructive) }
             },
             dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancel") } },
         )
@@ -148,7 +146,7 @@ internal fun SpokenSignInForm(
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
         OutlinedTextField(
             value = url, onValueChange = { url = it; error = null },
             label = { Text("Server address") }, singleLine = true,
@@ -168,8 +166,8 @@ internal fun SpokenSignInForm(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
         )
-        error?.let { Text("Couldn't sign in: $it", color = Destructive, style = MaterialTheme.typography.bodyMedium) }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        error?.let { Text("Couldn't sign in: $it", color = HearthTheme.colors.destructive, style = MaterialTheme.typography.bodyMedium) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
             Button(
                 enabled = !busy && username.isNotBlank() && password.isNotEmpty(),
                 onClick = {

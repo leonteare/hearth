@@ -13,18 +13,13 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.style.TextAlign
-
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,11 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.api.Credentials
 import im.flume.hearth.container
 import im.flume.hearth.ui.screens.SpokenSignInForm
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.userMessage
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLException
@@ -74,15 +70,15 @@ fun LoginScreen() {
     signedIn?.let { creds -> return SpokenStep(onDone = { finish(creds) }) }
 
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(HearthTheme.spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.m),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(48.dp))
-        Icon(Icons.Default.LocalFireDepartment, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+        Icon(HearthTheme.icons.brand, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
         Text("Hearth", style = MaterialTheme.typography.headlineLarge)
-        Text("Sign in to your Navidrome server", color = TextSecondary)
-        Spacer(Modifier.height(16.dp))
+        Text("Sign in to your Navidrome server", color = HearthTheme.colors.textSecondary)
+        Spacer(Modifier.height(HearthTheme.spacing.l))
         OutlinedTextField(
             value = url, onValueChange = { url = it }, label = { Text("Server address") },
             placeholder = { Text("http://100.x.y.z:4533") },
@@ -103,7 +99,7 @@ fun LoginScreen() {
         // The technical hints (Tailscale, certificates) are there for whoever set up the server, not up front.
         errorHelp?.let { help ->
             TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "Less info" else "More info") }
-            if (showHelp) Text(help, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            if (showHelp) Text(help, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
         }
         Button(
             onClick = {
@@ -145,20 +141,20 @@ fun LoginScreen() {
 @Composable
 private fun SpokenStep(onDone: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(HearthTheme.spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.m),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(48.dp))
-        Icon(Icons.Default.Podcasts, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+        Icon(HearthTheme.icons.podcast, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
         Text("Podcasts & audiobooks too?", style = MaterialTheme.typography.headlineSmall)
         Text(
             "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks here. " +
                 "Each of you has your own, so progress and followed shows are yours. You can do this later in Settings.",
-            color = TextSecondary,
+            color = HearthTheme.colors.textSecondary,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(HearthTheme.spacing.s))
         SpokenSignInForm(
             secondary = { TextButton(onClick = onDone) { Text("Skip") } },
             onSignedIn = onDone,

@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,8 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.ui.theme.AccentChoices
 import im.flume.hearth.ui.theme.AccentDeep
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -46,7 +42,7 @@ fun AppearanceSettings() {
     SettingsPage("Appearance") {
         Section("Accent colour")
         FlowRow(
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -55,7 +51,7 @@ fun AppearanceSettings() {
                 // The whole swatch + label is one 48dp+ radio target; TalkBack reads the colour name and whether it is selected.
                 Column(
                     Modifier
-                        .clip(HearthShapes.Card)
+                        .clip(HearthTheme.shapes.card)
                         .selectable(selected = selected, role = Role.RadioButton) {
                             c.session.updateSettings { it.copy(accent = argb.toInt()) }
                         },
@@ -66,12 +62,12 @@ fun AppearanceSettings() {
                             .size(48.dp)
                             .clip(CircleShape)
                             .background(Color(argb))
-                            .border(if (selected) 3.dp else 0.dp, Color.White, CircleShape),
+                            .border(if (selected) 3.dp else 0.dp, HearthTheme.colors.text, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (selected) Icon(Icons.Default.Check, null, tint = Color.Black)
+                        if (selected) Icon(HearthTheme.icons.check, null, tint = HearthTheme.colors.onAccent)
                     }
-                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) Color.White else TextSecondary)
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) HearthTheme.colors.text else HearthTheme.colors.textSecondary)
                 }
             }
         }
@@ -87,10 +83,10 @@ fun AppearanceSettings() {
         val size = LYRIC_SIZES.getOrElse(settings.lyricsSize) { 22 }.sp
         val gap = LYRIC_GAPS.getOrElse(settings.lyricsSpacing) { 8 }.dp
         Column(
-            Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(8.dp)).background(AccentDeep).padding(horizontal = 16.dp, vertical = 8.dp)
+            Modifier.fillMaxWidth().padding(HearthTheme.spacing.l).clip(HearthTheme.shapes.card).background(AccentDeep).padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s)
         ) {
             listOf("Here's how your lyrics" to 0.45f, "will look while a song" to 1f, "is playing" to 0.35f).forEach { (line, alpha) ->
-                Text(line, fontSize = size, lineHeight = size * 1.25f, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = alpha), modifier = Modifier.padding(vertical = gap))
+                Text(line, fontSize = size, lineHeight = size * 1.25f, fontWeight = FontWeight.Bold, color = HearthTheme.colors.onCover.copy(alpha = alpha), modifier = Modifier.padding(vertical = gap))
             }
         }
     }

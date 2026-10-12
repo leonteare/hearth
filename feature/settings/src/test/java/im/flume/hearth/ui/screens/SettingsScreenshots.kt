@@ -5,10 +5,11 @@ import im.flume.hearth.data.DownloadState
 import im.flume.hearth.testing.Samples
 import im.flume.hearth.testing.ScreenshotTest
 import im.flume.hearth.testing.liveRows
+import im.flume.hearth.ui.LoginScreen
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
-/** Settings rows and the Downloads page. Moves to :feature:settings with those screens. */
+/** Settings rows and the Downloads page. */
 class SettingsScreenshots : ScreenshotTest() {
     @Test
     fun `settings rows, a section of each kind`() = snapScreen("settings_rows") {
@@ -38,4 +39,17 @@ class SettingsScreenshots : ScreenshotTest() {
         }
         snapScreen("downloads_in_progress", live = liveRows(downloads = states)) { DownloadsScreen() }
     }
+
+    @Test
+    fun `the settings home page`() = snapScreen("settings_home") { SettingsScreen() }
+
+    @Test
+    fun `the appearance page with the accent picker`() = snapScreen("appearance") { AppearanceSettings() }
+
+    // Not the whole General page: it shows the app's version, which changes with every release.
+    @Test
+    fun `the podcasts and audiobooks sign-in form`() = snap("spoken_sign_in") { SpokenSignInForm {} }
+
+    @Test
+    fun `the sign-in screen`() = snapScreen("login") { LoginScreen() }
 }
