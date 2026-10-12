@@ -67,8 +67,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 - **domain:music**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
   (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`, `PlaylistEdits`,
   `PhotoPrep`, `Availability`, `RequestMatching` (is Tidal music on the server; `Availability` needs it).
-- **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
-  `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
+- **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadPins`
+  (removal plans, missing songs), `DownloadScheduling` (worker start/stop, Wi-Fi/app-start wake), `DownloadWorker`, `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
 - **domain:requests**: Tidarr: `RequestsRepository` (facade), `TidalBrowse` (search, artist/album lookups),
   `RequestActions` (request/retry/cancel/drop), `FollowIntents`, `RequestPolling` (start, poll), `RequestArrival`, worker.
 - **domain:spoken**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
