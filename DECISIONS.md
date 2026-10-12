@@ -49,7 +49,7 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **Container interfaces.** `:app` builds the one `HearthContainer`; lower modules see it as `DomainContainer`
   (`:core:domain`) or `AppContainer` (`:core:playback`, adds the player). Tests swap in `TestContainer`.
 - **Design tokens, ready for skins.** Colours, spacing, shapes and icons are named by purpose in `Tokens.kt` and read
-  through `HearthTheme`, so a skin can swap them in one place. The old globals in `Theme.kt` are deprecated, kept
-  only until every screen reads the tokens.
+  through `HearthTheme`, so a skin can swap them in one place. The old globals in `Theme.kt` were removed (2.20.3)
+  once every screen read the tokens.
 - **Screenshot tests run on Robolectric SDK 34.** SDK 35+ fails when the home folder path has a space (the owner's
   does). Fixed phone size (411x891dp, xxhdpi) and fixed sample dates so images only change when the look does.

@@ -52,7 +52,7 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 | `:domain:update` | `Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
 | `:core:domain` | Aggregator: `DomainContainer` (extends the four area containers), `SearchHits` (Search's one list across areas), `LegacyWorkers` (old worker class names → current; WorkManager's factory) |
 | `:core:playback` | Media3 service and player; `AppContainer` (DomainContainer + player) and `Context.container` |
-| `:core:ui` | `theme/` (`Tokens.kt`, legacy `Theme.kt`, `CoverSizes`, `Contrast`), `components/`, `screens/` (pieces two+ features share) |
+| `:core:ui` | `theme/` (`Tokens.kt`; `Theme.kt`: accent helpers, corner radii, `HearthTheme` setup; `CoverSizes`, `Contrast`), `components/`, `screens/` (pieces two+ features share) |
 | `:core:testing` | Test-only (via `testImplementation`): `Samples`, `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication`, `ScreenshotTest` |
 | `:feature:home` | `HomeScreen`, `SpokenHome`, `StatsScreen`; `HomeRoutes.kt` |
 | `:feature:library` | Library tabs/lists/controls, Browse, Album/Artist, Collection* (playlist/mix/genre/liked pages), Playlist{Screen,Edit,Menu,SharingUi}, `InfoSections`, `LocalBookRows`; `LibraryRoutes.kt` |
@@ -109,8 +109,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
   `LibraryActions`, `NavActions`, `MessageActions`, `CoverActions`), implemented in `:app` `AppActions` and
   `FakeActions`. Rows and cards call `LocalActions.current`, not callbacks threaded through layers.
 - **New colour / size / shape / icon**: a slot in `core/ui/.../theme/Tokens.kt` (`HearthColors`, `HearthSpacing`,
-  `HearthShapeSet`, `HearthIcons`), read as `HearthTheme.colors/spacing/shapes/icons`. The globals in `Theme.kt`
-  (`TextSecondary`, `Dimens`, `HearthShapes`, ...) are deprecated: don't use them in new code. No hard-coded dp or colours.
+  `HearthShapeSet`, `HearthIcons`), read as `HearthTheme.colors/spacing/shapes/icons`. No hard-coded dp or colours (`Theme.kt` keeps only the
+  accent helpers and the corner radii `HearthShapes` is built from).
 - **New screenshot test**: in the screen's module (`id("hearth.screenshots")` in its plugins), extend `ScreenshotTest`,
   `snap("name") { Page() }` (cropped) or `snapScreen` (whole phone: sheets, dialogs), use `Samples` (fixed dates, never
   "now"), record, commit `src/test/screenshots/<Class>_<name>.png`. A test moves with its screen and its PNGs.
@@ -186,3 +186,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 
 ## Mistake ledger
 <!-- When a session gets something wrong here and is corrected, append a one-line rule so the mistake isn't repeated. -->
+- A regex that passed JVM tests crashed the app on Android (ICU rejects an unescaped `}`); `RegexLiteralsTest` now guards it.
+- Agent worktrees were created from an old commit (before the restructure); always check the base against `main` first.
+- `agent-worktree.sh` once reported success while leaving folders behind (Windows long paths); confirm `.claude/worktrees` is empty after cleanup.
+- Changing a systemd timer's `OnCalendar` with `Persistent=true` started a missed run immediately; check `list-timers` and stop it if unwanted.
+- A screenshot test of a database-backed page can fire before its rows load; wait for the data (see `SpokenPagesScreenshots`' `Settled`), don't re-record.
