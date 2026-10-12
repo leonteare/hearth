@@ -68,8 +68,9 @@ internal fun PlayerControls(
     val actions = LocalActions.current
     val accent = MaterialTheme.colorScheme.primary
     val player = LocalContext.current.container.player
-    val meta = state.current?.mediaMetadata ?: return
-    val songId = state.current.mediaId
+    val current = state.current
+    val meta = current?.mediaMetadata ?: return
+    val songId = current.mediaId
     val pos = rememberPosition(state)
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }

@@ -15,7 +15,6 @@ import im.flume.hearth.core.domain.R
 import im.flume.hearth.container
 import im.flume.hearth.crashLoggingHandler
 import im.flume.hearth.spoken.SpokenSpeed
-import im.flume.hearth.ui.MainActivity
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 import kotlinx.coroutines.CoroutineScope
@@ -99,7 +98,7 @@ class PlaybackService : MediaSessionService() {
 
         val openApp = PendingIntent.getActivity(
             this, 0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(this, c.mainActivity).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         session = MediaSession.Builder(this, SpokenAwarePlayer(this, player))

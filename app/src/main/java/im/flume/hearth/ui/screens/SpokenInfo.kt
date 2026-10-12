@@ -21,8 +21,9 @@ internal fun rememberSpokenInfo(state: PlayerUiState, spoken: SpokenNowPlaying):
     val meta = state.current?.mediaMetadata
     val fallbackTitle = (if (spoken.isBook) meta?.albumTitle else meta?.title)?.toString().orEmpty()
     val fallbackSubtitle = meta?.artist?.toString().orEmpty()
-    return if (spoken.episodeId != null) {
-        val ep by remember(spoken.episodeId) { c.spoken.episode(spoken.episodeId) }.collectAsStateWithLifecycle(null)
+    val episodeId = spoken.episodeId
+    return if (episodeId != null) {
+        val ep by remember(episodeId) { c.spoken.episode(episodeId) }.collectAsStateWithLifecycle(null)
         SpokenInfo(ep?.episode?.title ?: fallbackTitle, ep?.podcastTitle ?: fallbackSubtitle, false, ep?.downloadState, ep?.finished == true)
     } else {
         val book by remember(spoken.libraryItemId) { c.spoken.book(spoken.libraryItemId) }.collectAsStateWithLifecycle(null)

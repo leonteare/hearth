@@ -56,7 +56,8 @@ internal fun SpokenPlayerMenu(state: PlayerUiState, spoken: SpokenNowPlaying, in
             }
             else -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) {
                 open = false
-                if (spoken.episodeId != null) c.spoken.downloads.downloadEpisode(spoken.libraryItemId, spoken.episodeId) else c.spoken.downloads.downloadBook(spoken.libraryItemId)
+                val episodeId = spoken.episodeId
+                if (episodeId != null) c.spoken.downloads.downloadEpisode(spoken.libraryItemId, episodeId) else c.spoken.downloads.downloadBook(spoken.libraryItemId)
                 actions.showMessage("Downloading")
             }
         }
