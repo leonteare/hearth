@@ -7,7 +7,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
-import im.flume.hearth.core.playback.PlaybackService.Companion.MAX_RECOVERY_ATTEMPTS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -26,7 +25,7 @@ internal suspend fun PlaybackService.recover(action: ErrorAction) {
         Recovery.SkipNext -> {
             consecutiveErrors++
             // Skip songs that won't load, but don't spin through the whole queue if they're all broken.
-            if (consecutiveErrors < 3 && player.hasNextMediaItem()) {
+            if (PlaybackErrors.keepSkipping(consecutiveErrors, player.hasNextMediaItem())) {
                 player.seekToNextMediaItem()
                 player.prepare()
                 player.play()
@@ -86,10 +85,9 @@ internal fun PlaybackService.httpStatus(error: PlaybackException): Int? =
 private fun PlaybackService.scheduleRecovery(wasPlaying: Boolean, waitForConnection: Boolean) {
     recoveryJob?.cancel()
     val attempt = recoveryAttempts++
-    if (attempt >= MAX_RECOVERY_ATTEMPTS) return
+    val wait = PlaybackErrors.retryDelayMs(attempt, waitForConnection) ?: return
     recoveryJob = scope.launch {
-        // Back off if retrying keeps failing, so a half-working server isn't hammered.
-        if (attempt > 0 || !waitForConnection) delay(minOf(60_000L, 3_000L shl attempt))
+        if (wait > 0) delay(wait)
         // Spoken word comes from Audiobookshelf, not Navidrome: just retry after the backoff.
         while (spokenNow == null && !c.network.isOnline.value) {
             if (c.network.offlineMode) {

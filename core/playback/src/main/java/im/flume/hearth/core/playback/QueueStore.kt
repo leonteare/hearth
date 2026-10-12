@@ -105,6 +105,11 @@ internal object QueueSaves {
 
     fun positionOf(q: SavedQueue) = SavedPosition(q.revision, q.positionMs, q.spokenPositionSec)
 
+    /** While playing, the queue is saved this often, so a crash or a killed app loses at most this much of the place. */
+    const val SAVE_EVERY_MS = 15_000L
+
+    fun positionSaveDue(lastSaveMs: Long, nowMs: Long): Boolean = nowMs - lastSaveMs > SAVE_EVERY_MS
+
     /** A revision newer than [previous] (time-based, so it keeps increasing across restarts). */
     fun nextRevision(previous: Long, nowMs: Long): Long = maxOf(nowMs, previous + 1)
 

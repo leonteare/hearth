@@ -127,7 +127,7 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!player.playWhenReady || player.mediaItemCount == 0) {
+        if (ServiceLifetime.stopOnTaskRemoved(player.playWhenReady, player.mediaItemCount)) {
             saveQueue()
             stopSelf()
         }

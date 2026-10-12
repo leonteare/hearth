@@ -119,7 +119,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 
 - **Pure, JVM-testable logic.** JUnit 4 on the JVM, no instrumented tests. Decisions go in an `object` or top-level
   function taking plain values and injectable `Random`/time (`QueuePlanner`, `DownloadPolicy`, `Stats`, `SearchIndex`).
-  Don't unit-test logic that needs a `Context`; Robolectric is only for screenshot tests (SDK 34, 411x891dp xxhdpi).
+  Don't unit-test logic that needs a `Context`; Robolectric is only for screenshot tests (SDK 34, 411x891dp xxhdpi)
+  and `:core:playback`'s two integration tests (`QueueEditsOnPlayerTest`, `SongSourceChainTest`: no audio, no network).
 - **Test names are backtick sentences**: ``fun `shuffle with a chosen song plays that song first`()``. `MockWebServer`
   for API tests, `kotlinx-coroutines-test` for suspend code. Tests live in the module of the code they test.
 - **Room migrations**: bump `version` in `@Database`; write a public `MIGRATION_X_Y_SQL` list, wrap it in

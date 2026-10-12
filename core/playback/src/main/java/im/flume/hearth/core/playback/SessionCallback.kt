@@ -90,7 +90,7 @@ internal class SessionCallback(private val service: PlaybackService) : MediaSess
         args: Bundle,
     ): ListenableFuture<SessionResult> {
         with(service) {
-            if (controller.packageName != packageName && customCommand.customAction !in BUTTON_COMMANDS) {
+            if (!CommandAccess.allowed(fromThisApp = controller.packageName == packageName, customCommand.customAction)) {
                 return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
             }
             when (customCommand.customAction) {
@@ -185,9 +185,17 @@ internal class SessionCallback(private val service: PlaybackService) : MediaSess
                 val (saved, items) = loaded
                 applySavedState(saved)
                 publishExtras()
-                future.set(MediaSession.MediaItemsWithStartPosition(items, saved.index.coerceIn(0, items.lastIndex), saved.positionMs))
+                future.set(MediaSession.MediaItemsWithStartPosition(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs))
             }
             return future
         }
     }
+}
+
+/**
+ * Which custom commands a controller may send. Other apps (system UI, Bluetooth, the car) get the
+ * lock-screen buttons only, so nothing outside Hearth can rewrite the queue.
+ */
+internal object CommandAccess {
+    fun allowed(fromThisApp: Boolean, action: String): Boolean = fromThisApp || action in BUTTON_COMMANDS
 }

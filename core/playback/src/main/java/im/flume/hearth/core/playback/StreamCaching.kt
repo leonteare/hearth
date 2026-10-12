@@ -26,7 +26,7 @@ internal fun PlaybackService.streamTarget(id: String): SongDataSource.StreamTarg
     // A song already fully cached at some bitrate keeps that one, so it plays without the network.
     val bitrate = pinnedBitrates[id] ?: run {
         val s = c.session.settings.value
-        val chosen = cachedBitrate(id) ?: if (c.network.isMetered()) s.mobileBitrate else s.wifiBitrate
+        val chosen = StreamQuality.choose(cachedBitrate(id), { c.network.isMetered() }, wifiKbps = s.wifiBitrate, mobileKbps = s.mobileBitrate)
         pinnedBitrates.putIfAbsent(id, chosen) ?: chosen
     }
     return c.api.streamUrl(id, bitrate)?.let { SongDataSource.StreamTarget(it, "$id@$bitrate") }
@@ -35,7 +35,7 @@ internal fun PlaybackService.streamTarget(id: String): SongDataSource.StreamTarg
 /** The bitrate this song is completely in the streaming cache at, or null. */
 internal fun PlaybackService.cachedBitrate(id: String): Int? {
     val s = c.session.settings.value
-    return listOfNotNull(pinnedBitrates[id], s.wifiBitrate, s.mobileBitrate).distinct()
+    return StreamQuality.cacheCandidates(pinnedBitrates[id], s.wifiBitrate, s.mobileBitrate)
         .firstOrNull { isFullyCached("$id@$it") }
 }
 
@@ -71,10 +71,8 @@ private fun PlaybackService.isItemOnPhone(item: MediaItem): Boolean {
  * With everything on the phone, a CPU wake lock is enough and the Wi-Fi radio can sleep.
  */
 internal fun PlaybackService.updateWakeMode() {
-    val cur = player.currentMediaItemIndex
-    if (player.mediaItemCount == 0 || cur !in 0 until player.mediaItemCount) return
-    val ahead = (cur until minOf(player.mediaItemCount, cur + 1 + WakeModePolicy.LOOKAHEAD))
-        .map { isItemOnPhone(player.getMediaItemAt(it)) }
+    val window = WakeModePolicy.window(player.currentMediaItemIndex, player.mediaItemCount) ?: return
+    val ahead = window.map { isItemOnPhone(player.getMediaItemAt(it)) }
     val mode = if (WakeModePolicy.localOnly(ahead)) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK
     if (mode != wakeMode) {
         wakeMode = mode
@@ -100,7 +98,7 @@ internal fun PlaybackService.prefetchUpcoming() {
     val s = c.session.settings.value
     val count = PrefetchPolicy.count(metered, if (metered) s.mobileBitrate else s.wifiBitrate)
     if (count == 0) return
-    val next = (player.currentMediaItemIndex + 1 until minOf(player.mediaItemCount, player.currentMediaItemIndex + 1 + count))
+    val next = PrefetchPolicy.window(player.currentMediaItemIndex, player.mediaItemCount, count)
         .map { player.getMediaItemAt(it).mediaId }
         .filterNot(c.downloads::isDownloaded)
     if (next.isEmpty()) return
@@ -122,7 +120,21 @@ internal fun PlaybackService.prefetchUpcoming() {
 
 /** Forgets pinned bitrates except for the current song and the few prefetched after it. */
 internal fun PlaybackService.unpinPassedSongs() {
-    val cur = player.currentMediaItemIndex
-    val keep = (cur..minOf(player.mediaItemCount - 1, cur + PREFETCH_COUNT)).mapTo(HashSet()) { player.getMediaItemAt(it).mediaId }
+    val keep = PrefetchPolicy.pinnedWindow(player.currentMediaItemIndex, player.mediaItemCount, PREFETCH_COUNT)
+        .mapTo(HashSet()) { player.getMediaItemAt(it).mediaId }
     pinnedBitrates.keys.retainAll(keep)
+}
+
+/** Which bitrate a song streams at. */
+internal object StreamQuality {
+    /**
+     * A song already completely in the cache at some bitrate ([cached]) keeps it, so it plays with no
+     * connection; otherwise the setting for this connection. [metered] is only asked when nothing is cached.
+     */
+    fun choose(cached: Int?, metered: () -> Boolean, wifiKbps: Int, mobileKbps: Int): Int =
+        cached ?: if (metered()) mobileKbps else wifiKbps
+
+    /** Bitrates to look for in the cache, most likely first: the one this song is pinned to, then the settings. */
+    fun cacheCandidates(pinned: Int?, wifiKbps: Int, mobileKbps: Int): List<Int> =
+        listOfNotNull(pinned, wifiKbps, mobileKbps).distinct()
 }
