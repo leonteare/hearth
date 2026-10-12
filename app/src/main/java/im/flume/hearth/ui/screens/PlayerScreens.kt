@@ -27,6 +27,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.ui.components.SongInfoDialog
 import im.flume.hearth.ui.theme.Dimens
@@ -731,6 +734,8 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
                     player.remove(e)
                     actions.showUndo("Removed from queue") { player.restore(e, after = before, before = after) }
                 },
+                onMoveUp = local.indexOfFirst { it.key == e.key }.takeIf { it > 0 }?.let { i -> { player.moveAfter(e, local.getOrNull(i - 2)) } },
+                onMoveDown = local.indexOfFirst { it.key == e.key }.takeIf { it in 0 until local.lastIndex }?.let { i -> { player.moveAfter(e, local[i + 1]) } },
             ) {
                 QueueRow(
                     e,
@@ -844,16 +849,28 @@ private fun SwipeableQueueRow(
     onRevealChange: (Boolean) -> Unit,
     onPlayNext: () -> Unit,
     onRemove: () -> Unit,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val reducedMotion = im.flume.hearth.ui.theme.LocalReducedMotion.current
+    // Swiping and dragging can't be done with TalkBack or switch access, so the same moves are offered as actions.
+    val a11yActions = listOfNotNull(
+        CustomAccessibilityAction("Play next") { onPlayNext(); true },
+        CustomAccessibilityAction("Remove") { onRemove(); true },
+        onMoveUp?.let { up -> CustomAccessibilityAction("Move up") { up(); true } },
+        onMoveDown?.let { down -> CustomAccessibilityAction("Move down") { down(); true } },
+    )
     val revealPx = with(density) { 104.dp.toPx() }
     val triggerPx = with(density) { 96.dp.toPx() }
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(revealed) { if (!revealed && offset.value < 0f) offset.animateTo(0f) }
+    // With animations switched off on the phone, rows jump into place instead of sliding.
+    suspend fun settle(to: Float) = if (reducedMotion) offset.snapTo(to) else { offset.animateTo(to); Unit }
+    LaunchedEffect(revealed) { if (!revealed && offset.value < 0f) settle(0f) }
 
-    Box(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().semantics { customActions = a11yActions }) {
         val o = offset.value
         val accent = MaterialTheme.colorScheme.primary
         if (o > 0f) {
@@ -889,13 +906,13 @@ private fun SwipeableQueueRow(
                             scope.launch {
                                 val v = offset.value
                                 when {
-                                    v >= triggerPx -> { onPlayNext(); offset.animateTo(0f) }
-                                    v < -revealPx / 2 -> { onRevealChange(true); offset.animateTo(-revealPx) }
-                                    else -> { onRevealChange(false); offset.animateTo(0f) }
+                                    v >= triggerPx -> { onPlayNext(); settle(0f) }
+                                    v < -revealPx / 2 -> { onRevealChange(true); settle(-revealPx) }
+                                    else -> { onRevealChange(false); settle(0f) }
                                 }
                             }
                         },
-                        onDragCancel = { scope.launch { offset.animateTo(0f) } },
+                        onDragCancel = { scope.launch { settle(0f) } },
                     ) { change, drag ->
                         change.consume()
                         scope.launch { offset.snapTo((offset.value + drag).coerceIn(-revealPx * 1.3f, triggerPx * 1.6f)) }

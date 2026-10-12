@@ -32,6 +32,7 @@ import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenKey
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import im.flume.hearth.data.RequestEntity
 import im.flume.hearth.data.RequestIntent
@@ -153,7 +154,7 @@ fun DownloadsScreen() {
                 // Podcasts and audiobooks download on their own; their rows sit in the same sections as songs.
                 spokenSection("sd", "Downloading", spokenDownloading)
                 spokenSection("sq", "Up next", spokenQueued)
-                spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Retry") } }
+                spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Try again") } }
             } else {
                 item(key = "status") {
                     val (title, body) = when {
@@ -181,7 +182,7 @@ fun DownloadsScreen() {
                                 }) { Text("Use mobile data") }
                             }
                             if (backingOff && !userPaused && !storageFull) {
-                                TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry now") }
+                                TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
                             }
                             TextButton(onClick = { confirmCancelAll = true }) { Text("Cancel all", color = TextSecondary) }
                         },
@@ -202,11 +203,11 @@ fun DownloadsScreen() {
                     spokenRows("sq", spokenQueued)
                 }
                 if (failed.isEmpty()) {
-                    spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Retry") } }
+                    spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Try again") } }
                 } else {
                     item(key = "f-head") {
                         SectionHeader("Couldn't download") {
-                            if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Retry") }
+                            if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
                         }
                         // Storage and backoff problems are already explained in the status card.
                         if (!storageFull && !backingOff) lastError?.let { MoreLine(it) }
@@ -218,7 +219,7 @@ fun DownloadsScreen() {
                     }
                     if (spokenFailed.isNotEmpty()) {
                         item(key = "sf-retry") {
-                            TextButton(onClick = { c.spoken.downloads.retryFailed() }, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Retry podcasts and audiobooks") }
+                            TextButton(onClick = { c.spoken.downloads.retryFailed() }, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Try podcasts and audiobooks again") }
                         }
                         spokenRows("sf", spokenFailed)
                     }
@@ -382,8 +383,12 @@ private fun SpokenDownloadListRow(r: SpokenDownloadRow, modifier: Modifier = Mod
         im.flume.hearth.ui.components.MenuItem(
             if (d.state == SpokenDownloadState.DONE) "Remove download" else "Cancel download",
             Icons.Default.Close,
-        ) { menu = false; c.spoken.downloads.remove(d.libraryItemId, d.episodeId) }
-        im.flume.hearth.ui.components.MenuItem(if (d.isBook) "Go to book" else "Go to show", Icons.Default.Podcasts) {
+        ) {
+            menu = false
+            if (d.state == SpokenDownloadState.DONE && !d.isBook) removeEpisodeDownload(c, actions, d.libraryItemId, d.episodeId)
+            else c.spoken.downloads.remove(d.libraryItemId, d.episodeId)
+        }
+        im.flume.hearth.ui.components.MenuItem(if (d.isBook) "Go to book" else "Go to show", if (d.isBook) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.Podcasts) {
             menu = false; actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId))
         }
     }

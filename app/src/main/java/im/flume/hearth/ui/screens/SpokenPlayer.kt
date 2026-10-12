@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.outlined.Bedtime
@@ -418,10 +419,12 @@ private fun SpokenPlayerMenu(state: PlayerUiState, spoken: SpokenNowPlaying, inf
         if (spoken.canGoBackToMusic) {
             MenuItem("Back to music", Icons.Default.LibraryMusic) { open = false; c.player.backToMusic() }
         }
-        MenuItem(if (spoken.isBook) "Go to book" else "Go to show", Icons.Default.Podcasts) { open = false; openPage() }
+        MenuItem(if (spoken.isBook) "Go to book" else "Go to show", if (spoken.isBook) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.Podcasts) { open = false; openPage() }
         if (!im.flume.hearth.spoken.LocalBookIds.isLocal(spoken.libraryItemId)) when (info.downloadState) {
             SpokenDownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) {
-                open = false; c.spoken.downloads.remove(key.libraryItemId, key.episodeId)
+                open = false
+                if (key.episodeId.isNotEmpty()) removeEpisodeDownload(c, actions, key.libraryItemId, key.episodeId)
+                else c.spoken.downloads.remove(key.libraryItemId, key.episodeId)
             }
             SpokenDownloadState.QUEUED, SpokenDownloadState.DOWNLOADING -> MenuItem("Cancel download", Icons.Default.Close) {
                 open = false; c.spoken.downloads.remove(key.libraryItemId, key.episodeId)

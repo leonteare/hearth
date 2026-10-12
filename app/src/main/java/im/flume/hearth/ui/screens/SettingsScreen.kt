@@ -253,7 +253,7 @@ fun StorageSettings() {
             c.downloads.schedule()
         }
         if (downloadedBytes > 0) {
-            Clickable("Remove all downloads", color = Destructive) { confirmRemoveAll = true }
+            Clickable("Remove all downloaded music", color = Destructive) { confirmRemoveAll = true }
         }
 
         Section("Streaming cache")
@@ -280,8 +280,8 @@ fun StorageSettings() {
     if (confirmRemoveAll) {
         AlertDialog(
             onDismissRequest = { confirmRemoveAll = false },
-            title = { Text("Remove all downloads?") },
-            text = { Text("Everything downloaded to this phone will be deleted. You can download it again later.") },
+            title = { Text("Remove all downloaded music?") },
+            text = { Text("All the music downloaded to this phone will be deleted. Downloaded podcasts and audiobooks stay. You can download the music again later.") },
             confirmButton = {
                 TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
                     Text("Remove", color = Destructive)
@@ -470,7 +470,7 @@ private fun PodcastsAndAudiobooksAccount() {
             actions.showMessage("Signed in. Your podcasts and audiobooks are on their way")
         }
     }
-    (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed: last refresh: $it" })?.let {
+    (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed to refresh: $it" })?.let {
         Text(
             it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),

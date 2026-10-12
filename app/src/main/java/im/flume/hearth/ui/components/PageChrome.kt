@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.NoticeDot
@@ -62,7 +64,7 @@ fun TopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
-        modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(end = 4.dp),
+        modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BackButton(onBack)
@@ -71,7 +73,7 @@ fun TopBar(
             style = MaterialTheme.typography.titleLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).semantics { heading() },
         )
         DownloadsIndicator()
         actions()
@@ -89,7 +91,7 @@ fun PageHeader(title: String, actions: @Composable RowScope.() -> Unit = {}) {
             .heightIn(min = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f).semantics { heading() })
         DownloadsIndicator()
         actions()
     }
@@ -164,7 +166,7 @@ fun SectionHeader(
         ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.titleLarge, color = color, modifier = Modifier.weight(1f).semantics { heading() })
         trailing?.invoke(this)
     }
 }

@@ -7,6 +7,11 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalContext
+import android.provider.Settings
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
@@ -39,8 +44,18 @@ val Surface = Color(0xFF1C1C1C)
 val SurfaceHigh = Color(0xFF282828)
 val TextSecondary = Color(0xFFB3B3B3)
 
-/** Text alpha for music that isn't on the server yet (rows, cards, headers). Cover art is never dimmed. */
-const val NotOnServerAlpha = 0.55f
+/**
+ * Alpha for dimmed text: music that isn't on the server yet, or can't play offline. Cover art is never
+ * dimmed. 0.7 is the lowest that keeps [TextSecondary] readable on [Background] (4.5:1, checked in
+ * ContrastTest); the cloud icons next to dimmed rows carry the rest of the meaning.
+ */
+const val DimmedTextAlpha = 0.7f
+
+/** Text alpha for music that isn't on the server yet (rows, cards, headers). */
+const val NotOnServerAlpha = DimmedTextAlpha
+
+/** Secondary text dimmed for something that can't be used right now, still readable on [Background]. */
+val DimmedText = TextSecondary.copy(alpha = DimmedTextAlpha)
 
 /** Tile colour for Liked Songs (shortcuts, quick tiles, page header). */
 val LikedColor = Color(0xFF5038A0)
@@ -147,7 +162,19 @@ private val Type = Typography(
 /** Title under a card's cover: body size, semi-bold. */
 val CardTitleStyle: TextStyle @Composable get() = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
 
+/**
+ * True when the phone's "Remove animations" setting is on (animator duration scale 0). Slides and
+ * crossfades that are only decoration are skipped then, since motion can make some people feel unwell.
+ */
+val LocalReducedMotion = staticCompositionLocalOf { false }
+
 @Composable
 fun HearthTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = colors(Accent), typography = Type, content = content)
+    val resolver = LocalContext.current.contentResolver
+    val reducedMotion = remember(resolver) {
+        runCatching { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+    }
+    CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+        MaterialTheme(colorScheme = colors(Accent), typography = Type, content = content)
+    }
 }

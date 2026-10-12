@@ -1,5 +1,6 @@
 package im.flume.hearth.ui.screens
 
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,7 +118,18 @@ fun HomeScreen() {
             }
         }
         (sync as? SyncState.Failed)?.let { f ->
-            item { Text("Library sync failed: ${f.message}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
+            item {
+                im.flume.hearth.ui.components.BannerCard(
+                    title = "Library sync failed",
+                    body = f.message,
+                    icon = Icons.Default.CloudOff,
+                    actions = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            c.appScope.launch { c.sync.fullSync(runCatching { c.api.scanStatus()?.lastScan }.getOrNull()) }
+                        }) { Text("Try again") }
+                    },
+                )
+            }
         }
 
         // Always the same four, so they're where your thumb expects. Downloads lives in Your Library.

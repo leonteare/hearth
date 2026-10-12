@@ -141,9 +141,7 @@ class LibrarySync(
         } catch (e: Exception) {
             val message = when (e) {
                 is java.net.UnknownHostException -> "Couldn't find the server (is Tailscale connected?)"
-                is java.net.ConnectException, is java.net.SocketTimeoutException -> "Couldn't reach the server"
-                is java.io.IOException -> "Lost connection to the server"
-                else -> e.message ?: "Sync failed"
+                else -> im.flume.hearth.util.userMessage(e, "Sync failed")
             }.let { im.flume.hearth.util.scrubSecrets(it) } // URLs can carry the login token
             _state.value = SyncState.Failed(message)
         }

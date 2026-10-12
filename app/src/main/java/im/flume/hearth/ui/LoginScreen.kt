@@ -65,6 +65,8 @@ fun LoginScreen() {
         c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
     }
 
+    var errorHelp by rememberSaveable { mutableStateOf<String?>(null) }
+    var showHelp by rememberSaveable { mutableStateOf(false) }
     signedIn?.let { creds -> return SpokenStep(onDone = { finish(creds) }) }
 
     Column(
@@ -94,10 +96,16 @@ fun LoginScreen() {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        // The technical hints (Tailscale, certificates) are there for whoever set up the server, not up front.
+        errorHelp?.let { help ->
+            androidx.compose.material3.TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "Less info" else "More info") }
+            if (showHelp) Text(help, color = im.flume.hearth.ui.theme.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        }
         Button(
             onClick = {
                 busy = true
                 error = null
+                errorHelp = null
                 scope.launch {
                     val creds = Credentials.fromPassword(url, user, pass)
                     val result = runCatching { c.api.ping(creds) }
@@ -106,13 +114,14 @@ fun LoginScreen() {
                         // Already signed in to podcasts & audiobooks (e.g. signed out of music only): no need to ask.
                         if (c.spoken.account.value?.needsSignIn == false) finish(creds) else signedIn = creds
                     }.onFailure { e ->
-                        error = if (generateSequence(e) { it.cause }.any { it is javax.net.ssl.SSLException || it is java.security.cert.CertificateException }) {
-                            "Couldn't sign in: the server's HTTPS certificate isn't trusted by this phone. " +
-                                "If it's your own certificate (e.g. Caddy's local one), install its root certificate on the phone, " +
+                        showHelp = false
+                        if (generateSequence(e) { it.cause }.any { it is javax.net.ssl.SSLException || it is java.security.cert.CertificateException }) {
+                            error = "Couldn't sign in: this phone doesn't trust the server's security certificate."
+                            errorHelp = "If it's your own certificate (e.g. Caddy's local one), install its root certificate on the phone, " +
                                 "or use a plain http:// address over Tailscale."
                         } else {
-                            "Couldn't sign in: ${im.flume.hearth.util.userMessage(e)}.\n" +
-                                "Check the address and that Tailscale is connected."
+                            error = "Couldn't sign in. ${im.flume.hearth.util.userMessage(e)}"
+                            errorHelp = "Check the server address, and that Tailscale is connected if your server uses it."
                         }
                     }
                 }

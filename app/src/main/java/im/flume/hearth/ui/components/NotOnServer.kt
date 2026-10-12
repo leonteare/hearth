@@ -147,6 +147,9 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
     /** The ⋯ menu of something on its way (Downloads page). */
     var requestMenu by mutableStateOf<RequestEntity?>(null)
 
+    /** Why [what] failed in plain words; with no network at all that's the connection, whatever [e] says. */
+    private fun whyFailed(what: String, e: Throwable?) = im.flume.hearth.util.couldNot(what, e, offline = c.network.cannotStream)
+
     fun preview(t: TidalTrack) {
         if (!c.network.isOnline.value) { actions.showMessage("Preview unavailable"); return }
         c.preview.toggle(t)
@@ -204,7 +207,7 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
                     }
                     actions.showUndo(message) { c.requests.request(r.asDraft(), r.like, r.toPhone) }
                 }
-                .onFailure { actions.showMessage("Couldn't stop it right now (offline?)") }
+                .onFailure { actions.showMessage(whyFailed("Couldn't stop it", it)) }
         }
     }
 
@@ -221,13 +224,14 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
             batch.withLock {
                 var failed = 0
                 var asked = 0
+                var lastError: Throwable? = null
                 tracks.forEach { t ->
                     runCatching { c.requests.request(c.requests.track(t), like = false, toPhone = false) }
                         .onSuccess { if (it == RequestsRepository.Outcome.REQUESTED || it == RequestsRepository.Outcome.ALREADY_ON_SERVER) asked++ }
-                        .onFailure { failed++ }
+                        .onFailure { failed++; lastError = it }
                 }
                 when {
-                    failed == tracks.size -> actions.showMessage("Couldn't get them right now (offline?)")
+                    failed == tracks.size -> actions.showMessage(whyFailed("Couldn't get them", lastError))
                     asked > 0 -> actions.showMessage(message)
                 }
             }
@@ -258,7 +262,7 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
                         }
                     )
                 }
-                .onFailure { actions.showMessage("Couldn't get \"$title\" right now (offline?)") }
+                .onFailure { actions.showMessage(whyFailed("Couldn't get \"$title\"", it)) }
         }
     }
 
@@ -266,7 +270,7 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
         c.appScope.launch {
             runCatching { c.requests.retry(r) }
                 .onSuccess { actions.showMessage("Trying \"${r.title}\" again") }
-                .onFailure { actions.showMessage("Couldn't try again right now (offline?)") }
+                .onFailure { actions.showMessage(whyFailed("Couldn't try again", it)) }
         }
     }
 
@@ -275,7 +279,7 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
         c.appScope.launch {
             runCatching { c.requests.cancel(r) }
                 .onSuccess { actions.showUndo("Stopped getting \"${r.title}\"") { c.requests.request(r.asDraft(), r.like, r.toPhone) } }
-                .onFailure { actions.showMessage("Couldn't stop it right now (offline?)") }
+                .onFailure { actions.showMessage(whyFailed("Couldn't stop it", it)) }
         }
     }
 
@@ -305,7 +309,7 @@ class GetMusic(private val c: AppContainer, private val actions: Actions) {
                     val top = p?.topTracks.orEmpty()
                     val owned = runCatching { c.requests.ownedTracks(top) }.getOrDefault(emptyMap())
                     val missing = top.filter { it.id !in owned }
-                    if (p == null) actions.showMessage("Couldn't get their music right now (offline?)")
+                    if (p == null) actions.showMessage(whyFailed("Couldn't get their music", null))
                     else if (missing.isEmpty()) actions.showMessage("Their popular songs are already on your server")
                     else getTracks(missing, "Getting ${missing.size} popular songs by ${artist.name} onto your server")
                 }
@@ -372,7 +376,7 @@ fun GetHeart(request: RequestEntity?, size: Dp = 22.dp, onClick: () -> Unit) {
     }) {
         Icon(
             if (coming) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            if (coming) "Don't like it" else "Like",
+            if (coming) "Don't add to Liked Songs" else "Like",
             tint = if (coming) MaterialTheme.colorScheme.primary else TextSecondary,
             modifier = Modifier.size(size),
         )
@@ -585,7 +589,7 @@ fun GetMusicSheets(get: GetMusic) {
             }
             if (isComing(r) && r.type != TidalType.ARTIST.api) {
                 val album = r.type == TidalType.ALBUM.api
-                if (r.like && r.toPhone) MenuItem(if (album) "Don't save it" else "Don't like it", Icons.Default.FavoriteBorder) { close(); get.dropIntent(r, like = true) }
+                if (r.like && r.toPhone) MenuItem(if (album) "Don't add to Your Library" else "Don't add to Liked Songs", Icons.Default.FavoriteBorder) { close(); get.dropIntent(r, like = true) }
                 if (r.toPhone && r.like) MenuItem("Don't download to phone", Icons.Outlined.ArrowCircleDown) { close(); get.dropIntent(r, toPhone = true) }
                 if (r.like || r.toPhone) MenuItem("Only add to server", Icons.Outlined.CloudUpload) { close(); get.serverOnly(r) }
             }
@@ -619,7 +623,7 @@ private fun IntentItems(
 ) {
     val get = LocalGetMusic.current
     val coming = isComing(request)
-    if (willLike(request)) MenuItem(if (album) "Don't save it" else "Don't like it", Icons.Default.Favorite) { close(); onLike() }
+    if (willLike(request)) MenuItem(if (album) "Don't add to Your Library" else "Don't add to Liked Songs", Icons.Default.Favorite) { close(); onLike() }
     else MenuItem(if (album) "Save" else "Like", Icons.Default.FavoriteBorder) { close(); onLike() }
     if (willDownload(request)) MenuItem("Don't download to phone", Icons.Outlined.ArrowCircleDown) { close(); onDownload() }
     else MenuItem("Download to phone", Icons.Outlined.ArrowCircleDown) { close(); onDownload() }

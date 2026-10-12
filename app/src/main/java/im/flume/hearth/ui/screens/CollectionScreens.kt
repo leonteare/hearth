@@ -454,7 +454,14 @@ fun CollectionScreen(
                 leading = if (showTrackNumbers) song.track.takeIf { it > 0 }?.toString() ?: "–" else null,
                 selected = selection?.let { key in it },
                 onLongPress = {
-                    if (selection == null) usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
+                    if (selection == null) {
+                        usage.track(im.flume.hearth.data.Usage.MULTI_SELECT)
+                        // Long-press opens the song menu on other pages, so explain the first time it selects here.
+                        if (!c.session.selectHintShown) {
+                            c.session.selectHintShown = true
+                            actions.showMessage("Selecting songs: tap more to add them, or use the bar below")
+                        }
+                    }
                     selection = (selection ?: emptySet()) + key
                 },
             )
@@ -645,10 +652,10 @@ fun PlaylistScreen(id: String) {
                         .onSuccess { removal ->
                             if (removal != null) actions.showUndo("Removed from playlist") {
                                 runCatching { c.library.undoRemoval(id, removal) }
-                                    .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't put the song back (offline?)")) }
+                                    .onFailure { actions.showMessage(c.library.editError(it, access.owner, im.flume.hearth.util.couldNot("Couldn't put the song back", it, !c.network.isOnline.value))) }
                             }
                         }
-                        .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't remove the song (offline?)")) }
+                        .onFailure { actions.showMessage(c.library.editError(it, access.owner, im.flume.hearth.util.couldNot("Couldn't remove the song", it, !c.network.isOnline.value))) }
                 }
             }
         } else null,
@@ -699,7 +706,7 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                 .onSuccess { actions.showMessage(done) }
                 .onFailure { e ->
                     actions.showMessage(
-                        if (e is im.flume.hearth.api.SubsonicException) c.library.editError(e, access.owner, "Couldn't change the photo (offline?)")
+                        if (e is im.flume.hearth.api.SubsonicException) c.library.editError(e, access.owner, im.flume.hearth.util.couldNot("Couldn't change the photo", e, !c.network.isOnline.value))
                         else photoError(e) { c.session.vault.clear(); c.nativeApi.forgetSession() }
                     )
                 }
@@ -758,7 +765,7 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                     renaming = false
                     c.appScope.launch {
                         runCatching { c.library.renamePlaylist(id, newName.trim()) }
-                            .onFailure { actions.showMessage(c.library.editError(it, access.owner, "Couldn't rename the playlist (offline?)")) }
+                            .onFailure { actions.showMessage(c.library.editError(it, access.owner, im.flume.hearth.util.couldNot("Couldn't rename the playlist", it, !c.network.isOnline.value))) }
                     }
                 }) { Text("Save") }
             },
@@ -800,7 +807,7 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
                                 .onSuccess { c.downloads.unpinAndRemove(DownloadRepository.KIND_PLAYLIST, id, songIds) }
                                 .isSuccess
                         }.await()
-                        if (ok) back?.onBackPressed() else actions.showMessage("Couldn't delete the playlist (offline?)")
+                        if (ok) back?.onBackPressed() else actions.showMessage(im.flume.hearth.util.couldNot("Couldn't delete the playlist", null, !c.network.isOnline.value))
                     }
                 }) { Text("Delete", color = Destructive) }
             },
@@ -843,7 +850,7 @@ fun PlaylistEditScreen(id: String) {
                     val error = c.appScope.async { runCatching { c.library.savePlaylistEdit(id, start, ids) }.exceptionOrNull() }.await()
                     saving = false
                     if (error == null) back?.onBackPressed()
-                    else actions.showMessage(c.library.editError(error, owner, "Couldn't save the new order (offline?)"))
+                    else actions.showMessage(c.library.editError(error, owner, im.flume.hearth.util.couldNot("Couldn't save the new order", error, !c.network.isOnline.value)))
                 }
             }) { Text(if (saving) "Saving…" else "Save") }
         }

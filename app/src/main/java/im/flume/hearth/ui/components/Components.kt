@@ -94,6 +94,8 @@ import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.DividerColor
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.DimmedText
+import androidx.compose.material.icons.filled.CloudOff
 
 /** Everything a song row or card can trigger. Provided once at the root. */
 interface Actions {
@@ -113,8 +115,12 @@ interface Actions {
     fun startArtistRadio(artistId: String, name: String)
     /** Opens the "Add to playlist" picker for these songs. */
     fun addToPlaylist(songIds: List<String>)
-    /** Shows [message] with an Undo button that runs [undo]. */
-    fun showUndo(message: String, undo: suspend () -> Unit)
+    /**
+     * Shows [message] with an Undo button that runs [undo]. Undo stays up for longer by default ([long]),
+     * because it usually follows something destructive and people need time to notice and reach it;
+     * pass false for harmless things like "Playing next".
+     */
+    fun showUndo(message: String, long: Boolean = true, undo: suspend () -> Unit)
     /** Shows a short [message], e.g. when something couldn't be saved. */
     fun showMessage(message: String) {}
     /** Opens the "New playlist" dialog. */
@@ -134,6 +140,9 @@ interface Actions {
 }
 
 val LocalActions = compositionLocalOf<Actions> { error("Actions not provided") }
+
+/** Shown when someone taps a song that can't play because it isn't on the phone and there's no connection. */
+const val NOT_DOWNLOADED_OFFLINE = "This song isn't downloaded, and you're offline"
 
 /**
  * What a tab page should show when it was opened by [Actions.openLibraryTab] or
@@ -200,6 +209,7 @@ fun PlayerCoverArt(
 ) {
     val actions = LocalActions.current
     val context = LocalContext.current
+    val reducedMotion = im.flume.hearth.ui.theme.LocalReducedMotion.current
     // The memory-cache key of the cover on screen now, used as the next one's placeholder.
     var showing by remember { mutableStateOf<MemoryCache.Key?>(null) }
     val m = (if (size != null) modifier.size(size) else modifier)
@@ -213,7 +223,7 @@ fun PlayerCoverArt(
     }
     // Built once per cover, with whatever was showing at that moment as its placeholder.
     val request = remember(data) {
-        ImageRequest.Builder(context).data(data).placeholderMemoryCacheKey(showing).crossfade(150).build()
+        ImageRequest.Builder(context).data(data).placeholderMemoryCacheKey(showing).apply { if (!reducedMotion) crossfade(150) }.build()
     }
     SubcomposeAsyncImage(
         model = request,
@@ -301,6 +311,7 @@ fun SongRow(
     subtitle: String = song.artist,
 ) {
     val rowState by rememberSongRowState(song.id)
+    val actions = LocalActions.current
     val haptics = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
     val dl = rowState.downloadState
@@ -312,8 +323,9 @@ fun SongRow(
             .fillMaxWidth()
             .background(if (selected == true) accent.copy(alpha = 0.12f) else Color.Transparent)
             .combinedClickable(
-                enabled = playable || selected != null,
-                onClick = onClick,
+                // Still tappable when it can't play, so a tap explains why instead of doing nothing.
+                onClick = { if (playable || selected != null) onClick() else actions.showMessage(NOT_DOWNLOADED_OFFLINE) },
+                onLongClickLabel = if (onLongPress != null) "Select songs" else "Song options",
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (onLongPress != null) onLongPress() else menu = true
@@ -344,7 +356,7 @@ fun SongRow(
                 overflow = TextOverflow.Ellipsis,
                 color = when {
                     isPlaying -> accent
-                    !playable -> TextSecondary.copy(alpha = 0.5f)
+                    !playable -> DimmedText
                     else -> Color.White
                 },
                 style = MaterialTheme.typography.bodyLarge,
@@ -353,14 +365,15 @@ fun SongRow(
                 when (dl) {
                     DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = accent)
                     DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, "Downloading", Modifier.size(14.dp), tint = TextSecondary)
-                    else -> {}
+                    // Not just dimmer text: an icon says why it can't play.
+                    else -> if (!playable) Icon(Icons.Default.CloudOff, "Not downloaded", Modifier.size(14.dp), tint = DimmedText)
                 }
-                if (dl != null && dl != DownloadState.FAILED) Spacer(Modifier.width(4.dp))
+                if ((dl != null && dl != DownloadState.FAILED) || !playable) Spacer(Modifier.width(4.dp))
                 Text(
                     subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = TextSecondary.copy(alpha = if (playable) 1f else 0.5f),
+                    color = if (playable) TextSecondary else DimmedText,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -380,12 +393,12 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemov
     var info by remember { mutableStateOf(false) }
     ActionSheet(expanded, onDismiss, title = song.title, subtitle = song.artist, coverArt = song.coverArt, fallback = song.album) {
         MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { actions.playNext(listOf(song.id)); onDismiss() }
+        MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { actions.addToQueue(listOf(song.id)); onDismiss() }
         MenuItem("Start radio", Icons.Default.Radio) { actions.startRadio(song); onDismiss() }
         MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
         onRemoveFromPlaylist?.let { remove ->
             MenuItem("Remove from this playlist", Icons.Default.RemoveCircleOutline) { remove(); onDismiss() }
         }
-        MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { actions.addToQueue(listOf(song.id)); onDismiss() }
         MenuItem(
             if (song.starred) "Remove from Liked Songs" else "Add to Liked Songs",
             if (song.starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
