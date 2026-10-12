@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -30,7 +31,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.core.ui.theme.Background
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 /** Diameter of the big play button, and of the glyph inside it. */
@@ -45,10 +45,11 @@ private val TickWidth = 2.dp
  * It also swallows taps so they don't reach the page underneath, and keeps content clear of the system
  * bars. Put any drag offset (graphicsLayer) before it, as the player screens do.
  */
-// Not composable, so it can't read HearthTheme.colors: it uses the default skin's page background.
-@Suppress("DEPRECATION")
+// Composable so the fade ends on the skin's page background.
+@Composable
+@ReadOnlyComposable
 fun Modifier.playerBackdrop(topColor: Color): Modifier = this
-    .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
+    .background(Brush.verticalGradient(listOf(topColor, HearthTheme.colors.background, HearthTheme.colors.background)))
     .clickable(enabled = false) {}
     .safeDrawingPadding()
 
