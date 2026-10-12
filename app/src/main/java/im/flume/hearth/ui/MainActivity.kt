@@ -1,5 +1,6 @@
 package im.flume.hearth.ui
 
+import im.flume.hearth.EXTRA_ROUTE
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
@@ -71,9 +72,5 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         container.player.disconnect()
         super.onStop()
-    }
-
-    companion object {
-        const val EXTRA_ROUTE = "im.flume.hearth.ROUTE"
     }
 }

@@ -1,5 +1,6 @@
 package im.flume.hearth.update
 
+import im.flume.hearth.domainContainer
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,8 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.edit
-import im.flume.hearth.BuildConfig
-import im.flume.hearth.container
+import im.flume.hearth.core.domain.BuildConfig
 import im.flume.hearth.util.scrubSecrets
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CoroutineScope
@@ -242,6 +242,6 @@ class InstallResultReceiver : BroadcastReceiver() {
             val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
             confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let(context::startActivity)
         }
-        context.container.updater.onInstallResult(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
+        context.domainContainer.updater.onInstallResult(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
     }
 }

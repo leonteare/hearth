@@ -23,7 +23,6 @@ android {
         targetSdk = 36
         versionCode = versionProps.getProperty("versionCode").toInt()
         versionName = versionProps.getProperty("versionName")
-        buildConfigField("String", "UPDATE_REPO", "\"leonteare/hearth\"")
     }
 
     signingConfigs {
@@ -77,6 +76,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:network"))
     implementation(project(":core:data"))
+    implementation(project(":core:domain"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

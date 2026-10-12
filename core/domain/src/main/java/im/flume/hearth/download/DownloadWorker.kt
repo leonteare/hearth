@@ -1,5 +1,6 @@
 package im.flume.hearth.download
 
+import im.flume.hearth.domainContainer
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -11,9 +12,8 @@ import androidx.room.withTransaction
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
-import im.flume.hearth.AppContainer
-import im.flume.hearth.HearthApp
-import im.flume.hearth.R
+import im.flume.hearth.DomainContainer
+import im.flume.hearth.core.domain.R
 import im.flume.hearth.data.DownloadEntity
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.util.scrubSecrets
@@ -51,7 +51,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
     private enum class Halt { WIFI, STORAGE }
 
     override suspend fun doWork(): Result {
-        val c = (applicationContext as HearthApp).container
+        val c = applicationContext.domainContainer
         val dao = c.db.downloads()
         val repo = c.downloads
         fun paused() = c.session.settings.value.downloadsPaused
@@ -245,7 +245,7 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         else -> e.message ?: e.javaClass.simpleName
     }.let { scrubSecrets(it) } // URLs carry the login token; never show them
 
-    private suspend fun fetch(c: AppContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
+    private suspend fun fetch(c: DomainContainer, http: OkHttpClient, songId: String, dir: File, bitrate: Int): File =
         withContext(Dispatchers.IO) {
             val url = c.api.streamUrl(songId, bitrate, estimateLength = false) ?: error("Not logged in")
             val tmp = File(dir, DownloadPolicy.partName(songId, System.nanoTime()))

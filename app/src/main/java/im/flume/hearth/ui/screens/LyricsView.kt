@@ -91,9 +91,11 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
         itemsIndexed(rows) { i, row ->
             if (row.isBreak) {
                 val active = i == current
+                val start = row.start
+                val end = row.end
                 val progress = when {
-                    active && row.start != null && row.end != null && row.end > row.start ->
-                        ((pos - row.start).toFloat() / (row.end - row.start)).coerceIn(0f, 1f)
+                    active && start != null && end != null && end > start ->
+                        ((pos - start).toFloat() / (end - start)).coerceIn(0f, 1f)
                     i < current -> 1f
                     else -> 0f
                 }

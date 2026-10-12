@@ -11,7 +11,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import im.flume.hearth.R
+import im.flume.hearth.core.domain.R
 import im.flume.hearth.container
 import im.flume.hearth.crashLoggingHandler
 import im.flume.hearth.spoken.SpokenSpeed

@@ -1,5 +1,6 @@
 package im.flume.hearth
 
+import im.flume.hearth.ui.MainActivity
 import android.app.Application
 import android.content.Context
 import androidx.annotation.OptIn
@@ -42,8 +43,8 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-class HearthApp : Application(), SingletonImageLoader.Factory {
-    lateinit var container: AppContainer
+class HearthApp : Application(), SingletonImageLoader.Factory, ContainerOwner {
+    override lateinit var container: HearthContainer
         private set
 
     override fun onCreate() {
@@ -54,7 +55,7 @@ class HearthApp : Application(), SingletonImageLoader.Factory {
             writeCrash(this, "thread ${thread.name}", e)
             previous?.uncaughtException(thread, e)
         }
-        container = AppContainer(this)
+        container = HearthContainer(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
@@ -73,37 +74,38 @@ class HearthApp : Application(), SingletonImageLoader.Factory {
 }
 
 /** Hand-wired singletons; small enough that a DI framework would be overkill. */
-class AppContainer(context: Context) {
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + crashLoggingHandler(context, "app"))
+class HearthContainer(context: Context) : AppContainer {
+    override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + crashLoggingHandler(context, "app"))
 
-    val http: OkHttpClient = OkHttpClient.Builder()
+    override val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    val session = SessionStore(context)
-    val db = AppDatabase.create(context)
-    val api = SubsonicClient(http) { session.credentials.value }
-    val network = NetworkMonitor(context, api, session, appScope)
-    val downloads = DownloadRepository(context, db, session, appScope)
-    val nativeApi = NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
-    val library = LibraryRepository(db, api, downloads, session, nativeApi)
+    override val session = SessionStore(context)
+    override val db = AppDatabase.create(context)
+    override val api = SubsonicClient(http) { session.credentials.value }
+    override val network = NetworkMonitor(context, api, session, appScope)
+    override val downloads = DownloadRepository(context, db, session, appScope)
+    override val nativeApi = NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
+    override val library = LibraryRepository(db, api, downloads, session, nativeApi)
     init { downloads.onUserDownload = { ids -> library.keepMixSongs(ids) } }
-    val lyrics = LyricsRepository(api, db.lyrics())
-    val mixes = MixRepository(context, db, api, session)
-    val usage = Usage(context)
-    val sync = LibrarySync(api, db, session, onSynced = { removed, complete -> downloads.afterSync(removed, complete) })
-    val player = PlayerConnection(context)
+    override val lyrics = LyricsRepository(api, db.lyrics())
+    override val mixes = MixRepository(context, db, api, session)
+    override val usage = Usage(context)
+    override val sync = LibrarySync(api, db, session, onSynced = { removed, complete -> downloads.afterSync(removed, complete) })
+    override val player = PlayerConnection(context)
     /** Podcasts and audiobooks from Audiobookshelf (separate login, own catalogue, progress and downloads). */
-    val spoken = SpokenRepository(context, db, http, session, network, appScope)
-    val queueInfo = MutableStateFlow(QueueInfo())
-    val updater = Updater(context, http, appScope)
-    val requests = RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
+    override val spoken = SpokenRepository(context, db, http, session, network, appScope)
+    override val queueInfo = MutableStateFlow(QueueInfo())
+    override val updater = Updater(context, http, appScope)
+    override val requests = RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
     /** 30 second previews of music that isn't on the server; separate from the main player. */
-    val preview = PreviewPlayer(context, http, { requests.tidarr }, player, appScope)
+    override val preview = PreviewPlayer(context, http, { requests.tidarr }, player, appScope)
 
     /** A page to open, e.g. from a notification tap; AppRoot navigates there and clears it. */
-    val pendingRoute = MutableStateFlow<String?>(null)
+    override val pendingRoute = MutableStateFlow<String?>(null)
+    override val mainActivity = MainActivity::class.java
 
     init {
         appScope.launch(Dispatchers.Main) {
@@ -128,7 +130,7 @@ class AppContainer(context: Context) {
 
     /** Recently streamed audio, so replays are instant and work with no signal. One instance per process. */
     @OptIn(UnstableApi::class)
-    val mediaCache: SimpleCache by lazy {
+    override val mediaCache: SimpleCache by lazy {
         SimpleCache(
             File(context.cacheDir, "media"),
             LeastRecentlyUsedCacheEvictor(session.settings.value.cacheSizeMb * 1024L * 1024L),
@@ -136,5 +138,3 @@ class AppContainer(context: Context) {
         )
     }
 }
-
-val Context.container: AppContainer get() = (applicationContext as HearthApp).container

@@ -76,27 +76,6 @@ fun MediaItem.withManual(manual: Boolean): MediaItem {
     return buildUpon().setMediaMetadata(mediaMetadata.buildUpon().setExtras(extras).build()).build()
 }
 
-/** Snapshot of the full queue so it survives the app being killed (and so the car can resume it). */
-@Serializable
-data class SavedQueue(
-    val window: List<String>,
-    val manual: List<Boolean>,
-    val index: Int,
-    val positionMs: Long,
-    val pending: List<String>,
-    val context: List<String>,
-    val shuffled: Boolean,
-    val label: String,
-    val repeatMode: Int,
-    /** Set when the queue is a podcast episode or audiobook (then [window] holds its files). */
-    val spokenItemId: String? = null,
-    val spokenEpisodeId: String? = null,
-    /** Position on the whole episode/book, seconds. */
-    val spokenPositionSec: Double? = null,
-    /** Which full save this is, so a newer position-only save is only ever applied to the queue it was taken from. */
-    val revision: Long = 0,
-)
-
 /**
  * Where playback had got to in the queue saved as [revision]. Written on its own every few seconds
  * while playing, so the (possibly very long) queue isn't rewritten just because the song moved on.

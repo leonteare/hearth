@@ -53,7 +53,8 @@ private fun ContinueCard(item: ContinueItem, c: AppContainer, actions: Actions) 
         subtitle = listOfNotNull(item.subtitle, SpokenFormat.remaining(item.durationSec - item.positionSec)).joinToString(" · "),
         subtitleLines = 2,
         onClick = {
-            if (item.episodeId != null) playEpisode(c, actions, item.libraryItemId, item.episodeId, downloaded)
+            val episodeId = item.episodeId
+            if (episodeId != null) playEpisode(c, actions, item.libraryItemId, episodeId, downloaded)
             else playBook(c, actions, item.libraryItemId, downloaded)
         },
         onLongClick = { actions.open(if (item.isBook) bookRoute(item.libraryItemId) else podcastRoute(item.libraryItemId)) },

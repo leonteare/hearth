@@ -294,11 +294,12 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
                     is ShowListEntry.Episode -> {
                         val e = entry.episode
                         val server = e.server
+                        val feed = e.feed
                         when {
                             server != null -> EpisodeListRow(server, Modifier.animateItem())
-                            e.feed != null && showFeedUrl != null -> FeedEpisodeRow(
-                                e.feed, p?.id, showFeedUrl, title,
-                                fetches[c.spoken.feeds.fetchKey(showFeedUrl, e.feed.key)], Modifier.animateItem(),
+                            feed != null && showFeedUrl != null -> FeedEpisodeRow(
+                                feed, p?.id, showFeedUrl, title,
+                                fetches[c.spoken.feeds.fetchKey(showFeedUrl, feed.key)], Modifier.animateItem(),
                             )
                         }
                     }

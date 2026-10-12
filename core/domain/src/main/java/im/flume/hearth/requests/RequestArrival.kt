@@ -1,12 +1,14 @@
 package im.flume.hearth.requests
 
+import im.flume.hearth.domainContainer
+import im.flume.hearth.EXTRA_ROUTE
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
-import im.flume.hearth.R
+import im.flume.hearth.core.domain.R
 import im.flume.hearth.api.TidalType
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.ArtistEntity
@@ -18,7 +20,6 @@ import im.flume.hearth.data.RequestTracking
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.toEntity
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.MainActivity
 import kotlinx.coroutines.launch
 
 /*
@@ -146,9 +147,9 @@ internal fun RequestsRepository.notifyArrival(note: RequestIntent.Note) {
     runCatching {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "New music", NotificationManager.IMPORTANCE_DEFAULT))
-        val intent = Intent(context, MainActivity::class.java)
+        val intent = Intent(context, context.domainContainer.mainActivity)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            .putExtra(MainActivity.EXTRA_ROUTE, route ?: "downloads")
+            .putExtra(EXTRA_ROUTE, route ?: "downloads")
         val id = key.hashCode()
         val pending = PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(context, CHANNEL)

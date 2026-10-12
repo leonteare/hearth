@@ -1,5 +1,6 @@
 package im.flume.hearth.spoken
 
+import im.flume.hearth.domainContainer
 import android.content.Context
 import android.os.Build
 import androidx.work.BackoffPolicy
@@ -10,8 +11,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import im.flume.hearth.BuildConfig
-import im.flume.hearth.HearthApp
+import im.flume.hearth.core.domain.BuildConfig
 import im.flume.hearth.api.AbsAuthException
 import im.flume.hearth.api.AbsClient
 import im.flume.hearth.api.AbsHttpException
@@ -343,7 +343,7 @@ class SpokenProgress(
 /** Sends queued progress once there's a connection; retried with backoff while the server can't be reached. */
 class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val spoken = (applicationContext as HearthApp).container.spoken
+        val spoken = applicationContext.domainContainer.spoken
         if (spoken.store.account.value == null) return Result.success()
         return if (spoken.progress.flush()) Result.success() else if (runAttemptCount < 20) Result.retry() else Result.success()
     }
