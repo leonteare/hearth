@@ -44,7 +44,7 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 | Module | Holds |
 |---|---|
 | `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `ApiExceptions`, `EXTRA_ROUTE`, `ic_notification` (`im.flume.hearth.core.common.R`) |
-| `:core:network` | `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
+| `:core:network` | `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` + `TidarrModels` + `TidarrParsing` |
 | `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas/im.flume.hearth.core.data.AppDatabase/`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`; `SearchIndex` (`SearchMatch`, `Scored`, `SongFilter`: text matching music and spoken share) |
 | `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning (below); `MusicContainer` |
 | `:domain:spoken` | Podcasts and audiobooks (below); `SpokenContainer` |
