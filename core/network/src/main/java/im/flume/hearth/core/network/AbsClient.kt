@@ -1,8 +1,6 @@
 package im.flume.hearth.core.network
 
 import im.flume.hearth.core.common.scrubSecrets
-import java.io.InputStream
-import java.text.Normalizer
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,91 +12,20 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.MultipartBody
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Base64
-import java.util.Locale
-import java.util.TimeZone
 import im.flume.hearth.core.common.AbsAuthException
 import im.flume.hearth.core.common.AbsException
 import im.flume.hearth.core.common.AbsHttpException
-
-/** An Audiobookshelf login: server, who, and the JWTs. Tokens only ever travel in the Authorization header. */
-data class AbsTokens(val accessToken: String, val refreshToken: String)
-
-/** Where [AbsClient] keeps the login. Implemented by AbsAccountStore (encrypted at rest). */
-interface AbsAuthStore {
-    /** Base URL without a trailing slash, or null when signed out. */
-    fun serverUrl(): String?
-    fun tokens(): AbsTokens?
-    fun saveTokens(tokens: AbsTokens)
-    /** The refresh token was refused: the user has to sign in again. */
-    fun onAuthLost()
-}
-
-/** The difference between the server's clock and this phone's, measured from response Date headers. */
-class ServerClock(initialOffsetMs: Long = 0, private val now: () -> Long = System::currentTimeMillis) {
-    @Volatile var offsetMs: Long = initialOffsetMs
-        private set
-    @Volatile var measured: Boolean = false
-        private set
-
-    /** Now, on the server's clock. Progress timestamps are kept on this clock so phones and server compare fairly. */
-    fun serverNow(): Long = now() + offsetMs
-
-    fun onSample(serverDateMs: Long, sentAtMs: Long, receivedAtMs: Long) {
-        offsetMs = ClockSkew.update(if (measured) offsetMs else null, ClockSkew.sample(serverDateMs, sentAtMs, receivedAtMs))
-        measured = true
-    }
-}
-
-object ClockSkew {
-    /**
-     * One measurement: server time minus the phone's time halfway through the request. The Date header
-     * has whole seconds, so +500 ms centres the estimate on the second it names.
-     */
-    fun sample(serverDateMs: Long, sentAtMs: Long, receivedAtMs: Long): Long =
-        serverDateMs + 500 - (sentAtMs + (receivedAtMs - sentAtMs) / 2)
-
-    /** Jumps to a new sample when it's far off (clock changed), otherwise smooths out the 1 s jitter. */
-    fun update(previous: Long?, sample: Long): Long = when {
-        previous == null -> sample
-        kotlin.math.abs(sample - previous) > 3_000 -> sample
-        else -> previous + (sample - previous) / 4
-    }
-
-    fun parseHttpDate(value: String?): Long? = value?.let {
-        runCatching {
-            SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).apply { timeZone = TimeZone.getTimeZone("GMT") }.parse(it)?.time
-        }.getOrNull()
-    }
-}
-
-object Jwt {
-    /** The token's expiry (epoch seconds), or null if it has none or can't be read. */
-    fun expiresAt(token: String): Long? = runCatching {
-        val payload = token.split('.').getOrNull(1) ?: return null
-        val json = String(Base64.getUrlDecoder().decode(payload.padEnd((payload.length + 3) / 4 * 4, '=')), Charsets.UTF_8)
-        Json.parseToJsonElement(json).jsonObject["exp"]?.jsonPrimitive?.longOrNull
-    }.getOrNull()
-}
 
 /**
  * Talks to Audiobookshelf. Every request goes through [http], which carries [AuthInterceptor]: the
@@ -324,29 +251,7 @@ class AbsClient(
         tags: List<String>,
         autoDownload: Boolean,
     ): AbsLibraryItem {
-        val title = feed.title ?: itunes?.title ?: throw AbsException("The feed has no title")
-        val body = buildJsonObject {
-            put("libraryId", libraryId)
-            put("folderId", folderId)
-            put("path", "${folderPath.trimEnd('/')}/${PodcastPaths.sanitizeFilename(title)}")
-            putJsonObject("media") {
-                putJsonObject("metadata") {
-                    put("title", title)
-                    (feed.author ?: itunes?.artistName)?.let { put("author", it) }
-                    feed.description?.let { put("description", it) }
-                    put("feedUrl", feedUrl)
-                    (feed.image ?: itunes?.cover)?.let { put("imageUrl", it) }
-                    itunes?.pageUrl?.let { put("itunesPageUrl", it) }
-                    itunes?.id?.let { put("itunesId", it.toString()) }
-                    feed.language?.let { put("language", it) }
-                    put("explicit", feed.explicit == "yes" || feed.explicit == "true" || itunes?.explicit == true)
-                    feed.type?.let { put("type", it) }
-                    putJsonArray("genres") { (itunes?.genres ?: feed.categories).filter { it.isNotBlank() }.forEach { add(JsonPrimitive(it)) } }
-                }
-                putJsonArray("tags") { tags.forEach { add(JsonPrimitive(it)) } }
-                put("autoDownloadEpisodes", autoDownload)
-            }
-        }
+        val body = newPodcastBody(libraryId, folderId, folderPath, feed, feedUrl, itunes, tags, autoDownload)
         return send("POST", "api/podcasts", body, AbsLibraryItem.serializer())!!
     }
 
@@ -397,34 +302,10 @@ class AbsClient(
         files: List<AbsUploadFile>,
         onProgress: (Long) -> Unit = {},
     ) = withContext(Dispatchers.IO) {
-        val sent = LongArray(files.size)
-        val form = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("title", title)
-            .apply { author?.takeIf { it.isNotBlank() }?.let { addFormDataPart("author", it) } }
-            .addFormDataPart("library", libraryId)
-            .addFormDataPart("folder", folderId)
-        files.forEachIndexed { i, f ->
-            form.addFormDataPart(i.toString(), f.name, object : RequestBody() {
-                override fun contentType() = (f.mimeType ?: "application/octet-stream").toMediaType()
-                override fun contentLength() = f.size.takeIf { it > 0 } ?: -1L
-                override fun writeTo(sink: okio.BufferedSink) {
-                    sent[i] = 0
-                    f.open().use { input ->
-                        val buf = ByteArray(64 * 1024)
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            sink.write(buf, 0, n)
-                            sent[i] += n
-                            onProgress(sent.sum())
-                        }
-                    }
-                }
-            })
-        }
+        val form = bookUploadForm(libraryId, folderId, title, author, files, onProgress)
         // A big book takes a while to send, and the server answers only once every file is saved.
         val client = http.newBuilder().writeTimeout(5, TimeUnit.MINUTES).readTimeout(10, TimeUnit.MINUTES).build()
-        client.newCall(Request.Builder().url(url("api/upload")).post(form.build()).build()).execute().use { resp ->
+        client.newCall(Request.Builder().url(url("api/upload")).post(form).build()).execute().use { resp ->
             if (resp.code == 403) throw AbsException("Your account isn't allowed to upload to the server")
             if (!resp.isSuccessful) throw AbsHttpException(resp.code, excerpt(resp))
         }
@@ -439,31 +320,5 @@ class AbsClient(
             if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://$url"
             return url
         }
-    }
-}
-
-/** One file to upload: its name on the server, size in bytes (0 if unknown) and how to read it. */
-class AbsUploadFile(val name: String, val size: Long, val mimeType: String?, val open: () -> InputStream)
-
-/** Mirrors Audiobookshelf's sanitizeFilename, so a podcast lands in the folder its own app would pick. */
-object PodcastPaths {
-    private val illegal = Regex("""[/?<>\\:*|"]""")
-    private val control = Regex("[\\x00-\\x1f\\x80-\\x9f]")
-    private val reserved = Regex("^\\.+$")
-    private val windowsReserved = Regex("^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\\..*)?$", RegexOption.IGNORE_CASE)
-    private val windowsTrailing = Regex("[. ]+$")
-
-    fun sanitizeFilename(name: String): String {
-        val s = Normalizer.normalize(name, Normalizer.Form.NFC)
-            .replaceFirst(":", " - ")
-            .replace(illegal, "")
-            .replace(control, "")
-            .replace(reserved, "")
-            .replace(Regex("[\\n\\r]"), "")
-            .replace(windowsReserved, "")
-            .replace(windowsTrailing, "")
-            .replace(Regex("\\s+"), " ")
-        // 255 bytes of UTF-16 = 127 chars; trim like the server does for very long titles.
-        return if (s.length > 127) s.take(127).trimEnd() else s
     }
 }
