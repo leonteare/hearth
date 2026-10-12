@@ -5,12 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,11 +32,14 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import androidx.compose.material3.MaterialTheme
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import im.flume.hearth.ui.theme.HearthTheme
 
-/** Neutral dark start colour for cover gradients, so pages don't flash the accent before the real colour is known. */
+/**
+ * Neutral dark start colour for cover gradients, so pages don't flash the accent before the real colour is known.
+ * Composables read it as HearthTheme.colors.coverFallback; this is the default skin's value.
+ */
 val CoverColorFallback = Color(0xFF2A2A2A)
 
 /**
@@ -51,7 +50,7 @@ private val coverColorCache = LruCache<String, Color>(200)
 
 /** A rich but dark-enough colour taken from the cover art, for header gradients. Fades in once known. */
 @Composable
-fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback, imageUrl: String? = null): Color {
+fun rememberCoverColor(coverArt: String?, fallback: Color = HearthTheme.colors.coverFallback, imageUrl: String? = null): Color {
     val context = LocalContext.current
     val actions = LocalActions.current
     // [imageUrl] is for artwork that isn't the server's (music not on it yet); it's also the cache key.
@@ -102,15 +101,15 @@ fun DownloadToggle(downloaded: Boolean, progress: Float?, onClick: () -> Unit) {
                     modifier = Modifier.size(26.dp).semantics {
                         contentDescription = "Downloading, ${(progress * 100).toInt()}%"
                     },
-                    trackColor = TextSecondary.copy(alpha = 0.3f),
+                    trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.3f),
                     strokeWidth = 2.dp,
                 )
             } else if (downloaded) {
-                Box(Modifier.size(26.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.ArrowDownward, "Remove download", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                Box(Modifier.size(26.dp).clip(HearthTheme.shapes.round).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
+                    Icon(HearthTheme.icons.downloadArrow, "Remove download", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                 }
             } else {
-                Icon(Icons.Outlined.ArrowCircleDown, "Download", tint = TextSecondary, modifier = Modifier.size(28.dp))
+                Icon(HearthTheme.icons.download, "Download", tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(28.dp))
             }
         }
     }

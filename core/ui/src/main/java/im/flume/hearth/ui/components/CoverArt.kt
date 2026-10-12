@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -34,8 +31,7 @@ import coil3.request.crossfade
 import im.flume.hearth.data.SearchIndex
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.LocalReducedMotion
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 @Composable
 fun CoverArt(
@@ -50,7 +46,7 @@ fun CoverArt(
     url: String? = null,
 ) {
     val actions = LocalActions.current
-    val m = (if (size != null) modifier.size(size) else modifier).clip(RoundedCornerShape(corner)).background(SurfaceHigh)
+    val m = (if (size != null) modifier.size(size) else modifier).clip(RoundedCornerShape(corner)).background(HearthTheme.colors.surfaceHigh)
     val url = url ?: actions.coverUrl(coverArt, requestSize)
     if (url == null) {
         Box(m) { Placeholder(fallback) }
@@ -91,7 +87,7 @@ fun PlayerCoverArt(
     val m = (if (size != null) modifier.size(size) else modifier)
         .onSizeChanged(onPixelSize)
         .clip(RoundedCornerShape(corner))
-        .background(SurfaceHigh)
+        .background(HearthTheme.colors.surfaceHigh)
     val data = url ?: actions.coverUrl(coverArt, requestSize)
     if (data == null) {
         Box(m) { Placeholder(fallback) }
@@ -113,22 +109,21 @@ fun PlayerCoverArt(
     )
 }
 
-private val PLACEHOLDER_COLOURS = listOf(0xFF4A3B6B, 0xFF2F5D62, 0xFF6B3B3B, 0xFF3B4F6B, 0xFF5E5A2E, 0xFF3E6B3B, 0xFF6B4A2E, 0xFF55305E)
-
 @Composable
 private fun Placeholder(text: String?) {
     val initials = text?.let { t ->
         SearchIndex.norm(t).split(' ').filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1) }.uppercase()
     }.orEmpty()
     if (initials.isEmpty()) {
-        Box(Modifier.fillMaxSize().background(SurfaceHigh), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.MusicNote, null, tint = TextSecondary)
+        Box(Modifier.fillMaxSize().background(HearthTheme.colors.surfaceHigh), contentAlignment = Alignment.Center) {
+            Icon(HearthTheme.icons.song, null, tint = HearthTheme.colors.textSecondary)
         }
         return
     }
-    val colour = Color(PLACEHOLDER_COLOURS[(text.hashCode() and 0x7fffffff) % PLACEHOLDER_COLOURS.size])
+    val tiles = HearthTheme.colors.coverPlaceholders
+    val colour = tiles[(text.hashCode() and 0x7fffffff) % tiles.size]
     BoxWithConstraints(Modifier.fillMaxSize().background(colour), contentAlignment = Alignment.Center) {
         val fontSize = with(LocalDensity.current) { (maxWidth * 0.36f).toSp() }
-        Text(initials, color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = fontSize)
+        Text(initials, color = HearthTheme.colors.onCover.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = fontSize)
     }
 }

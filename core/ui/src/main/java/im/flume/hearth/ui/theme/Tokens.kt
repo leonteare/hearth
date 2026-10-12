@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // The defaults below are the older globals, on purpose: one source for each value.
+
 // Semantic design tokens: what each colour, gap, shape and icon is FOR, so a skin can swap them in one place.
 // The defaults are today's look exactly; the older globals in Theme.kt (TextSecondary, Dimens, HearthShapes...)
 // stay and mean the same thing. Read them in composables through HearthTheme.colors / spacing / shapes / icons.
@@ -93,6 +95,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -127,11 +130,37 @@ data class HearthColors(
     val noticeDot: Color = NoticeDot,
     /** Text and icons over cover art and cover-tinted gradients. */
     val onCover: Color = Color.White,
-    /** Text and icons on an accent fill (buttons, the selected accent swatch). */
+    /**
+     * Text and icons on an accent fill (buttons, the selected accent swatch). [HearthTheme] replaces it with
+     * black or white, whichever reads better on the user's accent (see [readableOn]); every built-in accent gives black.
+     */
     val onAccent: Color = Color.Black,
+    /** True for a dark skin: the status and navigation bar icons are drawn light. */
+    val isDark: Boolean = true,
+    /** Neutral start colour for cover-tinted gradients until the cover's own colour is known. */
+    val coverFallback: Color = Color(0xFF2A2A2A),
+    /** Tiles behind the initials shown when something has no cover art; picked by the name's hash. */
+    val coverPlaceholders: List<Color> = listOf(
+        Color(0xFF4A3B6B), Color(0xFF2F5D62), Color(0xFF6B3B3B), Color(0xFF3B4F6B),
+        Color(0xFF5E5A2E), Color(0xFF3E6B3B), Color(0xFF6B4A2E), Color(0xFF55305E),
+    ),
+    /** The big round play button on the player, and the icon on it. */
+    val playButton: Color = Color.White,
+    val onPlayButton: Color = Color.Black,
 ) {
     /** Same as [text], under Material's name. */
     val onBackground: Color get() = text
+}
+
+/**
+ * Black or white, whichever has more contrast on [fill]: the content colour for a user-chosen accent.
+ * Black wins ties, so a mid-tone accent keeps the black text it has always had.
+ */
+fun readableOn(fill: Color): Color {
+    val argb = fill.copy(alpha = 1f).toArgb()
+    val onBlack = Contrast.ratio(argb, 0xFF000000.toInt())
+    val onWhite = Contrast.ratio(argb, 0xFFFFFFFF.toInt())
+    return if (onBlack >= onWhite) Color.Black else Color.White
 }
 
 /** Gaps and sizes. The scale (xxs…xxl) covers the common paddings; the named ones are [Dimens]. */

@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -23,23 +19,21 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.PreviewBar
 import im.flume.hearth.ui.screens.MiniPlayer
-import im.flume.hearth.ui.theme.NavBarColor
-import im.flume.hearth.ui.theme.NoticeDot
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthIcons
+import im.flume.hearth.ui.theme.HearthTheme
 
-internal val TABS = listOf(
-    Triple("home", "Home", Icons.Default.Home),
-    Triple("search", "Search", Icons.Default.Search),
-    Triple("library", "Your Library", Icons.Default.LibraryMusic),
+/** Route, label and the tab's icon slot (read from the theme when drawn, so a skin can swap it). */
+internal val TABS: List<Triple<String, String, (HearthIcons) -> ImageVector>> = listOf(
+    Triple("home", "Home", HearthIcons::home),
+    Triple("search", "Search", HearthIcons::search),
+    Triple("library", "Your Library", HearthIcons::library),
 )
 internal val TAB_ROUTES = TABS.map { it.first }
 
@@ -58,7 +52,7 @@ internal fun AppBottomBar(
     onHeight: (Int) -> Unit,
 ) {
     Column(
-        (if (landscape) Modifier.navigationBarsPadding().padding(bottom = 8.dp) else Modifier)
+        (if (landscape) Modifier.navigationBarsPadding().padding(bottom = HearthTheme.spacing.s) else Modifier)
             .onSizeChanged { onHeight(it.height) }
     ) {
         PreviewBar()
@@ -70,25 +64,25 @@ internal fun AppBottomBar(
 @Composable
 private fun TabIcon(icon: ImageVector, dot: Boolean) {
     if (!dot) return Icon(icon, contentDescription = null)
-    BadgedBox(badge = { Badge(containerColor = NoticeDot, modifier = Modifier.semantics { contentDescription = "New playlist invite" }) }) {
+    BadgedBox(badge = { Badge(containerColor = HearthTheme.colors.noticeDot, modifier = Modifier.semantics { contentDescription = "New playlist invite" }) }) {
         Icon(icon, contentDescription = null)
     }
 }
 
 @Composable
 private fun BottomBar(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
-    NavigationBar(containerColor = NavBarColor) {
+    NavigationBar(containerColor = HearthTheme.colors.navBar) {
         TABS.forEach { (dest, label, icon) ->
             NavigationBarItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { TabIcon(icon, dest == badged) },
+                icon = { TabIcon(icon(HearthTheme.icons), dest == badged) },
                 label = { Text(label) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedIconColor = TextSecondary,
-                    unselectedTextColor = TextSecondary,
+                    selectedIconColor = HearthTheme.colors.text,
+                    selectedTextColor = HearthTheme.colors.text,
+                    unselectedIconColor = HearthTheme.colors.textSecondary,
+                    unselectedTextColor = HearthTheme.colors.textSecondary,
                     indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 ),
             )
@@ -98,22 +92,22 @@ private fun BottomBar(currentTab: String, badged: String?, onTabClick: (String) 
 
 @Composable
 internal fun SideRail(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
-    NavigationRail(containerColor = NavBarColor) {
+    NavigationRail(containerColor = HearthTheme.colors.navBar) {
         Spacer(Modifier.weight(1f))
         TABS.forEach { (dest, label, icon) ->
             NavigationRailItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
-                icon = { TabIcon(icon, dest == badged) },
+                icon = { TabIcon(icon(HearthTheme.icons), dest == badged) },
                 label = { Text(label) },
                 colors = NavigationRailItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedIconColor = TextSecondary,
-                    unselectedTextColor = TextSecondary,
+                    selectedIconColor = HearthTheme.colors.text,
+                    selectedTextColor = HearthTheme.colors.text,
+                    unselectedIconColor = HearthTheme.colors.textSecondary,
+                    unselectedTextColor = HearthTheme.colors.textSecondary,
                     indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 ),
-                modifier = Modifier.padding(vertical = 4.dp),
+                modifier = Modifier.padding(vertical = HearthTheme.spacing.xs),
             )
         }
         Spacer(Modifier.weight(1f))

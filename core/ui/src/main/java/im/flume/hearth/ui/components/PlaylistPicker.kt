@@ -3,8 +3,6 @@ package im.flume.hearth.ui.components
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Asks for a name for a new playlist, with the keyboard already up. */
 @Composable
@@ -73,7 +72,7 @@ fun PlaylistPickerDialog(
         showCover = false,
     ) {
         LazyColumn(Modifier.heightIn(max = 420.dp)) {
-            item { MenuItem("New playlist", Icons.Default.Add, tint = MaterialTheme.colorScheme.primary, tintText = true) { creating = true } }
+            item { MenuItem("New playlist", HearthTheme.icons.add, tint = MaterialTheme.colorScheme.primary, tintText = true) { creating = true } }
             items(mine, key = { it.id }) { p ->
                 MediaRow(p.name, plural(p.songCount, "song"), onClick = { onAdd(p.id, p.name) }, coverArt = p.coverArt)
             }

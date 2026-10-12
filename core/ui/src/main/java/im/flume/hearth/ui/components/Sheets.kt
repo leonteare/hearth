@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,9 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.ui.theme.DividerColor
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Bottom sheet for song / player options, with an optional header showing what it's about. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,22 +46,22 @@ fun ActionSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = SurfaceHigh,
+        containerColor = HearthTheme.colors.surfaceHigh,
     ) {
         if (title != null) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
                 if (showCover) {
                     CoverArt(coverArt, 52.dp, requestSize = 150, fallback = fallback, url = coverUrl)
                     Spacer(Modifier.width(14.dp))
                 }
                 Column(Modifier.weight(1f)) {
                     Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    subtitle?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    subtitle?.let { Text(it, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = DividerColor)
+            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = HearthTheme.colors.divider)
         }
-        Column(Modifier.padding(bottom = 16.dp), content = content)
+        Column(Modifier.padding(bottom = HearthTheme.spacing.l), content = content)
     }
 }
 
@@ -77,7 +73,7 @@ fun ActionSheet(
 fun MenuItem(
     text: String,
     icon: ImageVector?,
-    tint: Color = Color.White,
+    tint: Color = HearthTheme.colors.text,
     checked: Boolean = false,
     tintText: Boolean = false,
     onClick: () -> Unit,
@@ -100,7 +96,7 @@ fun MenuItem(
             },
             modifier = Modifier.weight(1f),
         )
-        if (checked) Icon(Icons.Default.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+        if (checked) Icon(HearthTheme.icons.check, "Selected", tint = MaterialTheme.colorScheme.primary)
     }
 }
 

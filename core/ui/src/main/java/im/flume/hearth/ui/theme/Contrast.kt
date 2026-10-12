@@ -9,6 +9,12 @@ import kotlin.math.pow
 object Contrast {
     const val MIN_TEXT = 4.5
 
+    /**
+     * WCAG's floor for large text and icons. Dimmed text (music you can't use right now) only promises this on
+     * the raised sheet colour; on the page and cards it still meets [MIN_TEXT].
+     */
+    const val MIN_LARGE = 3.0
+
     /** [argb] drawn at [alpha] on top of the opaque [background], as the colour people actually see. */
     fun over(argb: Int, alpha: Float, background: Int): Int {
         fun mix(shift: Int): Int {

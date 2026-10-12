@@ -10,10 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -35,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.ui.theme.Background
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Diameter of the big play button, and of the glyph inside it. */
 private val BigPlaySize = 72.dp
@@ -48,6 +45,8 @@ private val TickWidth = 2.dp
  * It also swallows taps so they don't reach the page underneath, and keeps content clear of the system
  * bars. Put any drag offset (graphicsLayer) before it, as the player screens do.
  */
+// Not composable, so it can't read HearthTheme.colors: it uses the default skin's page background.
+@Suppress("DEPRECATION")
 fun Modifier.playerBackdrop(topColor: Color): Modifier = this
     .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
     .clickable(enabled = false) {}
@@ -57,7 +56,7 @@ fun Modifier.playerBackdrop(topColor: Color): Modifier = this
 @Composable
 fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
     Crossfade(isPlaying, animationSpec = tween(150), label = "playPause") { playing ->
-        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pause" else "Play", modifier)
+        Icon(if (playing) HearthTheme.icons.pause else HearthTheme.icons.play, if (playing) "Pause" else "Play", modifier)
     }
 }
 
@@ -67,8 +66,8 @@ fun BigPlayButton(isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = 
     FilledIconButton(
         onClick = onClick,
         modifier = modifier.size(BigPlaySize),
-        shape = CircleShape,
-        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
+        shape = HearthTheme.shapes.round,
+        colors = IconButtonDefaults.filledIconButtonColors(containerColor = HearthTheme.colors.playButton, contentColor = HearthTheme.colors.onPlayButton),
     ) { PlayPauseIcon(isPlaying, Modifier.size(BigPlayIconSize)) }
 }
 
@@ -99,7 +98,9 @@ fun PlayerSlider(
     modifier: Modifier = Modifier,
     ticks: List<Float> = emptyList(),
 ) {
-    val colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.25f))
+    val onCover = HearthTheme.colors.onCover
+    val tickColor = HearthTheme.colors.background
+    val colors = SliderDefaults.colors(thumbColor = onCover, activeTrackColor = onCover, inactiveTrackColor = onCover.copy(alpha = 0.25f))
     val value = if (seek.dragging) seek.value else fraction.coerceIn(0f, 1f)
     val onValueChange = { v: Float -> seek.dragging = true; seek.value = v }
     val onFinished = { onSeek(seek.value); seek.dragging = false }
@@ -118,7 +119,7 @@ fun PlayerSlider(
                     // Chapter starts: small gaps in the bar.
                     Canvas(Modifier.matchParentSize()) {
                         val w = TickWidth.toPx()
-                        ticks.forEach { f -> drawRect(Background, topLeft = Offset(f * size.width - w / 2, 0f), size = Size(w, size.height)) }
+                        ticks.forEach { f -> drawRect(tickColor, topLeft = Offset(f * size.width - w / 2, 0f), size = Size(w, size.height)) }
                     }
                 }
             },

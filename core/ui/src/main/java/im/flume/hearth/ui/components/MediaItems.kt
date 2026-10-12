@@ -27,12 +27,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import im.flume.hearth.ui.theme.CardTitleStyle
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * A list row: 48dp cover, title and one-line subtitle. Used for artists, albums, playlists, ranked
@@ -59,7 +57,7 @@ fun MediaRow(
     onLongClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     titleColor: Color = Color.Unspecified,
-    subtitleColor: Color = TextSecondary,
+    subtitleColor: Color = HearthTheme.colors.textSecondary,
     /** Small status icon before the subtitle (e.g. the not-on-your-server cloud). */
     subtitleIcon: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
@@ -72,31 +70,31 @@ fun MediaRow(
             .fillMaxWidth()
             .then(click)
             .padding(
-                start = Dimens.Gutter,
-                end = if (trailing != null) 4.dp else Dimens.Gutter,
-                top = Dimens.RowPaddingV,
-                bottom = Dimens.RowPaddingV,
+                start = HearthTheme.spacing.gutter,
+                end = if (trailing != null) HearthTheme.spacing.xs else HearthTheme.spacing.gutter,
+                top = HearthTheme.spacing.rowPaddingV,
+                bottom = HearthTheme.spacing.rowPaddingV,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         leading?.invoke()
         if (cover != null) {
-            Box(Modifier.size(Dimens.RowCover).clip(if (round) HearthShapes.Round else HearthShapes.Cover)) { cover() }
+            Box(Modifier.size(HearthTheme.spacing.rowCover).clip(if (round) HearthTheme.shapes.round else HearthTheme.shapes.cover)) { cover() }
         } else {
             CoverArt(
-                coverArt, Dimens.RowCover,
-                corner = if (round) Dimens.RowCover / 2 else Dimens.CoverCorner,
+                coverArt, HearthTheme.spacing.rowCover,
+                corner = if (round) HearthTheme.spacing.rowCover / 2 else Dimens.CoverCorner,
                 requestSize = 150, fallback = fallback, url = coverUrl,
             )
         }
-        Spacer(Modifier.width(Dimens.CoverGap))
+        Spacer(Modifier.width(HearthTheme.spacing.coverGap))
         Column(Modifier.weight(1f)) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = titleColor, style = MaterialTheme.typography.bodyLarge)
             subtitle?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (subtitleIcon != null) {
                         subtitleIcon()
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(HearthTheme.spacing.xs))
                     }
                     Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, color = subtitleColor, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -110,7 +108,7 @@ fun MediaRow(
 @Composable
 fun IconTile(icon: ImageVector, color: Color) {
     Box(Modifier.fillMaxSize().background(color), contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = Color.White)
+        Icon(icon, null, tint = HearthTheme.colors.onCover)
     }
 }
 
@@ -129,7 +127,7 @@ fun MediaCard(
     coverArt: String? = null,
     /** Artwork from elsewhere (podcast / audiobook covers), used instead of [coverArt]. */
     coverUrl: String? = null,
-    width: Dp = Dimens.CardWidth,
+    width: Dp = HearthTheme.spacing.cardWidth,
     round: Boolean = false,
     subtitleLines: Int = 1,
     /** Not on the server yet: title and subtitle dimmed (the cover isn't). */
@@ -141,23 +139,23 @@ fun MediaCard(
 ) {
     val align = if (round) TextAlign.Center else TextAlign.Start
     val textAlpha = if (dimmed) NotOnServerAlpha else 1f
-    Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClickLabel = if (onLongClick != null) "More options" else null, onLongClick = onLongClick)) {
+    Column(modifier.width(width).clip(HearthTheme.shapes.card).combinedClickable(onClick = onClick, onLongClickLabel = if (onLongClick != null) "More options" else null, onLongClick = onLongClick)) {
         if (cover != null) cover()
         else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title, url = coverUrl)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(HearthTheme.spacing.s))
         Text(
             title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = CardTitleStyle, textAlign = align,
-            color = Color.White.copy(alpha = textAlpha), modifier = Modifier.fillMaxWidth(),
+            color = HearthTheme.colors.text.copy(alpha = textAlpha), modifier = Modifier.fillMaxWidth(),
         )
         subtitle?.let {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (subtitleIcon != null) {
                     subtitleIcon()
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(HearthTheme.spacing.xs))
                 }
                 Text(
                     it, maxLines = subtitleLines, overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelMedium, color = TextSecondary.copy(alpha = textAlpha),
+                    style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary.copy(alpha = textAlpha),
                     textAlign = align, modifier = Modifier.weight(1f),
                 )
             }

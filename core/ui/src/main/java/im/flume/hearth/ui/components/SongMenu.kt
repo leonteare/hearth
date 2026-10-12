@@ -6,20 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.RemoveCircleOutline
-import androidx.compose.material.icons.outlined.ArrowCircleDown
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,7 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.SongEntity
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 @Composable
 fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemoveFromPlaylist: (() -> Unit)? = null) {
@@ -41,25 +27,25 @@ fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemov
     val dl = rememberSongRowState(song.id).value.downloadState
     var info by remember { mutableStateOf(false) }
     ActionSheet(expanded, onDismiss, title = song.title, subtitle = song.artist, coverArt = song.coverArt, fallback = song.album) {
-        MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { actions.playNext(listOf(song.id)); onDismiss() }
-        MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { actions.addToQueue(listOf(song.id)); onDismiss() }
-        MenuItem("Start radio", Icons.Default.Radio) { actions.startRadio(song); onDismiss() }
-        MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
+        MenuItem("Play next", HearthTheme.icons.playNext) { actions.playNext(listOf(song.id)); onDismiss() }
+        MenuItem("Add to queue", HearthTheme.icons.queue) { actions.addToQueue(listOf(song.id)); onDismiss() }
+        MenuItem("Start radio", HearthTheme.icons.radio) { actions.startRadio(song); onDismiss() }
+        MenuItem("Add to playlist", HearthTheme.icons.addToPlaylist) { actions.addToPlaylist(listOf(song.id)); onDismiss() }
         onRemoveFromPlaylist?.let { remove ->
-            MenuItem("Remove from this playlist", Icons.Default.RemoveCircleOutline) { remove(); onDismiss() }
+            MenuItem("Remove from this playlist", HearthTheme.icons.removeFromPlaylist) { remove(); onDismiss() }
         }
         MenuItem(
             if (song.starred) "Remove from Liked Songs" else "Add to Liked Songs",
-            if (song.starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            if (song.starred) HearthTheme.icons.likeOn else HearthTheme.icons.like,
         ) { actions.setStarred(song.id, !song.starred); onDismiss() }
         when (dl) {
-            null -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) { actions.download(listOf(song)); onDismiss() }
-            DownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) { actions.removeDownload(listOf(song.id)); onDismiss() }
-            else -> MenuItem("Cancel download", Icons.Default.Close) { actions.removeDownload(listOf(song.id)); onDismiss() }
+            null -> MenuItem("Download", HearthTheme.icons.download) { actions.download(listOf(song)); onDismiss() }
+            DownloadState.DONE -> MenuItem("Remove download", HearthTheme.icons.downloaded) { actions.removeDownload(listOf(song.id)); onDismiss() }
+            else -> MenuItem("Cancel download", HearthTheme.icons.close) { actions.removeDownload(listOf(song.id)); onDismiss() }
         }
-        song.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { actions.openAlbum(id); onDismiss() } }
-        song.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { actions.openArtist(id); onDismiss() } }
-        MenuItem("Song info", Icons.Outlined.Info) { info = true; onDismiss() }
+        song.albumId?.let { id -> MenuItem("Go to album", HearthTheme.icons.album) { actions.openAlbum(id); onDismiss() } }
+        song.artistId?.let { id -> MenuItem("Go to artist", HearthTheme.icons.artist) { actions.openArtist(id); onDismiss() } }
+        MenuItem("Song info", HearthTheme.icons.info) { info = true; onDismiss() }
     }
     if (info) SongInfoDialog(song, onDismiss = { info = false })
 }
@@ -87,7 +73,7 @@ fun SongInfoDialog(song: SongEntity, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 rows.forEach { (label, value) ->
                     Row {
-                        Text(label, color = TextSecondary, modifier = Modifier.widthIn(min = 88.dp).padding(end = 12.dp))
+                        Text(label, color = HearthTheme.colors.textSecondary, modifier = Modifier.widthIn(min = 88.dp).padding(end = HearthTheme.spacing.m))
                         Text(value, modifier = Modifier.weight(1f))
                     }
                 }
