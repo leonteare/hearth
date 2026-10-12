@@ -46,10 +46,14 @@ You need Android Studio, which provides the JDK and Android SDK.
 
 | Folder | What it does |
 |---|---|
-| `api/` | Subsonic API client (token auth, no password stored) |
-| `data/` | Room database (local library index, downloads, play history), settings, online/offline status |
-| `sync/` | Full library sync (empty `search3` paging) |
-| `playback/` | Media3 playback service, queue window logic, song data source (download → cache → stream), scrobbling |
-| `download/` | WorkManager download worker |
+| `api/` | Clients: Subsonic (token auth), Navidrome native API (playlist photos, users), Audiobookshelf, Tidarr |
+| `data/` | Room database, library/search/stats logic, settings, password vault, playlist sharing, server mixes |
+| `sync/` | Full library sync (empty `search3` paging, shrink guard) |
+| `download/` | Song downloads: policy and WorkManager worker |
+| `requests/` | Getting music that isn't on the server, through Tidarr |
+| `spoken/` | Podcasts and audiobooks from Audiobookshelf, plus audiobooks on the phone |
+| `playback/` | Media3 service, queue logic, data source (download → cache → stream), scrobbling, previews, visualiser audio analysis |
 | `update/` | Self-update from GitHub Releases |
-| `ui/` | Jetpack Compose screens |
+| `ui/` | Jetpack Compose screens, shared components, visualisers, theme |
+
+CLAUDE.md has the file-by-file map; DECISIONS.md lists settled design choices. `./verify.sh` compiles and runs the tests.

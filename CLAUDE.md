@@ -1,47 +1,86 @@
 # CLAUDE.md
 
 Hearth: a single-module Android app (Kotlin, Jetpack Compose, Media3, Room, WorkManager, OkHttp) that plays music
-from a Navidrome/Subsonic server. Package `im.flume.hearth`, all code in `app/`. See README.md for features.
+from a Navidrome/Subsonic server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, all
+code in `app/`. See README.md for features and DECISIONS.md for settled design choices (read before re-litigating one).
 
 ## Commands
 
-Run from the repo root with the Gradle wrapper. There is no CI. `release.sh` runs the same checks before it publishes.
+Run from the repo root. There is no CI.
 
 | Purpose | Command |
 |---|---|
-| Unit tests (the only test suite) | `./gradlew testDebugUnitTest` |
-| One test class | `./gradlew testDebugUnitTest --tests 'im.flume.hearth.playback.QueuePlannerTest'` |
-| Typecheck / compile | `./gradlew compileDebugKotlin` |
+| **Check a change (compile + all unit tests)** | `./verify.sh` (one PASS/FAIL line naming failing tests; `release.sh` runs it too) |
+| One test class | `./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'` |
+| Compile only | `./gradlew compileDebugKotlin` |
 | Debug APK (installs as `im.flume.hearth.debug`, alongside the release app) | `./gradlew assembleDebug` |
 | Release APK | `./gradlew assembleRelease` (fails on purpose without `keystore.properties`) |
-| Lint | No ktlint/detekt/spotless is set up. Only AGP's default `./gradlew lintDebug` exists, and nothing runs it. |
+| Lint | Nothing set up or enforced (only AGP's unused `lintDebug`). |
 
-- `gradle.properties` hard-codes `org.gradle.java.home=C:/Program Files/Android/Android Studio/jbr` (the owner builds
-  on Windows). On other machines, set `org.gradle.java.home` in `~/.gradle/gradle.properties`. That setting wins over
-  the project file. Don't edit the project file.
-- The Android SDK comes from Android Studio (`local.properties`, git-ignored). If Gradle can't find a JDK or SDK, say
-  so and stop. Don't claim the tests pass.
-- Before calling a change done, run `testDebugUnitTest` and `compileDebugKotlin`.
+- `gradle.properties` hard-codes `org.gradle.java.home` to Android Studio's jbr on Windows. Elsewhere, override it in
+  `~/.gradle/gradle.properties`; don't edit the project file.
+- Worktrees have no `local.properties` (git-ignored): `verify.sh` sets `ANDROID_HOME` itself; for raw Gradle, `export
+  ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"`. Don't create `local.properties`. No JDK or SDK? Say so and stop.
+- Live tests `AbsLiveTest`/`ShowFeedLiveTest` skip unless `ABS_LIVE_URL`/`_USER`/`_PASSWORD` (+ `ABS_LIVE_FEED`,
+  optional `ABS_LIVE_CA`) are set. They touch a real server; never commit the values.
 
 ## Layout: where new code goes
 
-All paths are under `app/src/main/java/im/flume/hearth/`.
+Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add, move or split a file.**
 
-- `HearthApp.kt`: `AppContainer`, which builds every singleton by hand (no DI framework, no ViewModels). Add each new
-  repository or service here. Composables reach it through `LocalContext.current.container`.
-- `api/`: `SubsonicClient` (token auth), `NavidromeNativeApi` (native API, used only for playlist photos), and
-  `Models.kt` (`@Serializable` responses).
-- `data/`: Room (`Entities.kt`, plus `Database.kt` with the DAOs, `AppDatabase` and migrations), repositories,
-  `SessionStore` (prefs and `Settings`), and `PasswordVault` (Keystore-encrypted password).
-- `sync/LibrarySync.kt`: syncs the whole library. `download/Downloads.kt`: repository, `DownloadPolicy`, and the worker.
-- `playback/`: `PlaybackService` (MediaSessionService), `QueuePlanner`/`QueueStore`, the data source chain
-  (download → cache → stream), and the scrobbler.
-- `update/`: self-update from GitHub Releases. The repo comes from `BuildConfig.UPDATE_REPO`.
-- `ui/`: `AppRoot.kt` (NavHost; register new routes as `screen("name/{arg}") { ... }`), `screens/` (one file per
-  area, holding many composables), `components/` (shared rows, cards, menus, `LocalActions`), and `theme/Theme.kt`
-  (colours, `Dimens`, `HearthShapes`).
-- `util/Errors.kt`: `scrubSecrets` / `userMessage`.
-- Tests mirror the package under `app/src/test/java/im/flume/hearth/<pkg>/`.
+- `HearthApp.kt`: `AppContainer` builds every singleton by hand (no DI, no ViewModels); add new repositories/services
+  here. Composables use `LocalContext.current.container`. Also `logHandledError`, `crashLoggingHandler`, crash files.
+- `api/` (HTTP clients; `@Serializable` models)
+  - `SubsonicClient` + `Models.kt`: Navidrome via Subsonic, token+salt auth. Library, stars, playlists, scrobbles, users.
+  - `NavidromeNativeApi`: Navidrome's own API (session from a password login): playlist photos and listing users to
+    share with.
+  - `AbsClient` + `AbsModels.kt`: Audiobookshelf (JWT login/refresh, `ServerClock` skew, safe file names).
+  - `TidarrClient`: Tidarr/Tidal search, artist/album pages, queueing downloads, preview stream info.
+- `data/`
+  - `Entities.kt`, `Database.kt` (DAOs, `AppDatabase`, migrations; spoken DAOs live in `spoken/`).
+  - `LibraryRepository` (queries, `LibraryOrder` sorting, `YourLibrary`), `SearchIndex` + `SearchHits` (search/ranking).
+  - `SessionStore` (prefs, `Settings`), `PasswordVault` (Keystore password), `NetworkMonitor`, `Usage` (local counts).
+  - `PlaylistSharing` (sharing info in the playlist comment), `PlaylistEdits`, `PhotoPrep` (playlist photo JPEGs).
+  - `ServerMixes`: server-built mixes (see contract below). `Mixes.kt`: on-phone artist mixes. `Stats`, `Lyrics`.
+  - `Availability` (owned vs missing music, preview window), `RequestIntent`/`RequestMatching` (Tidarr request logic).
+- `requests/Requests.kt`: "get music you don't have": `RequestsRepository` + worker follow a Tidarr request through
+  Navidrome's scan, then like it and/or download it.
+- `sync/LibrarySync.kt`: full library sync (shrink guard). `download/Downloads.kt`: repository, `DownloadPolicy`, worker.
+- `spoken/` (Audiobookshelf podcasts and audiobooks)
+  - `SpokenRepository` (sync, follow, OPML) + `SpokenEntities` (Room + `SpokenDao`), `AbsAccountStore` (ABS sign-in).
+  - `SpokenProgress` (resume points, outbox worker), `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`).
+  - `SpokenDownloads`, `SpokenPresentation` (formatting, chapters, speed, search, discovery).
+  - `ShowFeed` (RSS parse/match to server episodes) + `ShowFeeds` (fetch/cache feeds for show pages).
+  - Phone audiobooks: `LocalBooks` (folders, upload worker), `LocalBookLogic` (scan/naming), `LocalBookEntities`,
+    `LocalBookDetails`, `BookMatch` (match to metadata providers), `EmbeddedChapters` (MP4/ID3 chapter parsing).
+- `playback/`
+  - `PlaybackService` (MediaSessionService, queue commands), `PlayerConnection` (UI handle, `PlayerUiState`).
+  - `QueuePlanner`/`QueueStore` (window of ~50, saved queue), `SongDataSource` (download → cache → stream),
+    `Scrobbler`, `PlaybackErrors`, `CoverArt` (artwork, cache keys), `SpokenPlayback` (episode/book media items).
+  - `PreviewPlayer`: separate 30 s preview player for music not on the server.
+  - Visualiser audio: `AudioAnalyzer` (tap via `ForwardingAudioSink`), `AudioAnalysis` (FFT, bands), `BeatTracker`,
+    `TimedRing`.
+- `ui/`
+  - `AppRoot.kt` (NavHost; add routes as `screen("name/{arg}") { ... }`), `MainActivity`, `LoginScreen`.
+  - `components/`: `Components.kt` (`LocalActions`, rows, menus), `MediaItems`, `PageChrome` (headers, empty states),
+    `NotOnServer` (missing-music UI, `LocalGetMusic`), `PlaylistPicker`, `CoverColor`, `CoverPrefetcher`.
+  - `screens/`: Home, SearchLibrary (search + Library + browse), LibraryTabs, MusicPages (album/artist),
+    CollectionScreens (playlist/mix/genre/liked), PlayerScreens (now playing, queue, lyrics), Spoken{Screens,Player},
+    ShowPage, LocalBookScreens, Downloads, Settings, Stats, InfoSections, PlaylistSharingUi, UpdateUi, CrashBanner.
+  - `screens/visualiser/`: `VisualiserScreen`, `VisualiserCore` (styles, renderer base), one `*Renderer` per style,
+    helpers `Retro3d`, `Ridges`, `ScopeTrace`.
+  - `theme/Theme.kt`: colours, `Dimens`, `HearthShapes`.
+- `update/Updater.kt`: self-update from GitHub Releases (`BuildConfig.UPDATE_REPO`). `util/Errors.kt`: `scrubSecrets`,
+  `userMessage`.
+- Tests mirror the package under `app/src/test/java/im/flume/hearth/<pkg>/`; fixtures in `app/src/test/resources/`.
+
+### Server-side contracts (code on the homelab, `/opt/homelab`)
+
+- `monitoring/hearth-mixes.py` builds Navidrome playlists "Daily Mix"/"Discover Weekly" whose comment holds
+  `[hearth-mix]`. Downloaded mix songs go into a hidden playlist "Hearth · On my phone" marked `[hearth-kept]`, which
+  the job counts as saved. Keep the names/markers in `ServerMixes` in step with the script.
+- `podcast-cleanup.sh` (server) reads Audiobookshelf podcast tags `hearth-follower:<user>` and `hearth-unfollowed:<ms>`
+  (`FollowTags`) to delete episodes nobody follows.
 
 ## Conventions this code follows
 
@@ -54,7 +93,8 @@ All paths are under `app/src/main/java/im/flume/hearth/`.
   `kotlinx-coroutines-test` for suspend code.
 - **Room schema changes:** bump `version` in `@Database`. Write the SQL as a public `MIGRATION_X_Y_SQL` list and wrap
   it in `MIGRATION_X_Y`, then add it to `.addMigrations(...)`. Commit the new `app/schemas/.../N.json` that KSP
-  exports. Add a case to `MigrationTest` that compares the SQL with the exported schema. Real example:
+  exports. Add a case to `MigrationTest` that compares the SQL with the exported schema. (`MigrationTest` also fails if a migration isn't
+  registered or `version` doesn't match the newest JSON.) Real example:
   ```kotlin
   val MIGRATION_4_5_SQL = listOf(
       "ALTER TABLE downloads ADD COLUMN completedAt INTEGER NOT NULL DEFAULT 0",
@@ -80,11 +120,23 @@ All paths are under `app/src/main/java/im/flume/hearth/`.
 - Commit subjects are short, user-facing summaries, e.g. `Compact queue section headers`. `Release x.y.z` commits
   come only from `release.sh`.
 - Add new dependencies through `gradle/libs.versions.toml` and reference them as `libs.*`.
+- Regexes run on Android's ICU engine, which rejects some patterns the JVM accepts: escape a literal `]` and `}`
+  outside character classes. `RegexLiteralsTest` scans every `Regex("…")` literal for this.
+- Prefer imports over inline fully-qualified names (`im.flume.hearth.spoken.Foo`) in new code.
+
+## Parallel agents (several worktrees at once)
+
+- One feature per worktree and branch. Commit there; don't touch other worktrees or the main checkout.
+- Hot files (`AppRoot.kt`, `SearchLibrary.kt`, `CollectionScreens.kt`, `Database.kt`, `HearthApp.kt`) are edited by
+  many agents: keep changes small and localised (add, don't reorder or reformat), so merges stay clean. Put new
+  screens/logic in new files rather than growing these.
+- Never edit `version.properties` (only `release.sh` does). Two schema bumps in parallel collide: rebase and renumber.
+- Remove your worktree when done (`git worktree remove <path>`).
 
 ## Boundaries
 
 ### Always
-- Run `testDebugUnitTest` after changing logic, and add or extend a JVM test for any new pure logic.
+- Run `./verify.sh` after changing logic, and add or extend a JVM test for any new pure logic.
 - Ship a Room schema bump together with its migration, exported schema JSON and `MigrationTest` case.
 - Scrub URLs and credentials from anything logged, saved to `errors.log`/`last-crash.txt`, or shown to the user.
 - Keep the password in `PasswordVault` only. Sign-in uses the Subsonic token, not a stored plain password.
