@@ -1,18 +1,12 @@
 plugins {
     id("hearth.android.library")
-    alias(libs.plugins.kotlin.serialization)
 }
 
+// The aggregator: DomainContainer and what merges areas (Search's one list). The logic lives in :domain:*.
 dependencies {
     api(project(":core:data"))
     api(project(":domain:music"))
     api(project(":domain:spoken"))
+    api(project(":domain:requests"))
     api(project(":domain:update"))
-    api(libs.work.runtime)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.process)
-    implementation(libs.media3.exoplayer)
-
-    testImplementation(libs.okhttp.mockwebserver)
-    testImplementation(libs.kotlinx.coroutines.test)
 }
