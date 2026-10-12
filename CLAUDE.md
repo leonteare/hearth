@@ -64,7 +64,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 
 ### Where things live (relative to each module's root package)
 
-- **domain:music**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
+- **domain:music**: `LibraryRepository` (queries, playlist edits), `PlaySource`, `LibraryOrder` (+ `SongOrder`,
+  `YourLibrary`), `Stats`, `Usage`, `Lyrics`
   (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`, `PlaylistEdits`,
   `PhotoPrep`, `Availability`, `RequestMatching` (is Tidal music on the server; `Availability` needs it).
 - **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadPins`
