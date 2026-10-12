@@ -142,7 +142,7 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
 - Keep the password in `PasswordVault` only. Sign-in uses the Subsonic token, not a stored plain password.
 
 ### Ask first
-- Running `./release.sh`, `gh release`, `git push`, or creating tags. These publish an update to the owner's phones.
+- `gh release`, `git push` or tags by hand. (`./release.sh` itself: the owner wants tested changes released straight away, without asking — only release work that passes `./verify.sh`.)
 - Editing `version.properties`, which `release.sh` manages, or `gradle.properties`.
 - Adding a dependency, Gradle plugin, lint tool, or DI framework.
 - Changing `minSdk`/`targetSdk`, the `applicationId`, signing config, `network_security_config.xml`, or `AndroidManifest.xml` permissions.
