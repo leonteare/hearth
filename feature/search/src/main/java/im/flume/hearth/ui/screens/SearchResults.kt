@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,9 +44,7 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.remoteAlbumId
 import im.flume.hearth.ui.components.remoteArtistId
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Before anything is typed: recent searches (with Clear), then a grid of genres to browse. */
 internal fun LazyListScope.searchLanding(
@@ -62,27 +58,27 @@ internal fun LazyListScope.searchLanding(
     if (recent.isNotEmpty()) {
         item {
             SectionHeader("Recent searches") {
-                TextButton(onClick = onClearRecent) { Text("Clear", color = TextSecondary) }
+                TextButton(onClick = onClearRecent) { Text("Clear", color = HearthTheme.colors.textSecondary) }
             }
         }
         items(recent.take(RECENT_SEARCHES), key = { "r:$it" }) { r ->
             Row(
-                Modifier.fillMaxWidth().clickable { onPickRecent(r) }.padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+                Modifier.fillMaxWidth().clickable { onPickRecent(r) }.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.History, null, tint = TextSecondary)
-                Spacer(Modifier.width(16.dp))
+                Icon(HearthTheme.icons.history, null, tint = HearthTheme.colors.textSecondary)
+                Spacer(Modifier.width(HearthTheme.spacing.l))
                 Text(r, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
     if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
     items(genres.chunked(gridColumns)) { pair ->
-        Row(Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
             pair.forEach { g ->
                 Box(
-                    Modifier.weight(1f).heightIn(min = 72.dp).clip(HearthShapes.Card)
-                        .background(genreColor(g.genre)).clickable { onOpenGenre(g.genre) }.padding(12.dp)
+                    Modifier.weight(1f).heightIn(min = 72.dp).clip(HearthTheme.shapes.card)
+                        .background(genreColor(g.genre, HearthTheme.colors.genrePalette)).clickable { onOpenGenre(g.genre) }.padding(HearthTheme.spacing.m)
                 ) {
                     Text(g.genre, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -112,8 +108,8 @@ internal fun LazyListScope.searchResults(
         item(key = "close") {
             Text(
                 "No exact matches. Showing close matches.",
-                color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.s),
             )
         }
     }
@@ -130,7 +126,7 @@ internal fun LazyListScope.searchResults(
         item(key = "none") {
             Text(
                 if (hits.isEmpty()) "No results for \"$query\"" else "No ${filter.label.lowercase()} for \"$query\"",
-                color = TextSecondary, modifier = Modifier.padding(16.dp),
+                color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(HearthTheme.spacing.l),
             )
         }
     }
@@ -139,10 +135,10 @@ internal fun LazyListScope.searchResults(
 /** A small spinner with a line saying what's still being looked up. */
 @Composable
 private fun SearchProgressNote(text: String) {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.m), verticalAlignment = Alignment.CenterVertically) {
         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-        Spacer(Modifier.width(12.dp))
-        Text(text, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(HearthTheme.spacing.m))
+        Text(text, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -175,7 +171,6 @@ private fun SearchHitRow(
     }
 }
 
-private fun genreColor(name: String): Color {
-    val palette = listOf(0xFF8C1932, 0xFF1E3264, 0xFF477D95, 0xFF8D67AB, 0xFFE8115B, 0xFF148A08, 0xFFBA5D07, 0xFF503750, 0xFF0D73EC, 0xFF777777)
-    return Color(palette[(name.hashCode() and 0x7fffffff) % palette.size])
-}
+/** The same genre always gets the same tile colour, so the grid looks the same every visit. */
+internal fun genreColor(name: String, palette: List<Color>): Color =
+    palette[(name.hashCode() and 0x7fffffff) % palette.size]

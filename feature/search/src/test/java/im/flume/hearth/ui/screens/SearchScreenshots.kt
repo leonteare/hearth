@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.focus.FocusRequester
 import im.flume.hearth.data.AlbumItem
 import im.flume.hearth.data.ArtistItem
+import im.flume.hearth.data.GenreCount
 import im.flume.hearth.data.SearchFilter
 import im.flume.hearth.data.SearchHit
 import im.flume.hearth.data.SearchIndex
@@ -13,7 +14,7 @@ import im.flume.hearth.testing.Samples
 import im.flume.hearth.testing.ScreenshotTest
 import org.junit.Test
 
-/** Search's field, filters and results. Moves to :feature:search with those screens. */
+/** Search's field, filters, landing page and results. */
 class SearchScreenshots : ScreenshotTest() {
     @Test
     fun `the empty search field with its hint and the filter chips`() = snap("field_empty") {
@@ -53,7 +54,21 @@ class SearchScreenshots : ScreenshotTest() {
     }
 
     @Test
-    fun `no results says so`() = snap("no_results") {
+    fun `the landing page with recent searches and genres to browse`() = snap("landing") {
+        LazyColumn {
+            searchLanding(
+                recent = listOf("northern", "quiet hours"),
+                onClearRecent = {},
+                onPickRecent = {},
+                genres = listOf("Ambient", "Folk", "Jazz", "Electronic", "Classical").map { GenreCount(it, 10) },
+                gridColumns = 2,
+                onOpenGenre = {},
+            )
+        }
+    }
+
+    @Test
+    fun `no results says so`()= snap("no_results") {
         LazyColumn {
             searchResults(
                 query = "zzz", filter = SearchFilter.ALL, indexing = false,

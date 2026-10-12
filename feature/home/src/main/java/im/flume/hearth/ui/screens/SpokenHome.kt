@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.AppContainer
 import im.flume.hearth.spoken.ContinueItem
@@ -30,14 +29,14 @@ import im.flume.hearth.ui.components.Actions
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.MediaCard
 import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Home: started episodes and books, with how far you got; tap carries on, long-press opens the page. */
 fun LazyListScope.continueListeningSection(items: List<ContinueItem>, c: AppContainer, actions: Actions) {
     if (items.isEmpty()) return
     item(key = "continue-listening") {
         SectionHeader("Continue listening")
-        LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
             items(items, key = { "${it.libraryItemId}/${it.episodeId.orEmpty()}" }) { item -> ContinueCard(item, c, actions) }
         }
     }
@@ -59,14 +58,14 @@ private fun ContinueCard(item: ContinueItem, c: AppContainer, actions: Actions) 
         },
         onLongClick = { actions.open(if (item.isBook) bookRoute(item.libraryItemId) else podcastRoute(item.libraryItemId)) },
         cover = {
-            Box(Modifier.size(Dimens.CardWidth)) {
-                CoverArt(null, Dimens.CardWidth, fallback = item.subtitle ?: item.title, url = url)
+            Box(Modifier.size(HearthTheme.spacing.cardWidth)) {
+                CoverArt(null, HearthTheme.spacing.cardWidth, fallback = item.subtitle ?: item.title, url = url)
                 Box(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, HearthTheme.colors.shade.copy(alpha = 0.6f))))
+                        .padding(horizontal = HearthTheme.spacing.s, vertical = HearthTheme.spacing.s)
                 ) {
-                    ListenedBar(item.fraction, Modifier.fillMaxWidth(), color = Color.White)
+                    ListenedBar(item.fraction, Modifier.fillMaxWidth(), color = HearthTheme.colors.onCover)
                 }
             }
         },

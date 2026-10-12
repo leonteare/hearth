@@ -1,14 +1,12 @@
 package im.flume.hearth.ui.screens
 
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.unit.Dp
 import im.flume.hearth.AppContainer
 import im.flume.hearth.data.DownloadCounts
 import im.flume.hearth.data.ServerMixes
 import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenLists
 import im.flume.hearth.ui.components.BannerCard
-import im.flume.hearth.ui.theme.CoverSize
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -26,21 +24,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -67,20 +53,12 @@ import im.flume.hearth.data.Mix
 import im.flume.hearth.data.StatsPeriod
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.sync.SyncState
-import im.flume.hearth.ui.components.AlbumRow
-import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.MediaCard
 import im.flume.hearth.ui.components.PageHeader
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.AudiobooksColor
-import im.flume.hearth.ui.theme.PodcastsColor
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.LikedColor
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.data.PlaylistRules
 import java.util.Calendar
 
@@ -107,11 +85,11 @@ fun HomeScreen() {
     LaunchedEffect(songCount > 0) { if (songCount > 0) mixes = runCatching { c.mixes.today(online) }.getOrDefault(emptyList()) }
 
     val accent = MaterialTheme.colorScheme.primary
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
         item {
             PageHeader(greeting()) {
-                if (!online) Icon(Icons.Default.CloudOff, "Offline", tint = TextSecondary)
-                IconButton(onClick = { actions.open("settings") }) { Icon(Icons.Default.Settings, "Settings") }
+                if (!online) Icon(HearthTheme.icons.offline, "Offline", tint = HearthTheme.colors.textSecondary)
+                IconButton(onClick = { actions.open("settings") }) { Icon(HearthTheme.icons.settings, "Settings") }
             }
         }
 
@@ -121,9 +99,9 @@ fun HomeScreen() {
         val running = sync as? SyncState.Running
         if (running != null && songCount <= 0) {
             item {
-                Column(Modifier.padding(Dimens.Gutter)) {
-                    Text("Loading your library… ${running.songsSoFar} songs", color = TextSecondary)
-                    Spacer(Modifier.height(8.dp))
+                Column(Modifier.padding(HearthTheme.spacing.gutter)) {
+                    Text("Loading your library… ${running.songsSoFar} songs", color = HearthTheme.colors.textSecondary)
+                    Spacer(Modifier.height(HearthTheme.spacing.s))
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             }
@@ -133,7 +111,7 @@ fun HomeScreen() {
                 BannerCard(
                     title = "Library sync failed",
                     body = f.message,
-                    icon = Icons.Default.CloudOff,
+                    icon = HearthTheme.icons.offline,
                     actions = {
                         TextButton(onClick = {
                             c.appScope.launch { c.sync.fullSync(runCatching { c.api.scanStatus()?.lastScan }.getOrNull()) }
@@ -147,10 +125,10 @@ fun HomeScreen() {
         item {
             QuickGrid(
                 listOf(
-                    QuickTile("Shuffle my library", Icons.Default.Shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) },
-                    QuickTile("Liked Songs", Icons.Default.Favorite, LikedColor) { actions.open("liked") },
-                    QuickTile("Podcasts", Icons.Default.Podcasts, PodcastsColor) { actions.openLibraryTab("PODCASTS") },
-                    QuickTile("Audiobooks", Icons.AutoMirrored.Filled.MenuBook, AudiobooksColor) { actions.openLibraryTab("AUDIOBOOKS") },
+                    QuickTile("Shuffle my library", HearthTheme.icons.shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) },
+                    QuickTile("Liked Songs", HearthTheme.icons.likeOn, HearthTheme.colors.liked) { actions.open("liked") },
+                    QuickTile("Podcasts", HearthTheme.icons.podcast, HearthTheme.colors.podcasts) { actions.openLibraryTab("PODCASTS") },
+                    QuickTile("Audiobooks", HearthTheme.icons.audiobook, HearthTheme.colors.audiobooks) { actions.openLibraryTab("AUDIOBOOKS") },
                 )
             )
         }
@@ -166,7 +144,7 @@ fun HomeScreen() {
             // The Daily Mix and Discover Weekly the server builds overnight, with music you don't have yet.
             item {
                 SectionHeader("Your mixes")
-                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
                     items(serverMixes, key = { it.playlist.id }) { item ->
                         val p = item.playlist
                         MediaCard(p.name, ServerMixes.description(p), onClick = { actions.openPlaylist(p.id) }, subtitleLines = 2, coverArt = p.coverArt)
@@ -177,10 +155,10 @@ fun HomeScreen() {
             // Until the server has made any (or while offline): mixes built on the phone from your own library.
             item {
                 SectionHeader("Your mixes")
-                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
                     items(mixes.size) { i ->
                         val mix = mixes[i]
-                        MediaCard(mix.title, mix.subtitle, onClick = { actions.open("mix/${android.net.Uri.encode(mix.title)}") }, subtitleLines = 2, cover = { MixCover(mix, Dimens.CardWidth) })
+                        MediaCard(mix.title, mix.subtitle, onClick = { actions.open("mix/${android.net.Uri.encode(mix.title)}") }, subtitleLines = 2, cover = { MixCover(mix, HearthTheme.spacing.cardWidth) })
                     }
                 }
             }
@@ -189,7 +167,7 @@ fun HomeScreen() {
         if (playlists.isNotEmpty()) {
             item {
                 SectionHeader("Your playlists")
-                LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
                     items(playlists, key = { it.playlist.id }) { item ->
                         val p = item.playlist
                         val by = if (item.access.isOwner) "" else " • by ${PlaylistRules.displayName(item.access.owner)}"
@@ -212,9 +190,9 @@ internal data class QuickTile(
 @Composable
 internal fun QuickGrid(tiles: List<QuickTile>) {
     val columns = 2
-    Column(Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
         tiles.chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
                 row.forEach { t -> QuickTileView(t, Modifier.weight(1f)) }
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
@@ -225,18 +203,18 @@ internal fun QuickGrid(tiles: List<QuickTile>) {
 @Composable
 private fun QuickTileView(t: QuickTile, modifier: Modifier) {
     Row(
-        modifier.heightIn(min = 56.dp).clip(HearthShapes.Card).background(SurfaceHigh).clickable(onClick = t.onClick),
+        modifier.heightIn(min = 56.dp).clip(HearthTheme.shapes.card).background(HearthTheme.colors.surfaceHigh).clickable(onClick = t.onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(56.dp).background(t.color), contentAlignment = Alignment.Center) {
-            Icon(t.icon, null, tint = if (t.color == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.onPrimary else Color.White)
+            Icon(t.icon, null, tint = if (t.color == MaterialTheme.colorScheme.primary) MaterialTheme.colorScheme.onPrimary else HearthTheme.colors.onColorFill)
         }
         Text(
             t.title,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = HearthTheme.spacing.xs),
         )
     }
 }

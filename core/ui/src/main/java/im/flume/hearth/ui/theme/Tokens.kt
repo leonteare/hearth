@@ -129,6 +129,15 @@ data class HearthColors(
     val onCover: Color = Color.White,
     /** Text and icons on an accent fill (buttons, the selected accent swatch). */
     val onAccent: Color = Color.Black,
+    /** Icons on a tile filled with a fixed colour (Home's Liked Songs, Podcasts and Audiobooks tiles). */
+    val onColorFill: Color = Color.White,
+    /** Darkens what's under it, used with an alpha: stat tiles on the stats header, the fade under a progress bar on a cover. */
+    val shade: Color = Color.Black,
+    /** Search's genre tiles; each genre always gets the same one (picked by its name). */
+    val genrePalette: List<Color> = listOf(
+        Color(0xFF8C1932), Color(0xFF1E3264), Color(0xFF477D95), Color(0xFF8D67AB), Color(0xFFE8115B),
+        Color(0xFF148A08), Color(0xFFBA5D07), Color(0xFF503750), Color(0xFF0D73EC), Color(0xFF777777),
+    ),
 ) {
     /** Same as [text], under Material's name. */
     val onBackground: Color get() = text

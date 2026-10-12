@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,11 +27,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.OnSearchField
-import im.flume.hearth.ui.theme.SearchFieldColor
-import im.flume.hearth.ui.theme.SearchFieldHint
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** The rounded search box at the top of Search, with a clear button once something is typed. */
 @Composable
@@ -48,21 +41,21 @@ internal fun SearchField(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = Dimens.Gutter)
+            .padding(horizontal = HearthTheme.spacing.gutter)
             .heightIn(min = 48.dp)
-            .clip(HearthShapes.Card)
-            .background(SearchFieldColor)
-            .padding(start = 12.dp),
+            .clip(HearthTheme.shapes.card)
+            .background(HearthTheme.colors.searchField)
+            .padding(start = HearthTheme.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Search, null, tint = OnSearchField, modifier = Modifier.size(20.dp))
+        Icon(HearthTheme.icons.search, null, tint = HearthTheme.colors.onSearchField, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = query,
             onValueChange = onQueryChange,
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = OnSearchField),
-            cursorBrush = SolidColor(OnSearchField),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = HearthTheme.colors.onSearchField),
+            cursorBrush = SolidColor(HearthTheme.colors.onSearchField),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             modifier = Modifier.weight(1f).focusRequester(focus),
@@ -70,7 +63,7 @@ internal fun SearchField(
                 if (query.isEmpty()) {
                     Text(
                         hint,
-                        color = SearchFieldHint, style = MaterialTheme.typography.bodyLarge,
+                        color = HearthTheme.colors.searchFieldHint, style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -78,9 +71,9 @@ internal fun SearchField(
             },
         )
         if (query.isNotEmpty()) {
-            IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Close, "Clear", tint = OnSearchField) }
+            IconButton(onClick = { onQueryChange("") }) { Icon(HearthTheme.icons.close, "Clear", tint = HearthTheme.colors.onSearchField) }
         } else {
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(HearthTheme.spacing.m))
         }
     }
 }
