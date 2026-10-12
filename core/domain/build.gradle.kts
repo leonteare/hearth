@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(project(":core:data"))
+    api(project(":domain:spoken"))
     api(project(":domain:update"))
     api(libs.work.runtime)
     implementation(libs.androidx.core.ktx)
