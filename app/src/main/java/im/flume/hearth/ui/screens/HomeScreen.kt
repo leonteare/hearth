@@ -157,7 +157,7 @@ fun HomeScreen() {
                 LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
                     items(mixes.size) { i ->
                         val mix = mixes[i]
-                        MediaCard(mix.title, mix.subtitle, onClick = { actions.open("mix/$i") }, subtitleLines = 2, cover = { MixCover(mix, Dimens.CardWidth) })
+                        MediaCard(mix.title, mix.subtitle, onClick = { actions.open("mix/${android.net.Uri.encode(mix.title)}") }, subtitleLines = 2, cover = { MixCover(mix, Dimens.CardWidth) })
                     }
                 }
             }
@@ -234,7 +234,7 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
     else -> "Good evening"
 }
 
-/** Songs plus podcast episodes and audiobooks downloading to this phone, for the Downloads shortcut. */
+/** Songs plus podcast episodes and audiobooks downloading to this phone, for the downloads icon in page headers. */
 fun im.flume.hearth.AppContainer.allDownloadCounts(): kotlinx.coroutines.flow.Flow<im.flume.hearth.data.DownloadCounts> =
     kotlinx.coroutines.flow.combine(downloads.counts, spoken.downloads.rows) { songs, rows ->
         im.flume.hearth.data.DownloadCounts(
@@ -243,18 +243,3 @@ fun im.flume.hearth.AppContainer.allDownloadCounts(): kotlinx.coroutines.flow.Fl
             failed = songs.failed + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.FAILED },
         )
     }
-
-/**
- * The Downloads shortcut's label while songs are downloading (or failed), or music is on its way to
- * the server; null hides the shortcut.
- */
-fun downloadsShortcutLabel(counts: im.flume.hearth.data.DownloadCounts, requests: List<im.flume.hearth.data.RequestEntity>): String? {
-    val coming = requests.count { it.status.active }
-    val failed = requests.count { it.status == im.flume.hearth.data.RequestStatus.FAILED }
-    return when {
-        counts.active -> counts.summary
-        coming > 0 -> "Coming to your server · $coming"
-        failed > 0 -> "Downloads · $failed couldn't get"
-        else -> null
-    }
-}

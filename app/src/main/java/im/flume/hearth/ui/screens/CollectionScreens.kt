@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import im.flume.hearth.ui.components.EmptyState
+import im.flume.hearth.ui.components.DownloadsIndicator
 import im.flume.hearth.data.PlaylistRules
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.HideImage
@@ -383,7 +384,14 @@ fun CollectionScreen(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         BackButton()
                         Spacer(Modifier.weight(1f))
-                        Box(Modifier.statusBarsPadding()) { headerActions() }
+                        Row(Modifier.statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
+                            DownloadsIndicator()
+                            // Same search bar the pull-down opens, for anyone who doesn't know the gesture.
+                            if (searchable && !searchOpen) {
+                                IconButton(onClick = { searchOpen = true }) { Icon(Icons.Default.Search, "Find in ${if (title.isBlank()) "this list" else title}") }
+                            }
+                            headerActions()
+                        }
                     }
                     androidx.compose.animation.AnimatedVisibility(searchOpen) {
                         LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
@@ -528,7 +536,9 @@ fun CollectionScreen(
             ) {
                 BackButton()
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                DownloadsIndicator()
                 FilledIconButton(
+
                     onClick = onPlay,
                     // 40dp circle inside a 48dp touch target.
                     modifier = Modifier.minimumInteractiveComponentSize().size(40.dp),
@@ -565,15 +575,19 @@ private fun SelectionBar(
     }
 }
 
+/**
+ * A mix built on this phone, found by its title ("Artist Mix", one per artist) rather than its place
+ * in the list: the list can be rebuilt differently (e.g. offline), and the page must stay the mix you tapped.
+ */
 @Composable
-fun MixScreen(index: Int) {
+fun MixScreen(key: String) {
     val c = LocalContext.current.container
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     var mix by remember { mutableStateOf<im.flume.hearth.data.Mix?>(null) }
     var songs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
-    LaunchedEffect(index) {
-        mix = runCatching { c.mixes.today(online).getOrNull(index) }.getOrNull()
+    LaunchedEffect(key) {
+        mix = runCatching { c.mixes.today(online).firstOrNull { it.title == key } }.getOrNull()
         songs = mix?.let { c.library.songsByIds(it.songIds) }.orEmpty()
         loaded = true
     }
@@ -650,14 +664,15 @@ fun PlaylistScreen(id: String) {
         },
         headerActions = {
             val current = item
-            if (current != null && (current.access.canEdit || current.access.isMember)) PlaylistMenu(current, screenScope)
+            // Always there, in the same spot as on album and show pages; what's inside depends on your access.
+            if (current != null) PlaylistMenu(current, screenScope, songs.map { it.id })
         },
     )
 }
 
 /** The playlist's ⋯ menu. What's in it depends on whether you own it, can add to it, or only listen. */
 @Composable
-private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: kotlinx.coroutines.CoroutineScope) {
+private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: kotlinx.coroutines.CoroutineScope, songIds: List<String>) {
     val c = LocalContext.current.container
     val context = LocalContext.current
     val actions = LocalActions.current
@@ -702,7 +717,13 @@ private fun PlaylistMenu(item: im.flume.hearth.data.PlaylistItem, screenScope: k
 
     IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
     ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = item.playlist.coverArt, fallback = name) {
+        if (songIds.isNotEmpty()) {
+            MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { open = false; actions.playNext(songIds) }
+            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { open = false; actions.addToQueue(songIds) }
+            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(songIds) }
+        }
         if (access.canEdit) {
+
             MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
             MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
             MenuItem("Change photo", Icons.Default.AddPhotoAlternate) {
