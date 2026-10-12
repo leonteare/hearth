@@ -60,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,10 +94,12 @@ import im.flume.hearth.playback.EXTRA_COVER_ART
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.coverPalette
+import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -106,7 +109,8 @@ import kotlin.math.max
 /**
  * Full-screen music visualiser over Now Playing. Tap for controls (they hide after 3 s), swipe
  * sideways to change style. Audio analysis and drawing run only while this is on screen and the
- * app is in the foreground; the system bars are hidden and the screen kept on meanwhile.
+ * app is in the foreground; the system bars are hidden meanwhile, and the screen kept on while
+ * music plays. Paused, it stops drawing once the picture has settled, and the screen may sleep.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +123,7 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     val swipeAt = with(LocalDensity.current) { 72.dp.toPx() }
 
-    ImmersiveMode()
+    ImmersiveMode(keepScreenOn = state.isPlaying)
 
     var style by remember { mutableStateOf(VisualiserStyle.byId(c.session.settings.value.visualiserStyle)) }
     var outgoing by remember { mutableStateOf<VisualiserStyle?>(null) }
@@ -158,6 +162,8 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
 
     val frame = remember { VisFrame() }
     var tick by remember { mutableLongStateOf(0L) }
+    /** Goes up when new cover colours arrive, to wake a paused, sleeping visualiser to blend them in. */
+    var paletteChanges by remember { mutableIntStateOf(0) }
     val playing by rememberUpdatedState(state.isPlaying)
     val meta = state.current?.mediaMetadata
     SideEffect {
@@ -170,11 +176,16 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
         // Stops when the app goes to the background, and with it the audio tap.
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             AudioAnalyzer.start()
+            val pacer = FramePacer()
             try {
                 var last = 0L
                 var slowFor = 0f
                 while (isActive) {
+                    var asleep = false
+                    var sleptStyle = style
+                    var sleptPalette = paletteChanges
                     withFrameNanos { now ->
+                        if (!pacer.shouldDraw(now)) return@withFrameNanos
                         val dt = if (last == 0L) 1f / 60f else ((now - last) / 1e9f).coerceIn(0.001f, 0.1f)
                         last = now
                         frame.dt = dt
@@ -194,6 +205,18 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                             if (r.quality > 0.5f) r.quality = max(0.5f, r.quality - 0.25f)
                         }
                         tick = now
+                        val still = outgoing == null && frame.palette.settled && FramePacer.isQuiet(frame.audio)
+                        if (pacer.sleep(dt, playing, still)) {
+                            asleep = true
+                            sleptStyle = style
+                            sleptPalette = paletteChanges
+                        }
+                    }
+                    if (asleep) {
+                        // The last frame stays on screen; draw again once anything would change it.
+                        snapshotFlow { playing || style != sleptStyle || paletteChanges != sleptPalette }.first { it }
+                        pacer.wake()
+                        last = 0L
                     }
                 }
             } finally {
@@ -206,15 +229,17 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
     val coverArt = state.current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
     var paletteSet by remember { mutableStateOf(false) }
     LaunchedEffect(coverArt) {
-        val url = coverArt?.let { actions.coverUrl(it, 600) }
+        // Now Playing's size, so it's already cached; decoded small, as the palette only needs a few colours.
+        val url = coverArt?.let { actions.coverUrl(it, CoverSize.LARGE) }
         val bitmap = url?.let {
-            val request = ImageRequest.Builder(context).data(it).size(600).allowHardware(false).build()
+            val request = ImageRequest.Builder(context).data(it).size(CoverSize.MEDIUM).allowHardware(false).build()
             (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap()
         }
         val swatches = if (bitmap != null && coverArt != null) withContext(Dispatchers.Default) { coverPalette(coverArt, bitmap) } else emptyList()
         val colours = VisPalette.vivid(swatches, accent)
         if (paletteSet) frame.palette.setTarget(colours) else frame.palette.snap(colours)
         paletteSet = true
+        paletteChanges++
     }
 
     LaunchedEffect(controls, interaction, picker) {
@@ -364,20 +389,23 @@ private fun RenderLayer(renderer: VisualiserRenderer, frame: VisFrame, tick: () 
     }
 }
 
-/** Hides the status and navigation bars (swipe to peek) and keeps the screen on, until disposed. */
+/**
+ * Hides the status and navigation bars (swipe to peek) until disposed, and keeps the screen on
+ * while [keepScreenOn]: only while music plays, so a visualiser left paused lets the phone sleep.
+ */
 @Composable
-private fun ImmersiveMode() {
+private fun ImmersiveMode(keepScreenOn: Boolean) {
     val view = LocalView.current
     DisposableEffect(view) {
         val window = view.context.findActivity()?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller?.hide(WindowInsetsCompat.Type.systemBars())
-        view.keepScreenOn = true
-        onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
-            view.keepScreenOn = false
-        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+    DisposableEffect(view, keepScreenOn) {
+        view.keepScreenOn = keepScreenOn
+        onDispose { view.keepScreenOn = false }
     }
 }
 
