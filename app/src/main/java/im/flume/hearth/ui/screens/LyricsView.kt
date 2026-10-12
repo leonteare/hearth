@@ -43,10 +43,6 @@ import im.flume.hearth.data.rows
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.theme.TextSecondary
 
-/** Lyric text sizes (sp) and line gaps (dp) for the Appearance settings. */
-val LYRIC_SIZES = listOf(18, 22, 27, 32)
-val LYRIC_GAPS = listOf(4, 8, 14)
-
 @Composable
 internal fun LyricsView(song: SongEntity?, state: PlayerUiState, modifier: Modifier) {
     val c = LocalContext.current.container
