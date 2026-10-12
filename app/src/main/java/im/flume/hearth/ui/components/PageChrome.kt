@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import im.flume.hearth.data.DownloadCounts
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.NoticeDot
@@ -113,7 +114,7 @@ data class DownloadsBadge(val downloading: Int, val waiting: Int, val failed: In
 
     companion object {
         /** Null hides the icon: nothing downloading, waiting or failed. */
-        fun of(counts: im.flume.hearth.data.DownloadCounts, coming: Int, comingFailed: Int): DownloadsBadge? {
+        fun of(counts: DownloadCounts, coming: Int, comingFailed: Int): DownloadsBadge? {
             val badge = DownloadsBadge(counts.downloading, counts.queued + coming, counts.failed + comingFailed)
             return badge.takeIf { it.inProgress > 0 || it.failed > 0 }
         }

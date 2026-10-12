@@ -1,5 +1,6 @@
 package im.flume.hearth.spoken
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.charset.Charset
@@ -372,7 +373,7 @@ object Id3Chapters {
 
     /** Undoes ID3 unsynchronisation: every 0xFF 0x00 pair was a lone 0xFF. */
     private fun resync(b: ByteArray): ByteArray {
-        val out = java.io.ByteArrayOutputStream(b.size)
+        val out = ByteArrayOutputStream(b.size)
         var i = 0
         while (i < b.size) {
             out.write(b[i].toInt())

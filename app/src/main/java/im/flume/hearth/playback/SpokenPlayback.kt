@@ -10,10 +10,12 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import im.flume.hearth.spoken.BookEntity
+import im.flume.hearth.spoken.ChapterEntity
 import im.flume.hearth.spoken.EpisodeRow
 import im.flume.hearth.spoken.LocalBookEntity
 import im.flume.hearth.spoken.LocalBookFileEntity
 import im.flume.hearth.spoken.LocalSessionPayload
+import im.flume.hearth.spoken.ProgressMerge
 import im.flume.hearth.spoken.SpokenProgress
 import im.flume.hearth.spoken.SpokenTimeline
 import im.flume.hearth.spoken.TimelineChapter
@@ -150,7 +152,7 @@ data class SpokenNow(
     val isBook: Boolean get() = episodeId == null
 
     companion object {
-        fun chaptersOf(rows: List<im.flume.hearth.spoken.ChapterEntity>) = rows.map { TimelineChapter(it.startSec, it.endSec, it.title) }
+        fun chaptersOf(rows: List<ChapterEntity>) = rows.map { TimelineChapter(it.startSec, it.endSec, it.title) }
     }
 }
 
@@ -271,7 +273,7 @@ class ListeningTracker(private val progress: SpokenProgress) {
         pausedAt = 0
         listenedMs += elapsedMs
         lastPosSec = positionSec
-        if (!finished && im.flume.hearth.spoken.ProgressMerge.reachedEnd(positionSec, item.timeline.durationSec)) {
+        if (!finished && ProgressMerge.reachedEnd(positionSec, item.timeline.durationSec)) {
             finished = true
             save(item)
         } else if (wallNow - lastSaveAt >= SAVE_EVERY_MS) save(item)
@@ -304,7 +306,7 @@ class ListeningTracker(private val progress: SpokenProgress) {
     private suspend fun save(item: SpokenNow) {
         lastSaveAt = System.currentTimeMillis()
         progress.record(item.libraryItemId, item.episodeId, lastPosSec, item.timeline.durationSec)
-        if (im.flume.hearth.spoken.ProgressMerge.reachedEnd(lastPosSec, item.timeline.durationSec)) finished = true
+        if (ProgressMerge.reachedEnd(lastPosSec, item.timeline.durationSec)) finished = true
     }
 
     private suspend fun saveSession(item: SpokenNow) {

@@ -1,6 +1,7 @@
 package im.flume.hearth.data
 
 import im.flume.hearth.api.SubsonicException
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -174,7 +175,7 @@ class PlaylistRulesTest {
         // Admins (or unknown) being refused don't get told to become admins.
         assertEquals("Couldn't save the playlist", PlaylistRules.editError(SubsonicException(50, "nope"), "leon", isAdmin = true, "fallback"))
         assertEquals("Couldn't save the playlist", PlaylistRules.editError(SubsonicException(50, "nope"), "leon", isAdmin = null, "fallback"))
-        assertEquals("fallback", PlaylistRules.editError(java.io.IOException(), "leon", isAdmin = false, "fallback"))
+        assertEquals("fallback", PlaylistRules.editError(IOException(), "leon", isAdmin = false, "fallback"))
         assertEquals("fallback", PlaylistRules.editError(SubsonicException(70, "missing"), "leon", isAdmin = false, "fallback"))
     }
 }

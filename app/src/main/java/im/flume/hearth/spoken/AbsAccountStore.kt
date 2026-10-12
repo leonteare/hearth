@@ -5,10 +5,12 @@ import androidx.core.content.edit
 import im.flume.hearth.api.AbsAuthStore
 import im.flume.hearth.api.AbsTokens
 import im.flume.hearth.data.PasswordVault
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /** Who is signed in to Audiobookshelf on this phone. */
@@ -57,7 +59,7 @@ class AbsAccountStore(context: Context) : AbsAuthStore {
 
     /** A random id for this phone, so the server's listening stats show which device it was. */
     val deviceId: String
-        get() = prefs.getString("deviceId", null) ?: java.util.UUID.randomUUID().toString().also { id -> prefs.edit { putString("deviceId", id) } }
+        get() = prefs.getString("deviceId", null) ?: UUID.randomUUID().toString().also { id -> prefs.edit { putString("deviceId", id) } }
 
     var lastFullSyncAt: Long
         get() = prefs.getLong("lastFullSyncAt", 0)
@@ -65,13 +67,13 @@ class AbsAccountStore(context: Context) : AbsAuthStore {
 
     /** Recent follow / unfollow choices made on this phone (see FollowTags.heal), by podcast id. */
     fun followIntents(): Map<String, FollowIntent> = runCatching {
-        json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(FollowIntent.serializer()), prefs.getString("followIntents", null) ?: "[]")
+        json.decodeFromString(ListSerializer(FollowIntent.serializer()), prefs.getString("followIntents", null) ?: "[]")
     }.getOrDefault(emptyList()).associateBy { it.podcastId }
 
     @Synchronized
     fun updateFollowIntents(transform: (Map<String, FollowIntent>) -> Map<String, FollowIntent>) {
         val next = transform(followIntents()).values.toList()
-        prefs.edit { putString("followIntents", json.encodeToString(kotlinx.serialization.builtins.ListSerializer(FollowIntent.serializer()), next)) }
+        prefs.edit { putString("followIntents", json.encodeToString(ListSerializer(FollowIntent.serializer()), next)) }
     }
 
     fun updateSettings(transform: (SpokenSettings) -> SpokenSettings) {

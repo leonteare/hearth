@@ -1,5 +1,6 @@
 package im.flume.hearth.spoken
 
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -164,7 +165,7 @@ object FollowTags {
 }
 
 /** A follow / unfollow this user made on this phone, kept for [FollowTags.heal]. */
-@kotlinx.serialization.Serializable
+@Serializable
 data class FollowIntent(val podcastId: String, val username: String, val follow: Boolean, val at: Long)
 
 /** Episode facts the download planner needs. */

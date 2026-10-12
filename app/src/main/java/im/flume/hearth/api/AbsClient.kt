@@ -1,5 +1,9 @@
 package im.flume.hearth.api
 
+import im.flume.hearth.util.scrubSecrets
+import java.io.InputStream
+import java.text.Normalizer
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
@@ -8,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -234,7 +239,7 @@ class AbsClient(
         call(Request.Builder().url(url(path)).method(method, body.toString().toRequestBody(JSON)).build(), de?.let { d -> { s: String -> json.decodeFromString(d, s) } })
 
     private fun excerpt(resp: Response): String =
-        im.flume.hearth.util.scrubSecrets(runCatching { resp.body?.string().orEmpty() }.getOrDefault("").take(160))
+        scrubSecrets(runCatching { resp.body?.string().orEmpty() }.getOrDefault("").take(160))
 
     // ------------------------------------------------------------------ API
 
@@ -287,7 +292,7 @@ class AbsClient(
 
     /** Replaces a podcast's or book's tags (read-modify-write: see FollowTags). */
     suspend fun setTags(libraryItemId: String, tags: List<String>) {
-        send<Unit>("PATCH", "api/items/$libraryItemId/media", buildJsonObject { putJsonArray("tags") { tags.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } } }, null)
+        send<Unit>("PATCH", "api/items/$libraryItemId/media", buildJsonObject { putJsonArray("tags") { tags.forEach { add(JsonPrimitive(it)) } } }, null)
     }
 
     suspend fun setAutoDownload(libraryItemId: String, enabled: Boolean) {
@@ -341,9 +346,9 @@ class AbsClient(
                     feed.language?.let { put("language", it) }
                     put("explicit", feed.explicit == "yes" || feed.explicit == "true" || itunes?.explicit == true)
                     feed.type?.let { put("type", it) }
-                    putJsonArray("genres") { (itunes?.genres ?: feed.categories).filter { it.isNotBlank() }.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
+                    putJsonArray("genres") { (itunes?.genres ?: feed.categories).filter { it.isNotBlank() }.forEach { add(JsonPrimitive(it)) } }
                 }
-                putJsonArray("tags") { tags.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
+                putJsonArray("tags") { tags.forEach { add(JsonPrimitive(it)) } }
                 put("autoDownloadEpisodes", autoDownload)
             }
         }
@@ -423,7 +428,7 @@ class AbsClient(
             })
         }
         // A big book takes a while to send, and the server answers only once every file is saved.
-        val client = http.newBuilder().writeTimeout(5, java.util.concurrent.TimeUnit.MINUTES).readTimeout(10, java.util.concurrent.TimeUnit.MINUTES).build()
+        val client = http.newBuilder().writeTimeout(5, TimeUnit.MINUTES).readTimeout(10, TimeUnit.MINUTES).build()
         client.newCall(Request.Builder().url(url("api/upload")).post(form.build()).build()).execute().use { resp ->
             if (resp.code == 403) throw AbsException("Your account isn't allowed to upload to the server")
             if (!resp.isSuccessful) throw AbsHttpException(resp.code, excerpt(resp))
@@ -443,7 +448,7 @@ class AbsClient(
 }
 
 /** One file to upload: its name on the server, size in bytes (0 if unknown) and how to read it. */
-class AbsUploadFile(val name: String, val size: Long, val mimeType: String?, val open: () -> java.io.InputStream)
+class AbsUploadFile(val name: String, val size: Long, val mimeType: String?, val open: () -> InputStream)
 
 /** Mirrors Audiobookshelf's sanitizeFilename, so a podcast lands in the folder its own app would pick. */
 object PodcastPaths {
@@ -454,7 +459,7 @@ object PodcastPaths {
     private val windowsTrailing = Regex("[. ]+$")
 
     fun sanitizeFilename(name: String): String {
-        val s = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFC)
+        val s = Normalizer.normalize(name, Normalizer.Form.NFC)
             .replaceFirst(":", " - ")
             .replace(illegal, "")
             .replace(control, "")

@@ -2,6 +2,9 @@ package im.flume.hearth.api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class SubsonicEnvelope(
@@ -83,11 +86,11 @@ data class SongDto(
     val isDir: Boolean = false,
     val replayGain: ReplayGain? = null,
     /** OpenSubsonic: Navidrome sends a list of strings; tolerate a single string too. */
-    val isrc: kotlinx.serialization.json.JsonElement? = null,
+    val isrc: JsonElement? = null,
 ) {
     fun isrcCodes(): List<String> = when (val v = isrc) {
-        is kotlinx.serialization.json.JsonArray -> v.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-        is kotlinx.serialization.json.JsonPrimitive -> if (v.isString) listOf(v.content) else emptyList()
+        is JsonArray -> v.mapNotNull { (it as? JsonPrimitive)?.content }
+        is JsonPrimitive -> if (v.isString) listOf(v.content) else emptyList()
         else -> emptyList()
     }.map { it.trim().uppercase() }.filter { it.isNotEmpty() }.distinct()
 }

@@ -1,6 +1,11 @@
 package im.flume.hearth.api
 
 import im.flume.hearth.util.scrubSecrets
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.Base64
+import javax.net.ssl.SSLException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -190,9 +195,9 @@ class TidarrClient(http: OkHttpClient, private val config: () -> TidarrConfig?) 
         } catch (e: IOException) {
             throw TidarrException(
                 when (e) {
-                    is java.net.UnknownHostException -> "Couldn't find Tidarr (is the address right?)"
-                    is javax.net.ssl.SSLException -> "Couldn't make a secure connection to Tidarr"
-                    is java.net.SocketTimeoutException, is java.io.InterruptedIOException -> "Tidarr took too long to answer"
+                    is UnknownHostException -> "Couldn't find Tidarr (is the address right?)"
+                    is SSLException -> "Couldn't make a secure connection to Tidarr"
+                    is SocketTimeoutException, is InterruptedIOException -> "Tidarr took too long to answer"
                     else -> "Couldn't reach Tidarr" + (e.message?.let { ": " + scrubSecrets(it) } ?: "")
                 }
             )
@@ -415,7 +420,7 @@ object TidarrParsing {
         val root = json.parseToJsonElement(body).obj() ?: return null
         if (root["manifestMimeType"].str() != "application/vnd.tidal.bts") return null
         val encoded = root["manifest"].str() ?: return null
-        val decoded = runCatching { String(java.util.Base64.getDecoder().decode(encoded.trim()), Charsets.UTF_8) }.getOrNull() ?: return null
+        val decoded = runCatching { String(Base64.getDecoder().decode(encoded.trim()), Charsets.UTF_8) }.getOrNull() ?: return null
         val manifest = runCatching { json.parseToJsonElement(decoded).obj() }.getOrNull() ?: return null
         val url = manifest["urls"].arr()?.firstNotNullOfOrNull { it.str() }?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
             ?: return null

@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,7 +85,7 @@ fun AboutText(title: String, text: String, link: String?) {
             Box(
                 Modifier
                     .heightIn(min = 48.dp)
-                    .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                    .clickable(role = Role.Button) {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     },
                 contentAlignment = Alignment.CenterStart,

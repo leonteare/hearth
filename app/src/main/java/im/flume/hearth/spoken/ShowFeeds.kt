@@ -1,6 +1,7 @@
 package im.flume.hearth.spoken
 
 import android.content.Context
+import im.flume.hearth.api.AbsAuthException
 import im.flume.hearth.api.AbsLibraryItem
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CancellationException
@@ -190,7 +191,7 @@ class ShowFeeds(context: Context, private val repo: SpokenRepository, private va
                 // A blip in the connection isn't a failure: keep looking until the give-up time.
                 item = try {
                     repo.api.item(id) ?: throw IOException("This show isn't on your server any more")
-                } catch (e: im.flume.hearth.api.AbsAuthException) {
+                } catch (e: AbsAuthException) {
                     throw e
                 } catch (e: IOException) {
                     if (e.message?.contains("isn't on your server") == true) throw e

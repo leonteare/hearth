@@ -4,11 +4,16 @@ import android.os.Bundle
 import im.flume.hearth.api.NavidromeNativeApi
 import im.flume.hearth.api.PlaylistDto
 import im.flume.hearth.api.SubsonicClient
+import im.flume.hearth.api.SubsonicException
+import java.io.IOException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import im.flume.hearth.download.DownloadRepository
+import kotlinx.coroutines.withContext
 
 /**
  * Something the user can press play on. Converted to a Bundle to travel to the playback service, so
@@ -67,7 +72,7 @@ class LibraryRepository(
             PlaylistRules.items(all, creds?.username, decisions)
         }
 
-    private val keepLock = kotlinx.coroutines.sync.Mutex()
+    private val keepLock = Mutex()
     /** The kept playlist once made here, so a second download before the next sync doesn't make another. */
     private var keptPlaylistId: String? = null
 
@@ -130,7 +135,7 @@ class LibraryRepository(
     /** Search index over the local library, rebuilt after each sync. */
     suspend fun searchIndex(syncedAt: Long): SearchIndex {
         index?.takeIf { it.first == syncedAt }?.let { return it.second }
-        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        return withContext(Dispatchers.Default) {
             SearchIndex(dao.allSongsOnce(), dao.allAlbumsOnce(), dao.allArtistsOnce())
         }.also { index = syncedAt to it }
     }
@@ -209,7 +214,7 @@ class LibraryRepository(
 
     /** The playlist's song ids as the server has them right now, in order. */
     private suspend fun serverSongIds(playlistId: String): List<String> =
-        (api.playlist(playlistId) ?: throw java.io.IOException("Playlist not found")).entry.map { it.id }
+        (api.playlist(playlistId) ?: throw IOException("Playlist not found")).entry.map { it.id }
 
     /**
      * The song ids to start an edit from: fresh from the server when possible (also updating the local
@@ -288,7 +293,7 @@ class LibraryRepository(
 
     /** Message for a failed playlist edit; only mentions admin rights when the account isn't one. */
     suspend fun editError(e: Throwable, owner: String?, fallback: String): String {
-        val notAuthorized = e is im.flume.hearth.api.SubsonicException && e.notAuthorized
+        val notAuthorized = e is SubsonicException && e.notAuthorized
         val isAdmin = if (!notAuthorized) null else session.credentials.value?.username?.let { me ->
             runCatching { api.user(me)?.adminRole }.getOrNull()
         }
@@ -301,12 +306,12 @@ class LibraryRepository(
      * Returns the sharing the server has afterwards (read back, not assumed).
      */
     suspend fun updateSharing(playlistId: String, change: (Sharing) -> Sharing): Sharing? {
-        val pl = api.playlist(playlistId) ?: throw java.io.IOException("Playlist not found")
+        val pl = api.playlist(playlistId) ?: throw IOException("Playlist not found")
         val parsed = PlaylistSharing.parse(pl.comment)
         val current = parsed.sharing ?: Sharing()
         val next = change(current.copy(owner = current.owner ?: pl.owner?.lowercase()))
         api.setPlaylistComment(playlistId, PlaylistSharing.serialize(parsed.text, next), public = !next.isEmpty)
-        val fresh = refreshPlaylist(playlistId) ?: throw java.io.IOException("Playlist not found")
+        val fresh = refreshPlaylist(playlistId) ?: throw IOException("Playlist not found")
         return PlaylistSharing.parse(fresh.comment).sharing
     }
 

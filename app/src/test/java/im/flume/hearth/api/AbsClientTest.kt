@@ -4,6 +4,7 @@ import im.flume.hearth.spoken.toBook
 import im.flume.hearth.spoken.toEntity
 import im.flume.hearth.spoken.toPodcast
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -178,7 +179,7 @@ class AbsClientTest {
     @Test
     fun `iTunes directory results parse`() {
         val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true; explicitNulls = false }
-        val r = json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(AbsPodcastSearchResult.serializer()), fixture("itunes_search.json"))
+        val r = json.decodeFromString(ListSerializer(AbsPodcastSearchResult.serializer()), fixture("itunes_search.json"))
         assertEquals("Up First from NPR", r.first().title)
         assertEquals("https://feeds.npr.org/510318/podcast.xml", r.first().feedUrl)
         assertEquals(1222114325L, r.first().id)

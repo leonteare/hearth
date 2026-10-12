@@ -35,6 +35,7 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import androidx.compose.material3.MaterialTheme
+import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -58,8 +59,8 @@ fun rememberCoverColor(coverArt: String?, fallback: Color = CoverColorFallback, 
     var found by remember(key) { mutableStateOf(key?.let { coverColorCache.get(it) }) }
     LaunchedEffect(key) {
         if (key == null || found != null) return@LaunchedEffect
-        val url = (if (coverArt != null) actions.coverUrl(coverArt, im.flume.hearth.ui.theme.CoverSize.SMALL) else imageUrl) ?: return@LaunchedEffect
-        val request = ImageRequest.Builder(context).data(url).size(im.flume.hearth.ui.theme.CoverSize.SMALL).allowHardware(false).build()
+        val url = (if (coverArt != null) actions.coverUrl(coverArt, CoverSize.SMALL) else imageUrl) ?: return@LaunchedEffect
+        val request = ImageRequest.Builder(context).data(url).size(CoverSize.SMALL).allowHardware(false).build()
         val result = SingletonImageLoader.get(context).execute(request) as? SuccessResult ?: return@LaunchedEffect
         val bitmap = result.image.toBitmap()
         val palette = withContext(Dispatchers.Default) { Palette.from(bitmap).generate() }

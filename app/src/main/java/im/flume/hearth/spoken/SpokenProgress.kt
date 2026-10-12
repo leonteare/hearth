@@ -2,6 +2,7 @@ package im.flume.hearth.spoken
 
 import android.content.Context
 import android.os.Build
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -16,6 +17,7 @@ import im.flume.hearth.api.AbsClient
 import im.flume.hearth.api.AbsHttpException
 import im.flume.hearth.api.AbsMediaProgress
 import im.flume.hearth.data.AppDatabase
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -324,7 +326,7 @@ class SpokenProgress(
                 OUTBOX_WORK, ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<OutboxWorker>()
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                    .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                     .build(),
             )
         }

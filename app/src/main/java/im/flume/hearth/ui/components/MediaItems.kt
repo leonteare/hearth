@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import im.flume.hearth.ui.theme.CardTitleStyle
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.NotOnServerAlpha
 import im.flume.hearth.ui.theme.TextSecondary
 
 /**
@@ -139,7 +140,7 @@ fun MediaCard(
     cover: (@Composable () -> Unit)? = null,
 ) {
     val align = if (round) TextAlign.Center else TextAlign.Start
-    val textAlpha = if (dimmed) im.flume.hearth.ui.theme.NotOnServerAlpha else 1f
+    val textAlpha = if (dimmed) NotOnServerAlpha else 1f
     Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClickLabel = if (onLongClick != null) "More options" else null, onLongClick = onLongClick)) {
         if (cover != null) cover()
         else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title, url = coverUrl)

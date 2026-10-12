@@ -6,6 +6,9 @@ import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.PlaylistSongEntity
 import im.flume.hearth.data.SessionStore
 import im.flume.hearth.data.toEntity
+import im.flume.hearth.util.scrubSecrets
+import im.flume.hearth.util.userMessage
+import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -140,9 +143,9 @@ class LibrarySync(
             throw e
         } catch (e: Exception) {
             val message = when (e) {
-                is java.net.UnknownHostException -> "Couldn't find the server (is Tailscale connected?)"
-                else -> im.flume.hearth.util.userMessage(e, "Sync failed")
-            }.let { im.flume.hearth.util.scrubSecrets(it) } // URLs can carry the login token
+                is UnknownHostException -> "Couldn't find the server (is Tailscale connected?)"
+                else -> userMessage(e, "Sync failed")
+            }.let { scrubSecrets(it) } // URLs can carry the login token
             _state.value = SyncState.Failed(message)
         }
     }

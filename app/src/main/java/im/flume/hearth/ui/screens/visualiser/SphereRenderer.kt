@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.exp
@@ -139,7 +140,7 @@ class SphereRenderer : VisualiserRenderer() {
         drawCircle(Color.Black.copy(alpha = 0.85f), radius = ballR * 0.92f, center = Offset(cx, cy))
         drawCircle(
             pal.color(0), radius = ballR * 0.92f, center = Offset(cx, cy),
-            alpha = 0.25f + 0.45f * pulse, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f * density),
+            alpha = 0.25f + 0.45f * pulse, style = Stroke(width = 1.5f * density),
             blendMode = BlendMode.Plus,
         )
 
