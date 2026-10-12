@@ -355,19 +355,52 @@ enum class SongOrder {
     /** By album, then disc and track: Liked Songs' "Album" sort (not on All songs' menu). */
     ALBUM;
 
+    /**
+     * The songs in this order. Slow for a whole library (thousands of songs): call it off the main
+     * thread. Text keys are worked out once per song rather than in every comparison, which keeps
+     * a sort of ~7k songs to a few milliseconds.
+     */
     fun sort(songs: List<SongEntity>): List<SongEntity> = when (this) {
-        TITLE -> songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::title))
-        ALBUM -> songs.sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::album).thenBy { it.disc }.thenBy { it.track }
-        )
-        ARTIST -> songs.sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER, SongEntity::artist).thenBy { it.album.lowercase() }.thenBy { it.disc }.thenBy { it.track }
-        )
+        TITLE -> songs.sortedByKeys { SortKey(it, foldCase(it.title)) }
+        ALBUM -> songs.sortedByKeys { SortKey(it, foldCase(it.album), disc = it.disc, track = it.track) }
+        ARTIST -> songs.sortedByKeys { SortKey(it, foldCase(it.artist), it.album.lowercase(), it.disc, it.track) }
         RECENT -> songs.sortedByDescending { it.created.orEmpty() }
         PLAYS -> songs.sortedByDescending { it.playCount }
     }
 
+    /** One song's precomputed sort keys, compared in order. */
+    private class SortKey(val song: SongEntity, val text: String, val text2: String = "", val disc: Int = 0, val track: Int = 0) :
+        Comparable<SortKey> {
+        override fun compareTo(other: SortKey): Int {
+            text.compareTo(other.text).let { if (it != 0) return it }
+            text2.compareTo(other.text2).let { if (it != 0) return it }
+            disc.compareTo(other.disc).let { if (it != 0) return it }
+            return track.compareTo(other.track)
+        }
+    }
+
     companion object {
+        /**
+         * [text] folded so that plain comparison orders it exactly as [String.CASE_INSENSITIVE_ORDER]
+         * does (which compares each character's upper-then-lower case), without redoing it per comparison.
+         */
+        fun foldCase(text: String): String {
+            var i = 0
+            while (i < text.length) {
+                val c = text[i]
+                if (Character.toLowerCase(Character.toUpperCase(c)) != c) break
+                i++
+            }
+            if (i == text.length) return text
+            val out = CharArray(text.length)
+            for (j in text.indices) out[j] = Character.toLowerCase(Character.toUpperCase(text[j]))
+            return String(out)
+        }
+
+        /** Stable, like the comparator sorts it replaces: equal keys keep the database's order. */
+        private inline fun List<SongEntity>.sortedByKeys(key: (SongEntity) -> SortKey): List<SongEntity> =
+            map(key).sorted().map { it.song }
+
         /** The All songs sort menu position (see SONG_SORTS). */
         fun fromMenu(index: Int): SongOrder = entries.getOrElse(index) { TITLE }
 

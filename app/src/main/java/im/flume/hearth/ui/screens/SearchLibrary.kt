@@ -821,10 +821,22 @@ fun BrowseAlbumsScreen() {
 
 @Composable
 fun BrowseSongsScreen() {
-    val dao = LocalContext.current.container.db.library()
+    val context = LocalContext.current
+    val dao = context.container.db.library()
     val actions = LocalActions.current
     val songs by remember { dao.allSongs() }.collectAsStateWithLifecycle(emptyList())
-    val sortedCache = remember(songs) { HashMap<SongOrder, List<SongEntity>>() }
+    // Sorting ~7k songs takes too long for the main thread: every order is sorted in the background,
+    // once per version of the list, the saved one first. Until an order is first ready its list is empty.
+    val savedOrder = remember { SongOrder.fromMenu(context.getSharedPreferences("library", android.content.Context.MODE_PRIVATE).getInt("browse-SONGS", 0)) }
+    val sortedByOrder by androidx.compose.runtime.produceState(emptyMap<SongOrder, List<SongEntity>>(), songs) {
+        val orders = listOf(savedOrder) + SONG_SORTS.indices.map { SongOrder.fromMenu(it) }.filter { it != savedOrder }
+        // The previous version's lists stay up until each is replaced, so nothing blanks on a resync.
+        var done = value
+        for (order in orders) {
+            done = done + (order to withContext(Dispatchers.Default) { order.sort(songs) })
+            value = done
+        }
+    }
     BrowseList(
         "All songs", "browse-SONGS", SONG_SORTS,
         extraActions = {
@@ -833,9 +845,8 @@ fun BrowseSongsScreen() {
             }
         },
     ) { sort ->
-        // Sorting ~7k songs is too slow to redo on every recomposition: once per list and order.
         val order = SongOrder.fromMenu(sort)
-        val sorted = sortedCache.getOrPut(order) { order.sort(songs) }
+        val sorted = sortedByOrder[order].orEmpty()
         // Tapping a song plays everything, in this order, starting from that song. The service sorts
         // the library itself: thousands of ids in a Bundle can exceed the Binder limit.
         items(sorted, key = { it.id }) { song ->
