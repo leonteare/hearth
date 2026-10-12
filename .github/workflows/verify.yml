@@ -1,0 +1,77 @@
+# Runs the same ./verify.sh the owner runs by hand (compile + unit and screenshot tests) on every push to
+# main and on every pull request. The job's result is verify.sh's own PASS/FAIL exit code.
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per branch or pull request: a newer push cancels the run still going for the same ref.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Caches ~/.gradle (dependencies, wrapper and build cache) and keeps it from growing without limit.
+      # Preferred over setup-java's own `cache: gradle`, which is a plain glob with no cleanup.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Robolectric fetches the android-all jar for the SDK it runs on (SDK 34, ~100 MB) into ~/.m2 the first
+      # time a screenshot test runs; keeping it means later runs don't download it again.
+      - name: Cache Robolectric's android-all jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: robolectric-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-${{ runner.os }}-
+
+      # The project's gradle.properties pins org.gradle.java.home to the owner's Windows JDK. A
+      # gradle.properties in GRADLE_USER_HOME (~/.gradle) wins over the project's one, so this points Gradle
+      # at the JDK installed above without touching the checked-in file.
+      - name: Point Gradle at this runner's JDK
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.java.home=$JAVA_HOME" >> ~/.gradle/gradle.properties
+
+      # Git has gradlew without its executable bit (it has only ever been run from Windows).
+      - name: Make the scripts executable
+        run: chmod +x gradlew verify.sh
+
+      # ANDROID_HOME is already set on the runner, and verify.sh leaves a pre-set one alone.
+      - name: Verify
+        run: ./verify.sh
+
+      # Screenshot tests that no longer match their references leave a reference | new | difference image.
+      - name: Upload the test reports and any screenshot differences
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-failures
+          path: |
+            **/build/outputs/roborazzi/*_compare.png
+            **/build/reports/tests/**
+          if-no-files-found: ignore
