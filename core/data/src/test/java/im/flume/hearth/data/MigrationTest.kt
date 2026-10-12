@@ -213,7 +213,7 @@ class MigrationTest {
 
         val version = Regex("""@Database\([^@]*?\bversion\s*=\s*(\d+)""").find(databaseSource)!!.groupValues[1].toInt()
         val newest = File("schemas/im.flume.hearth.data.AppDatabase").listFiles()!!.mapNotNull { it.nameWithoutExtension.toIntOrNull() }.max()
-        assertEquals("@Database(version) vs newest file in app/schemas (commit the JSON KSP exports)", newest, version)
+        assertEquals("@Database(version) vs newest file in core/data/schemas (commit the JSON KSP exports)", newest, version)
         val exported = Json.parseToJsonElement(File("schemas/im.flume.hearth.data.AppDatabase/$newest.json").readText())
             .jsonObject["database"]!!.jsonObject["version"]!!.jsonPrimitive.content.toInt()
         assertEquals(version, exported)

@@ -1,5 +1,5 @@
 // Every Room schema migration, one step per version, registered in AppDatabase.create.
-// Each step must match the schema KSP exports to app/schemas: MigrationTest checks both.
+// Each step must match the schema KSP exports to core/data/schemas: MigrationTest checks both.
 package im.flume.hearth.data
 
 import androidx.room.migration.Migration

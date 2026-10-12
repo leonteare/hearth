@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// The player feature: its screens and its <Feature>Routes.kt. Depends only on :core:ui (and through it the core modules),
+// The player feature: mini player, Now Playing, queue, lyrics, spoken player and visualiser (no routes: :app draws
+// them as overlays). Depends only on :core:ui (and through it the core modules),
 // never on another feature.
 dependencies {
     implementation(project(":core:ui"))
