@@ -122,23 +122,23 @@ object HearthShapes {
     val Round = CircleShape
 }
 
-private fun colors(accent: Color) = darkColorScheme(
+private fun colorScheme(accent: Color, c: HearthColors) = darkColorScheme(
     primary = accent,
-    onPrimary = Color.Black,
+    onPrimary = c.onAccent,
     secondary = accent,
-    background = Background,
-    onBackground = Color.White,
-    surface = Background,
-    onSurface = Color.White,
-    surfaceVariant = Surface,
-    onSurfaceVariant = TextSecondary,
-    surfaceContainer = Surface,
-    surfaceContainerHigh = SurfaceHigh,
-    surfaceContainerHighest = SurfaceHigh,
-    surfaceContainerLow = Surface,
-    outline = Color(0xFF3E3E3E),
-    outlineVariant = DividerColor,
-    error = Destructive,
+    background = c.background,
+    onBackground = c.text,
+    surface = c.background,
+    onSurface = c.text,
+    surfaceVariant = c.surface,
+    onSurfaceVariant = c.textSecondary,
+    surfaceContainer = c.surface,
+    surfaceContainerHigh = c.surfaceHigh,
+    surfaceContainerHighest = c.surfaceHigh,
+    surfaceContainerLow = c.surface,
+    outline = c.outline,
+    outlineVariant = c.divider,
+    error = c.destructive,
 )
 
 private val Type = Typography(
@@ -168,13 +168,26 @@ val CardTitleStyle: TextStyle @Composable get() = MaterialTheme.typography.bodyM
  */
 val LocalReducedMotion = staticCompositionLocalOf { false }
 
+/** The app theme. The token defaults are today's look; a skin passes its own (see Tokens.kt). */
 @Composable
-fun HearthTheme(content: @Composable () -> Unit) {
+fun HearthTheme(
+    colors: HearthColors = HearthColors(),
+    spacing: HearthSpacing = HearthSpacing(),
+    shapes: HearthShapeSet = HearthShapeSet(),
+    icons: HearthIcons = HearthIcons(),
+    content: @Composable () -> Unit,
+) {
     val resolver = LocalContext.current.contentResolver
     val reducedMotion = remember(resolver) {
         runCatching { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
     }
-    CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
-        MaterialTheme(colorScheme = colors(Accent), typography = Type, content = content)
+    CompositionLocalProvider(
+        LocalReducedMotion provides reducedMotion,
+        LocalHearthColors provides colors,
+        LocalHearthSpacing provides spacing,
+        LocalHearthShapes provides shapes,
+        LocalHearthIcons provides icons,
+    ) {
+        MaterialTheme(colorScheme = colorScheme(Accent, colors), typography = Type, content = content)
     }
 }

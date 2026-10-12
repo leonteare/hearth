@@ -59,6 +59,7 @@ import im.flume.hearth.playback.SpokenNowPlaying
 import im.flume.hearth.spoken.ChapterEntity
 import im.flume.hearth.spoken.ChapterMarks
 import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.ui.components.PlayPauseIcon
 import im.flume.hearth.ui.components.formatDuration
 import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.TextSecondary

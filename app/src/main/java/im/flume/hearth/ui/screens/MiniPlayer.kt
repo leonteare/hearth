@@ -2,9 +2,7 @@ package im.flume.hearth.ui.screens
 
 // The mini player above the tabs (swipe sideways to skip a song) and the shared play / pause glyph.
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -17,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
@@ -47,6 +43,7 @@ import im.flume.hearth.container
 import im.flume.hearth.data.Usage
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.CoverPrefetcher
+import im.flume.hearth.ui.components.PlayPauseIcon
 import im.flume.hearth.ui.components.PlayerCoverArt
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.theme.CoverSize
@@ -140,13 +137,5 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             gapSize = 0.dp,
             drawStopIndicator = {},
         )
-    }
-}
-
-/** Play / pause glyph that crossfades between states and says what tapping it will do. */
-@Composable
-internal fun PlayPauseIcon(isPlaying: Boolean, modifier: Modifier) {
-    Crossfade(isPlaying, animationSpec = tween(150), label = "playPause") { playing ->
-        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playing) "Pause" else "Play", modifier)
     }
 }

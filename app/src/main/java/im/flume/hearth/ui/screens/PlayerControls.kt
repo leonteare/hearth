@@ -52,6 +52,7 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.Usage
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.PlayPauseIcon
 import im.flume.hearth.ui.components.formatDuration
 import im.flume.hearth.ui.theme.TextSecondary
 
