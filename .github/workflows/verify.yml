@@ -37,8 +37,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # packages: '' skips the action's default install of the retired "tools" package, which no longer exists
+      # in the SDK repository (it fails the step). The runner image already has the SDK; AGP fetches the rest.
       - name: Set up the Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       # Robolectric fetches the android-all jar for the SDK it runs on (SDK 34, ~100 MB) into ~/.m2 the first
       # time a screenshot test runs; keeping it means later runs don't download it again.
