@@ -39,21 +39,23 @@ You need Android Studio, which provides the JDK and Android SDK.
 
 ```
 ./gradlew assembleRelease      # signed APK in app/build/outputs/apk/release/
-./gradlew testDebugUnitTest    # unit tests
+./verify.sh                    # compile + all tests
 ```
 
 ## Layout
 
-| Folder | What it does |
-|---|---|
-| `api/` | Clients: Subsonic (token auth), Navidrome native API (playlist photos, users), Audiobookshelf, Tidarr |
-| `data/` | Room database, library/search/stats logic, settings, password vault, playlist sharing, server mixes |
-| `sync/` | Full library sync (empty `search3` paging, shrink guard) |
-| `download/` | Song downloads: policy and WorkManager worker |
-| `requests/` | Getting music that isn't on the server, through Tidarr |
-| `spoken/` | Podcasts and audiobooks from Audiobookshelf, plus audiobooks on the phone |
-| `playback/` | Media3 service, queue logic, data source (download → cache → stream), scrobbling, previews, visualiser audio analysis |
-| `update/` | Self-update from GitHub Releases |
-| `ui/` | Jetpack Compose screens, shared components, visualisers, theme |
+Gradle modules, each depending only on the ones above it (features never depend on each other):
 
-CLAUDE.md has the file-by-file map; DECISIONS.md lists settled design choices. `./verify.sh` compiles and runs the tests.
+| Module | What it does |
+|---|---|
+| `core/common` | Error logging, crash files, scrubbing secrets from messages |
+| `core/network` | Clients: Subsonic (token auth), Navidrome native API (playlist photos, users), Audiobookshelf, Tidarr |
+| `core/data` | Room database, migrations and schemas, settings, password vault |
+| `core/domain` | Library/search/stats logic, sync (shrink guard), downloads, requests via Tidarr, podcasts and audiobooks, self-update |
+| `core/playback` | Media3 service, queue, data source (download → cache → stream), scrobbling, previews, visualiser audio analysis |
+| `core/ui` | Theme and design tokens, shared components and rows |
+| `core/testing` | Test helpers: sample data, fake container, screenshot test base |
+| `feature/home`, `library`, `search`, `player`, `spoken`, `settings` | The screens for each area |
+| `app` | The Application, navigation, bottom bar, signing and versioning |
+
+CLAUDE.md has the detailed map; DECISIONS.md lists settled design choices. `./verify.sh` compiles and runs every module's tests, including screenshot tests.
