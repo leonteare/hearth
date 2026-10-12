@@ -31,15 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropUp
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -95,8 +86,7 @@ import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.coverPalette
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -285,12 +275,13 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
     }
 
     if (picker) {
-        ModalBottomSheet(onDismissRequest = { picker = false; interaction++ }, containerColor = SurfaceHigh) {
-            Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+        val spacing = HearthTheme.spacing
+        ModalBottomSheet(onDismissRequest = { picker = false; interaction++ }, containerColor = HearthTheme.colors.surfaceHigh) {
+            Column(Modifier.navigationBarsPadding().padding(bottom = spacing.l)) {
                 for ((group, retro) in listOf("Modern" to false, "Retro" to true)) {
                     Text(
-                        group, style = MaterialTheme.typography.labelLarge, color = TextSecondary,
-                        modifier = Modifier.padding(start = 24.dp, top = 12.dp, bottom = 4.dp),
+                        group, style = MaterialTheme.typography.labelLarge, color = HearthTheme.colors.textSecondary,
+                        modifier = Modifier.padding(start = spacing.xl, top = spacing.m, bottom = spacing.xs),
                     )
                     VisualiserStyle.entries.filter { it.retro == retro }.forEach { s ->
                         Row(
@@ -298,11 +289,11 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                                 .fillMaxWidth()
                                 .heightIn(min = 52.dp)
                                 .clickable(role = Role.RadioButton) { picker = false; interaction++; switchTo(s) }
-                                .padding(horizontal = 24.dp),
+                                .padding(horizontal = spacing.xl),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(s.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                            if (s == style) Icon(Icons.Default.Check, "Selected", tint = accent)
+                            if (s == style) Icon(HearthTheme.icons.check, "Selected", tint = accent)
                         }
                     }
                 }
@@ -321,58 +312,62 @@ private fun Controls(
 ) {
     val player = LocalContext.current.container.player
     val meta = state.current?.mediaMetadata
+    // Drawn over the visualiser's black canvas, so the scrims stay black whatever the skin; text uses onCover.
+    val onCanvas = HearthTheme.colors.onCover
+    val icons = HearthTheme.icons
+    val spacing = HearthTheme.spacing
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxWidth().height(180.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent))))
         Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(280.dp)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
         )
-        Row(Modifier.safeDrawingPadding().padding(8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close visualiser", tint = Color.White) }
-            Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                Text(meta?.title?.toString().orEmpty(), color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(meta?.artist?.toString().orEmpty(), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.safeDrawingPadding().padding(spacing.s).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClose) { Icon(icons.close, "Close visualiser", tint = onCanvas) }
+            Column(Modifier.weight(1f).padding(horizontal = spacing.s)) {
+                Text(meta?.title?.toString().orEmpty(), color = onCanvas, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(meta?.artist?.toString().orEmpty(), color = onCanvas.copy(alpha = 0.7f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Column(
-            Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = 24.dp).fillMaxWidth(),
+            Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(bottom = spacing.xl).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
                 Modifier
-                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(50))
+                    .background(onCanvas.copy(alpha = 0.12f), RoundedCornerShape(50))
                     .clickable(onClickLabel = "Choose a style", onClick = onPick)
-                    .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(start = 14.dp, end = spacing.s, top = spacing.s, bottom = spacing.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.GraphicEq, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(style.label, color = Color.White, style = MaterialTheme.typography.labelLarge)
-                Icon(Icons.Default.ArrowDropUp, null, tint = Color.White)
+                Icon(icons.visualiser, null, tint = onCanvas, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(spacing.s))
+                Text(style.label, color = onCanvas, style = MaterialTheme.typography.labelLarge)
+                Icon(icons.expandUp, null, tint = onCanvas)
             }
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 IconButton(onClick = { onAction(); player.previous() }, Modifier.size(56.dp)) {
-                    Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(36.dp))
+                    Icon(icons.previous, "Previous", tint = onCanvas, modifier = Modifier.size(36.dp))
                 }
                 FilledIconButton(
                     onClick = { onAction(); player.playPause() },
                     modifier = Modifier.size(68.dp),
                     shape = CircleShape,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = onCanvas, contentColor = Color.Black),
                 ) {
                     Icon(
-                        if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (state.isPlaying) icons.pause else icons.play,
                         if (state.isPlaying) "Pause" else "Play",
                         modifier = Modifier.size(38.dp),
                     )
                 }
                 IconButton(onClick = { onAction(); player.next() }, Modifier.size(56.dp)) {
-                    Icon(Icons.Default.SkipNext, "Next", tint = Color.White, modifier = Modifier.size(36.dp))
+                    Icon(icons.next, "Next", tint = onCanvas, modifier = Modifier.size(36.dp))
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text("Swipe sideways for another style", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
+            Text("Swipe sideways for another style", color = onCanvas.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

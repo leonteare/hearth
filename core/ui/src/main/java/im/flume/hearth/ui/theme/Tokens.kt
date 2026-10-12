@@ -271,6 +271,9 @@ data class HearthIcons(
     val settingsGeneral: ImageVector = Icons.Outlined.Settings,
     val storage: ImageVector = Icons.Outlined.Storage,
     val appearance: ImageVector = Icons.Outlined.Palette,
+
+    // Spoken-word speed sheet (pairs with slower)
+    val faster: ImageVector = Icons.Filled.Add,
 )
 
 val LocalHearthColors = staticCompositionLocalOf { HearthColors() }

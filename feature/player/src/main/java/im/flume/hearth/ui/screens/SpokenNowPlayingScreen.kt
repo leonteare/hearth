@@ -5,8 +5,6 @@ package im.flume.hearth.ui.screens
 // This file holds the page itself; its controls, menu and sheets live in the other Spoken* files.
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +32,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -51,11 +45,11 @@ import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.playback.SpokenNowPlaying
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.playerBackdrop
 import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -74,6 +68,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
     val scope = rememberCoroutineScope()
     val dragDown = remember { Animatable(0f) }
     val closeAt = with(LocalDensity.current) { 140.dp.toPx() }
+    val spacing = HearthTheme.spacing
     val dragToClose = Modifier.pointerInput(Unit) {
         var dy = 0f
         detectVerticalDragGestures(
@@ -98,9 +93,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
         Modifier
             .fillMaxSize()
             .graphicsLayer { translationY = dragDown.value }
-            .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
-            .clickable(enabled = false) {}
-            .safeDrawingPadding()
+            .playerBackdrop(topColor)
     ) {
         val landscape = maxWidth > maxHeight
         val art: @Composable (Modifier) -> Unit = { m ->
@@ -114,18 +107,18 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
         val controls: @Composable () -> Unit = {
             SpokenControls(state, spoken, info, chapters, openPage, { speedSheet = true }, { chapterSheet = true }, onOpenQueue)
         }
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = spacing.xl)) {
             SpokenNowPlayingHeader(state, spoken, info, onClose, openPage, { sleepSheet = true }, dragToClose)
             if (landscape) {
-                Row(Modifier.weight(1f).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).padding(vertical = spacing.s), verticalAlignment = Alignment.CenterVertically) {
                     art(Modifier.weight(1f).fillMaxHeight())
-                    Spacer(Modifier.width(32.dp))
+                    Spacer(Modifier.width(spacing.xxl))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) { controls() }
                 }
             } else {
-                art(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
+                art(Modifier.weight(1f).fillMaxWidth().padding(vertical = spacing.l))
                 controls()
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(spacing.s))
             }
         }
     }
@@ -143,9 +136,9 @@ private fun SpokenNowPlayingHeader(
     modifier: Modifier,
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
+        IconButton(onClick = onClose) { Icon(HearthTheme.icons.collapse, "Close", Modifier.size(32.dp)) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (spoken.isBook) "AUDIOBOOK" else "PODCAST", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text(if (spoken.isBook) "AUDIOBOOK" else "PODCAST", style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary)
             Text(
                 if (spoken.isBook) info.subtitle.ifBlank { info.title } else info.subtitle,
                 style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,

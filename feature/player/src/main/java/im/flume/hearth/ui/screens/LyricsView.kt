@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,11 +40,7 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.currentIndex
 import im.flume.hearth.data.rows
 import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.ui.theme.TextSecondary
-
-/** Lyric text sizes (sp) and line gaps (dp) for the Appearance settings. */
-val LYRIC_SIZES = listOf(18, 22, 27, 32)
-val LYRIC_GAPS = listOf(4, 8, 14)
+import im.flume.hearth.ui.theme.HearthTheme
 
 @Composable
 internal fun LyricsView(song: SongEntity?, state: PlayerUiState, modifier: Modifier) {
@@ -70,7 +65,7 @@ internal fun LyricsView(song: SongEntity?, state: PlayerUiState, modifier: Modif
 
 @Composable
 private fun LyricsMessage(text: String, modifier: Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) { Text(text, color = TextSecondary) }
+    Box(modifier, contentAlignment = Alignment.Center) { Text(text, color = HearthTheme.colors.textSecondary) }
 }
 
 @Composable
@@ -81,13 +76,14 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
     val fontSize = LYRIC_SIZES.getOrElse(settings.lyricsSize) { 22 }.sp
     val gap = LYRIC_GAPS.getOrElse(settings.lyricsSpacing) { 8 }.dp
     val pos = rememberPosition(state)
+    val text = HearthTheme.colors.text
     val rows = remember(lyrics) { lyrics.rows() }
     val current = rows.currentIndex(pos)
     val listState = rememberLazyListState()
     LaunchedEffect(current) {
         if (current >= 0) listState.animateScrollToItem((current - 2).coerceAtLeast(0))
     }
-    LazyColumn(modifier, state = listState, contentPadding = PaddingValues(vertical = 24.dp)) {
+    LazyColumn(modifier, state = listState, contentPadding = PaddingValues(vertical = HearthTheme.spacing.xl)) {
         itemsIndexed(rows) { i, row ->
             if (row.isBreak) {
                 val active = i == current
@@ -109,9 +105,9 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
                     lineHeight = (if (lyrics.synced) fontSize else fontSize * 0.8f) * 1.25f,
                     fontWeight = if (lyrics.synced) FontWeight.Bold else FontWeight.Normal,
                     color = when {
-                        active -> Color.White
-                        past -> Color.White.copy(alpha = 0.55f)
-                        else -> Color.White.copy(alpha = 0.35f)
+                        active -> text
+                        past -> text.copy(alpha = 0.55f)
+                        else -> text.copy(alpha = 0.35f)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -131,7 +127,8 @@ private fun SyncedOrPlainLyrics(lyrics: Lyrics, state: PlayerUiState, modifier: 
 @Composable
 private fun BreakDots(active: Boolean, progress: Float, modifier: Modifier = Modifier) {
     val smooth by animateFloatAsState(progress, tween(300, easing = LinearEasing), label = "dots")
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    val dot = HearthTheme.colors.text
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
         repeat(3) { i ->
             val lit = (smooth * 3 - i).coerceIn(0f, 1f)
             val alpha = when {
@@ -139,7 +136,7 @@ private fun BreakDots(active: Boolean, progress: Float, modifier: Modifier = Mod
                 progress >= 1f -> 0.55f
                 else -> 0.3f
             }
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Color.White.copy(alpha = alpha)))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(dot.copy(alpha = alpha)))
         }
     }
 }

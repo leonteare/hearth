@@ -6,21 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.outlined.ArrowCircleDown
-import androidx.compose.material.icons.outlined.Bedtime
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.TimerOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.container
@@ -47,11 +31,13 @@ import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.LocalRowContext
 import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.SongInfoDialog
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.delay
 
 @Composable
 internal fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit) {
     val actions = LocalActions.current
+    val icons = HearthTheme.icons
     val player = LocalContext.current.container.player
     val dl = song?.let { LocalRowContext.current.downloads[it.id] }
     var open by remember { mutableStateOf(false) }
@@ -62,25 +48,25 @@ internal fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Uni
         SleepTimerSheet(active = sleepAt != 0L, onPick = { if (it != 0L) usage.track(Usage.SLEEP); player.setSleepTimer(it); sleepPicker = false }, onDismiss = { sleepPicker = false })
     }
     if (info && song != null) SongInfoDialog(song, onDismiss = { info = false })
-    IconButton(onClick = { open = true }, enabled = song != null) { Icon(Icons.Default.MoreHoriz, "More options") }
+    IconButton(onClick = { open = true }, enabled = song != null) { Icon(icons.moreHorizontal, "More options") }
     ActionSheet(open, { open = false }, title = song?.title, subtitle = song?.artist, coverArt = song?.coverArt, fallback = song?.album) {
         if (song != null) {
-            MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { open = false; actions.playNext(listOf(song.id)) }
-            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { open = false; actions.addToQueue(listOf(song.id)) }
-            MenuItem("Start radio", Icons.Default.Radio) { open = false; actions.startRadio(song) }
-            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(listOf(song.id)) }
+            MenuItem("Play next", icons.playNext) { open = false; actions.playNext(listOf(song.id)) }
+            MenuItem("Add to queue", icons.queue) { open = false; actions.addToQueue(listOf(song.id)) }
+            MenuItem("Start radio", icons.radio) { open = false; actions.startRadio(song) }
+            MenuItem("Add to playlist", icons.addToPlaylist) { open = false; actions.addToPlaylist(listOf(song.id)) }
             when (dl) {
-                null -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) { open = false; actions.download(listOf(song)) }
-                DownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) { open = false; actions.removeDownload(listOf(song.id)) }
-                else -> MenuItem("Cancel download", Icons.Default.Close) { open = false; actions.removeDownload(listOf(song.id)) }
+                null -> MenuItem("Download", icons.download) { open = false; actions.download(listOf(song)) }
+                DownloadState.DONE -> MenuItem("Remove download", icons.downloaded) { open = false; actions.removeDownload(listOf(song.id)) }
+                else -> MenuItem("Cancel download", icons.close) { open = false; actions.removeDownload(listOf(song.id)) }
             }
         }
-        MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", Icons.Outlined.Bedtime, tint = if (sleepAt != 0L) MaterialTheme.colorScheme.primary else Color.White) {
+        MenuItem(if (sleepAt != 0L) "Sleep timer (on)" else "Sleep timer", icons.sleepTimer, tint = if (sleepAt != 0L) MaterialTheme.colorScheme.primary else HearthTheme.colors.text) {
             open = false; sleepPicker = true
         }
-        song?.albumId?.let { id -> MenuItem("Go to album", Icons.Default.Album) { open = false; onClose(); actions.openAlbum(id) } }
-        song?.artistId?.let { id -> MenuItem("Go to artist", Icons.Default.Person) { open = false; onClose(); actions.openArtist(id) } }
-        if (song != null) MenuItem("Song info", Icons.Outlined.Info) { open = false; info = true }
+        song?.albumId?.let { id -> MenuItem("Go to album", icons.album) { open = false; onClose(); actions.openAlbum(id) } }
+        song?.artistId?.let { id -> MenuItem("Go to artist", icons.artist) { open = false; onClose(); actions.openArtist(id) } }
+        if (song != null) MenuItem("Song info", icons.info) { open = false; info = true }
     }
 }
 
@@ -97,8 +83,8 @@ internal fun SleepStatus(sleepAt: Long) {
     }
     val accent = MaterialTheme.colorScheme.primary
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.Bedtime, null, tint = accent, modifier = Modifier.size(12.dp))
-        Spacer(Modifier.width(4.dp))
+        Icon(HearthTheme.icons.sleepTimer, null, tint = accent, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(HearthTheme.spacing.xs))
         Text(text, style = MaterialTheme.typography.labelMedium, color = accent)
     }
 }
@@ -106,8 +92,9 @@ internal fun SleepStatus(sleepAt: Long) {
 @Composable
 private fun SleepTimerSheet(active: Boolean, onPick: (Long) -> Unit, onDismiss: () -> Unit) {
     val options = listOf(15, 30, 45, 60).map { "$it minutes" to it * 60_000L } + ("End of this song" to PlaybackService.SLEEP_END_OF_SONG)
+    val icons = HearthTheme.icons
     ActionSheet(true, onDismiss, title = "Sleep timer", showCover = false) {
-        options.forEach { (label, ms) -> MenuItem(label, Icons.Outlined.Timer) { onPick(ms) } }
-        if (active) MenuItem("Turn off timer", Icons.Outlined.TimerOff, tint = MaterialTheme.colorScheme.primary, tintText = true) { onPick(0) }
+        options.forEach { (label, ms) -> MenuItem(label, icons.timer) { onPick(ms) } }
+        if (active) MenuItem("Turn off timer", icons.timerOff, tint = MaterialTheme.colorScheme.primary, tintText = true) { onPick(0) }
     }
 }

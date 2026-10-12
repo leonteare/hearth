@@ -17,10 +17,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -46,13 +41,8 @@ import im.flume.hearth.playback.EXTRA_COVER_ART
 import im.flume.hearth.playback.QueueEntry
 import im.flume.hearth.ui.components.BannerCard
 import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.theme.Background
-import im.flume.hearth.ui.theme.DestructiveFill
-import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.ui.theme.LocalReducedMotion
-import im.flume.hearth.ui.theme.Surface
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -95,6 +85,7 @@ internal fun SwipeableQueueRow(
     Box(Modifier.fillMaxWidth().semantics { customActions = a11yActions }) {
         val o = offset.value
         val accent = MaterialTheme.colorScheme.primary
+        val colors = HearthTheme.colors
         if (o > 0f) {
             val armed = o >= triggerPx
             Row(
@@ -102,26 +93,26 @@ internal fun SwipeableQueueRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val onAccent = MaterialTheme.colorScheme.onPrimary
-                Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = onAccent)
-                Spacer(Modifier.width(8.dp))
+                Icon(HearthTheme.icons.playNext, null, tint = onAccent)
+                Spacer(Modifier.width(HearthTheme.spacing.s))
                 Text("Play next", color = onAccent, fontWeight = FontWeight.Bold)
             }
         } else if (o < 0f) {
-            Box(Modifier.matchParentSize().background(DestructiveFill)) {
+            Box(Modifier.matchParentSize().background(colors.destructiveFill)) {
                 Column(
                     Modifier.align(Alignment.CenterEnd).width(104.dp).fillMaxHeight().clickable(enabled = revealed, onClick = onRemove),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(Icons.Default.Delete, null, tint = Color.White)
-                    Text("Remove", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Icon(HearthTheme.icons.delete, null, tint = colors.text)
+                    Text("Remove", color = colors.text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
             }
         }
         Box(
             Modifier
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .background(Background)
+                .background(colors.background)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -150,24 +141,26 @@ internal fun LaterRow(song: SongEntity, alpha: Float) {
     MediaRow(
         song.title, song.artist, onClick = null,
         coverArt = song.coverArt, fallback = song.album,
-        titleColor = Color.White.copy(alpha = alpha * 0.85f),
-        subtitleColor = TextSecondary.copy(alpha = alpha),
+        titleColor = HearthTheme.colors.text.copy(alpha = alpha * 0.85f),
+        subtitleColor = HearthTheme.colors.textSecondary.copy(alpha = alpha),
     )
 }
 
 @Composable
 internal fun QueueHeader(text: String, alpha: Float = 1f, trailing: String? = null) {
     // Compact compared with page section headers: the queue is a dense list, not a page of carousels.
+    val colors = HearthTheme.colors
+    val spacing = HearthTheme.spacing
     Row(
-        Modifier.fillMaxWidth().padding(start = Dimens.Gutter, end = Dimens.Gutter, top = 14.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().padding(start = spacing.gutter, end = spacing.gutter, top = 14.dp, bottom = spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = alpha), modifier = Modifier.weight(1f),
+            color = colors.text.copy(alpha = alpha), modifier = Modifier.weight(1f),
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        trailing?.let { Text(it, color = TextSecondary, style = MaterialTheme.typography.labelMedium) }
+        trailing?.let { Text(it, color = colors.textSecondary, style = MaterialTheme.typography.labelMedium) }
     }
 }
 
@@ -182,19 +175,20 @@ internal fun QueueRow(
     modifier: Modifier = Modifier,
 ) {
     val meta = entry.item.mediaMetadata
+    val colors = HearthTheme.colors
     MediaRow(
         meta.title?.toString().orEmpty(),
         meta.artist?.toString().orEmpty(),
         onClick = if (isCurrent) null else onClick,
-        modifier = modifier.background(if (dragging) SurfaceHigh else if (isCurrent) Surface else Background),
+        modifier = modifier.background(if (dragging) colors.surfaceHigh else if (isCurrent) colors.surface else colors.background),
         coverArt = meta.extras?.getString(EXTRA_COVER_ART),
         fallback = meta.albumTitle?.toString(),
-        titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = alpha),
-        subtitleColor = TextSecondary.copy(alpha = alpha),
+        titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else colors.text.copy(alpha = alpha),
+        subtitleColor = colors.textSecondary.copy(alpha = alpha),
         trailing = handle?.let { h ->
             {
                 Box(h().size(48.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
+                    Icon(HearthTheme.icons.dragHandle, "Reorder", tint = colors.textSecondary)
                 }
             }
         },
