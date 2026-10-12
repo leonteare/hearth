@@ -51,13 +51,11 @@ class LibrarySync(
     private val _state = MutableStateFlow<SyncState>(SyncState.Idle)
     val state: StateFlow<SyncState> = _state.asStateFlow()
 
-    /** Syncs if forced, never synced, the server has rescanned, or it's been more than 6 hours. */
+    /** Syncs everything if [needsFullSync] says so; otherwise just the cheap stars and playlists checks. */
     suspend fun syncIfNeeded(force: Boolean = false) {
         if (mutex.isLocked) return
         val scan = api.scanStatus()
-        val stale = System.currentTimeMillis() - session.lastSyncAt > SIX_HOURS
-        val rescanned = scan?.lastScan != null && scan.lastScan != session.lastScan
-        if (force || session.lastSyncAt == 0L || stale || rescanned || session.syncedSchema < SCHEMA) {
+        if (needsFullSync(force, session.lastSyncAt, System.currentTimeMillis(), scan?.lastScan, session.lastScan, session.syncedSchema)) {
             fullSync(scan?.lastScan)
         } else {
             refreshStars()
@@ -182,9 +180,32 @@ class LibrarySync(
 
     companion object {
         const val PAGE = 500
-        private const val SCHEMA = 5 // 4: playlist comment and public flag; 5: song ISRCs
-        private const val SIX_HOURS = 6 * 60 * 60 * 1000L
+        const val SCHEMA = 5 // 4: playlist comment and public flag; 5: song ISRCs
+        /** A safety net only: new music shows up through the server's scan time changing. */
+        const val SAFETY_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000L
+        /** For a server that doesn't report when it last scanned, the old regular resync. */
+        const val NO_SCAN_INFO_INTERVAL_MS = 6 * 60 * 60 * 1000L
         const val SHRUNK_MESSAGE = "The server returned almost no songs, so the library wasn't changed"
+
+        /**
+         * Whether to re-read the whole library (~15 requests for 7k songs). The library only changes
+         * when the server rescans its music folder, which shows as a new [remoteLastScan], so with that
+         * known a full sync is needed only then (or after a week, as a safety net). A server that can't
+         * say when it scanned ([remoteLastScan] null) keeps the old 6-hour resync.
+         */
+        fun needsFullSync(
+            force: Boolean,
+            lastSyncAt: Long,
+            nowMs: Long,
+            remoteLastScan: String?,
+            localLastScan: String?,
+            syncedSchema: Int,
+        ): Boolean {
+            if (force || lastSyncAt == 0L || syncedSchema < SCHEMA) return true
+            if (remoteLastScan != null && remoteLastScan != localLastScan) return true
+            val interval = if (remoteLastScan == null) NO_SCAN_INFO_INTERVAL_MS else SAFETY_INTERVAL_MS
+            return nowMs - lastSyncAt > interval
+        }
 
         /**
          * False when the server's song list is suspiciously small: empty, or under half of a sizeable

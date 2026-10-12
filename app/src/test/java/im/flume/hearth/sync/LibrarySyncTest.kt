@@ -31,6 +31,47 @@ class LibrarySyncTest {
         assertTrue(looksComplete(remoteCount = 7000, localCount = 0))
     }
 
+    private val day = 24 * 60 * 60 * 1000L
+    private val synced = 100 * day
+
+    private fun needs(
+        nowMs: Long = synced + day,
+        remote: String? = "2026-01-01T00:00",
+        local: String? = "2026-01-01T00:00",
+        force: Boolean = false,
+        lastSyncAt: Long = synced,
+        schema: Int = LibrarySync.SCHEMA,
+    ) = LibrarySync.needsFullSync(force, lastSyncAt, nowMs, remote, local, schema)
+
+    @Test
+    fun `opening the app a day later with no server rescan doesn't resync`() {
+        assertFalse(needs())
+        assertFalse(needs(nowMs = synced + 6 * day))
+    }
+
+    @Test
+    fun `a server rescan resyncs`() {
+        assertTrue(needs(remote = "2026-01-02T00:00"))
+    }
+
+    @Test
+    fun `a week without a sync resyncs as a safety net`() {
+        assertTrue(needs(nowMs = synced + 8 * day))
+    }
+
+    @Test
+    fun `first sync, a forced sync and an older schema resync`() {
+        assertTrue(needs(lastSyncAt = 0))
+        assertTrue(needs(force = true))
+        assertTrue(needs(schema = LibrarySync.SCHEMA - 1))
+    }
+
+    @Test
+    fun `a server that doesn't say when it scanned resyncs after six hours`() {
+        assertFalse(needs(remote = null, nowMs = synced + 5 * 60 * 60 * 1000L))
+        assertTrue(needs(remote = null, nowMs = synced + 7 * 60 * 60 * 1000L))
+    }
+
     @Test
     fun `small libraries may shrink a lot`() {
         assertTrue(looksComplete(remoteCount = 20, localCount = 200))
