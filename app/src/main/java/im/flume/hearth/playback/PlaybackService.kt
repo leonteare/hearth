@@ -164,7 +164,8 @@ class PlaybackService : MediaSessionService() {
                 /* handleAudioFocus = */ true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
+            // Starts with the Wi-Fi lock; updateWakeMode drops it while the music comes from the phone.
+            .setWakeMode(wakeMode)
             .build()
         player.addListener(PlayerListener())
 
@@ -215,6 +216,7 @@ class PlaybackService : MediaSessionService() {
             c.spoken.progress.scheduleFlush()
         }
         saveQueueBlocking()
+        c.network.setPlaying(false)
         session.release()
         player.release()
         scope.cancel()
@@ -551,6 +553,35 @@ class PlaybackService : MediaSessionService() {
         return c.downloads.isDownloaded(id) || cachedBitrate(id) != null
     }
 
+    /**
+     * Can play this queue item with no connection: a downloaded song or episode file, a book from a
+     * folder on the phone, or a song completely in the streaming cache.
+     */
+    private fun isItemOnPhone(item: MediaItem): Boolean {
+        val uri = item.localConfiguration?.uri
+        if (uri?.scheme == "content") return true
+        if (item.isSpoken) return uri?.let(SpokenMedia::parse)?.let { (itemId, ino) -> c.spoken.downloads.localFile(itemId, ino) } != null
+        return c.downloads.isDownloaded(item.mediaId) || cachedBitrate(item.mediaId) != null
+    }
+
+    private var wakeMode = C.WAKE_MODE_NETWORK
+
+    /**
+     * Holds the Wi-Fi lock only when it's needed: while the song playing or the next couple stream.
+     * With everything on the phone, a CPU wake lock is enough and the Wi-Fi radio can sleep.
+     */
+    private fun updateWakeMode() {
+        val cur = player.currentMediaItemIndex
+        if (player.mediaItemCount == 0 || cur !in 0 until player.mediaItemCount) return
+        val ahead = (cur until minOf(player.mediaItemCount, cur + 1 + WakeModePolicy.LOOKAHEAD))
+            .map { isItemOnPhone(player.getMediaItemAt(it)) }
+        val mode = if (WakeModePolicy.localOnly(ahead)) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK
+        if (mode != wakeMode) {
+            wakeMode = mode
+            player.setWakeMode(mode)
+        }
+    }
+
     private fun cancelPrefetch() {
         prefetchJob?.cancel()
         prefetchWriters.forEach { it.cancel() }
@@ -559,12 +590,17 @@ class PlaybackService : MediaSessionService() {
     /**
      * Saves the next few songs into the streaming cache in the background, so a tunnel or dead spot
      * doesn't interrupt playback. Downloaded songs are skipped; already-cached ones cost nothing.
-     * Called on every song change, which first stops the previous round's downloads.
+     * Called on every song change, which first stops the previous round's downloads. Fewer songs on
+     * mobile data (see [PrefetchPolicy]).
      */
     private fun prefetchUpcoming() {
         cancelPrefetch()
         if (!c.network.isOnline.value) return
-        val next = (player.currentMediaItemIndex + 1 until minOf(player.mediaItemCount, player.currentMediaItemIndex + 1 + PREFETCH_COUNT))
+        val metered = c.network.isMetered()
+        val s = c.session.settings.value
+        val count = PrefetchPolicy.count(metered, if (metered) s.mobileBitrate else s.wifiBitrate)
+        if (count == 0) return
+        val next = (player.currentMediaItemIndex + 1 until minOf(player.mediaItemCount, player.currentMediaItemIndex + 1 + count))
             .map { player.getMediaItemAt(it).mediaId }
             .filterNot(c.downloads::isDownloaded)
         if (next.isEmpty()) return
@@ -991,6 +1027,7 @@ class PlaybackService : MediaSessionService() {
             }
             applyVolumeLevelling()
             unpinPassedSongs()
+            updateWakeMode()
             // A queue restored (or skipped through) while paused isn't "now playing" yet, and shouldn't use data.
             if (player.playWhenReady) {
                 startPending = null
@@ -1006,6 +1043,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             ticker?.cancel()
+            c.network.setPlaying(isPlaying)
             if (isPlaying) {
                 consecutiveErrors = 0
                 startPending?.let { pending ->
@@ -1021,6 +1059,7 @@ class PlaybackService : MediaSessionService() {
                     while (isActive) {
                         delay(TICK_MS)
                         if (spokenNow != null) tracker.tick(spokenPositionSec(), TICK_MS) else scrobbler.onListened(TICK_MS)
+                        // Cheap: unless the queue itself changed, only the position file is written (see QueueStore).
                         if (System.currentTimeMillis() - lastSave > 15_000) {
                             saveQueue()
                             lastSave = System.currentTimeMillis()
@@ -1069,6 +1108,10 @@ class PlaybackService : MediaSessionService() {
                     }
                 }
             }
+        }
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            updateWakeMode()
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -1246,7 +1289,8 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_SOURCE_LABEL = "sourceLabel"
         const val EXTRA_PENDING_COUNT = "pendingCount"
         private const val TICK_MS = 1000L
-        private const val PREFETCH_COUNT = 3
+        /** Most songs ever prefetched ahead (on Wi-Fi); their pinned bitrates are kept. */
+        private const val PREFETCH_COUNT = PrefetchPolicy.UNMETERED
         private const val MAX_RECOVERY_ATTEMPTS = 6
     }
 }
