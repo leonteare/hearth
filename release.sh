@@ -30,7 +30,8 @@ printf 'versionCode=%s\nversionName=%s\n' "$code" "$new" > version.properties
 echo "Releasing Hearth $new (build $code)"
 
 export JAVA_HOME="${JAVA_HOME:-C:/Program Files/Android/Android Studio/jbr}"
-./gradlew --console=plain -q testDebugUnitTest assembleRelease
+./verify.sh
+./gradlew --console=plain -q assembleRelease
 
 mkdir -p dist
 apk="dist/Hearth-$new.apk"

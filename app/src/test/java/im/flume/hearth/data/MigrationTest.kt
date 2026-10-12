@@ -162,4 +162,57 @@ class MigrationTest {
         assertEquals(tables.toSet(), entities(11).map { it["tableName"]!!.jsonPrimitive.content }.toSet())
         tables.filter { it != "local_books" }.forEach { assertEquals(it, createSql(10, it), createSql(11, it)) }
     }
+
+    private val databaseSource by lazy { File("src/main/java/im/flume/hearth/data/Database.kt").readText().replace("\r\n", "\n") }
+
+    /** The SQL strings a migration object runs; 1→2 and 2→3 call execSQL inline rather than through a list. */
+    private fun inlineSql(name: String): List<String> {
+        val body = databaseSource.substringAfter("val $name = object").substringBefore("\n        }\n")
+        return Regex("""execSQL\("((?:[^"\\]|\\.)*)"\)""").findAll(body).map { it.groupValues[1].replace("\\\"", "\"") }.toList()
+    }
+
+    @Test
+    fun `migration 1 to 2 creates exactly the lyrics table`() {
+        val v1 = entities(1).map { it["tableName"]!!.jsonPrimitive.content }.toSet()
+        assertEquals(v1 + "lyrics", entities(2).map { it["tableName"]!!.jsonPrimitive.content }.toSet())
+        val lyrics = createSql(2, "lyrics").replace("`\${TABLE_NAME}`", "`lyrics`")
+        assertEquals(listOf(lyrics), inlineSql("MIGRATION_1_2"))
+        v1.forEach { assertEquals(it, createSql(1, it), createSql(2, it)) }
+    }
+
+    @Test
+    fun `migration 2 to 3 adds exactly the replay gain columns`() {
+        val before = columns(createSql(2, "songs"))
+        val after = columns(createSql(3, "songs"))
+        val prefix = "ALTER TABLE songs ADD COLUMN "
+        val added = inlineSql("MIGRATION_2_3").associate { stmt ->
+            assertTrue(stmt.startsWith(prefix))
+            val def = stmt.removePrefix(prefix)
+            def.substringBefore(" ").trim('`') to def.substringAfter(" ")
+        }
+        assertEquals(after - before.keys, added)
+        val tables = entities(2).map { it["tableName"]!!.jsonPrimitive.content }
+        tables.filter { it != "songs" }.forEach { assertEquals(it, createSql(2, it), createSql(3, it)) }
+    }
+
+    @Test
+    fun `every migration is registered and the chain reaches the newest exported schema`() {
+        val defined = Regex("""val (MIGRATION_(\d+)_(\d+)) = object : Migration\((\d+), (\d+)\)""").findAll(databaseSource).map {
+            val (name, from, to, argFrom, argTo) = it.destructured
+            assertEquals("$name names the versions it migrates", from to to, argFrom to argTo)
+            name to (from.toInt() to to.toInt())
+        }.toMap()
+        val registered = Regex("""\.addMigrations\(([^)]*)\)""").find(databaseSource)!!.groupValues[1]
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        assertEquals("Defined but not passed to addMigrations (or the other way round)", defined.keys.sorted(), registered.sorted())
+
+        val version = Regex("""@Database\([^@]*?\bversion\s*=\s*(\d+)""").find(databaseSource)!!.groupValues[1].toInt()
+        val newest = File("schemas/im.flume.hearth.data.AppDatabase").listFiles()!!.mapNotNull { it.nameWithoutExtension.toIntOrNull() }.max()
+        assertEquals("@Database(version) vs newest file in app/schemas (commit the JSON KSP exports)", newest, version)
+        val exported = Json.parseToJsonElement(File("schemas/im.flume.hearth.data.AppDatabase/$newest.json").readText())
+            .jsonObject["database"]!!.jsonObject["version"]!!.jsonPrimitive.content.toInt()
+        assertEquals(version, exported)
+        // One step at a time from 1 up to the current version, so every installed version can upgrade.
+        assertEquals((1 until version).map { it to it + 1 }, defined.values.sortedBy { it.first })
+    }
 }
