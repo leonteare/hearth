@@ -42,11 +42,6 @@ data class Credentials(
     }
 }
 
-class SubsonicException(val code: Int, message: String) : IOException(message) {
-    /** Subsonic error 50: the user isn't allowed to do this (e.g. edit someone else's playlist). */
-    val notAuthorized: Boolean get() = code == 50
-}
-
 class SubsonicClient(
     private val http: OkHttpClient,
     private val credentialsProvider: () -> Credentials?,

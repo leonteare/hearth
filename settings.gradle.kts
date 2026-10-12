@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
@@ -14,3 +15,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Hearth"
 include(":app")
+include(":core:common")

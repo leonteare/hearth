@@ -10,16 +10,22 @@ import java.util.regex.PatternSyntaxException
 /**
  * Android compiles regexes with ICU, which throws on some patterns the JVM accepts, so a pattern that
  * passes every JVM test can still crash the app the first time it runs on a phone. This scans every
- * literal `Regex("…")` / `"…".toRegex()` in the app's source for those patterns.
+ * literal `Regex("…")` / `"…".toRegex()` in every module's source for those patterns.
  */
 class RegexLiteralsTest {
     private data class Literal(val file: File, val line: Int, val pattern: String)
 
     @Test
     fun `every regex literal in the app compiles on the JVM and on Android`() {
-        val root = File("src/main/java")
-        assertTrue("Run from the app module (no ${root.absolutePath})", root.isDirectory)
-        val literals = root.walkTopDown().filter { it.extension == "kt" }.flatMap { regexLiterals(it) }.toList()
+        // Tests run from their module's folder; the repo root is the nearest folder with settings.gradle.kts.
+        val root = generateSequence(File("").absoluteFile) { it.parentFile }.firstOrNull { File(it, "settings.gradle.kts").isFile }
+        assertTrue("No settings.gradle.kts above ${File("").absolutePath}", root != null)
+        val sources = root!!.walkTopDown()
+            .onEnter { it.name != "build" && !it.name.startsWith(".") }
+            .filter { it.isDirectory && it.invariantSeparatorsPath.endsWith("/src/main/java") }
+            .toList()
+        assertTrue("Found no module sources under $root", sources.isNotEmpty())
+        val literals = sources.flatMap { dir -> dir.walkTopDown().filter { it.extension == "kt" }.flatMap { regexLiterals(it) } }
         assertTrue("Found no regex literals at all; the scanner is broken", literals.size >= 10)
         val problems = literals.flatMap { lit ->
             val jvm = try {

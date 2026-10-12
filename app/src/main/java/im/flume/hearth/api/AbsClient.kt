@@ -50,14 +50,6 @@ interface AbsAuthStore {
     fun onAuthLost()
 }
 
-open class AbsException(message: String, cause: Throwable? = null) : IOException(message, cause)
-
-/** The server answered with an error status. [body] is a short, token-free excerpt. */
-class AbsHttpException(val code: Int, val body: String) : AbsException("The podcast server answered HTTP $code${if (body.isNotBlank()) ": $body" else ""}")
-
-/** Not signed in, or the login expired and couldn't be renewed. */
-class AbsAuthException(message: String) : AbsException(message)
-
 /** The difference between the server's clock and this phone's, measured from response Date headers. */
 class ServerClock(initialOffsetMs: Long = 0, private val now: () -> Long = System::currentTimeMillis) {
     @Volatile var offsetMs: Long = initialOffsetMs

@@ -28,7 +28,8 @@ if [ ! -f local.properties ] && [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SD
     fi
 fi
 
-results=app/build/test-results/testDebugUnitTest
+# Every module's unit test results (app/, core/*/, feature/*/).
+results() { find . \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/test-results/testDebugUnitTest/*.xml' "$@" -print 2>/dev/null; }
 log=$(mktemp)
 started=$(mktemp)   # only results newer than this count, so a stale run can't be reported
 trap 'rm -f "$log" "$started"' EXIT
@@ -38,7 +39,7 @@ status=$?
 
 # Each <testcase> that holds a <failure> or <error> is a failed test.
 failed=""
-fresh=$(find "$results" -name '*.xml' -newer "$started" 2>/dev/null)
+fresh=$(results -newer "$started")
 if [ -n "$fresh" ]; then
     # shellcheck disable=SC2086
     failed=$(awk '
@@ -51,7 +52,8 @@ if [ -n "$fresh" ]; then
 fi
 
 if [ "$status" = 0 ]; then
-    total=$(cat "$results"/*.xml 2>/dev/null | grep -o '<testcase ' | wc -l | tr -d ' ')
+    # shellcheck disable=SC2046
+    total=$(cat $(results) /dev/null | grep -o '<testcase ' | wc -l | tr -d ' ')
     echo "PASS: compiled, $total tests passed"
     exit 0
 fi

@@ -17,12 +17,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 
-/** Navidrome turned the password down (wrong, or changed since it was saved). */
-class WrongPasswordException : IOException("Navidrome didn't accept the password")
-
-/** No password saved yet; the UI should ask for it once. */
-class PasswordNeededException : IOException("Password needed")
-
 /**
  * Navidrome's own (non-Subsonic) API, only for what Subsonic can't do: playlist photos. It needs a
  * session token from a real password login, so the password comes from [password] (kept encrypted

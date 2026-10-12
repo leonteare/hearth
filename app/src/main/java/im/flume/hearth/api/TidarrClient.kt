@@ -31,8 +31,6 @@ import java.util.concurrent.TimeUnit
 /** Where Tidarr lives. [apiKey] is optional (Tidarr's auth can be off) and is sent as `X-Api-Key`. */
 data class TidarrConfig(val url: String, val apiKey: String?)
 
-class TidarrException(message: String) : IOException(message)
-
 /** Tidarr's names for what can be downloaded. */
 enum class TidalType(val api: String) {
     TRACK("track"), ALBUM("album"), ARTIST("artist");
