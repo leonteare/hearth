@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,11 +27,8 @@ import im.flume.hearth.api.TidalAlbum
 import im.flume.hearth.api.TidalArtist
 import im.flume.hearth.api.TidalTrack
 import im.flume.hearth.data.RequestStatus
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * A song that isn't on the server, in the same layout as [SongRow]: tap previews it, ♡ gets it,
@@ -61,35 +55,35 @@ fun MissingSongRow(
                 onClick = { get.preview(track) },
                 onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); get.menuFor = track },
             )
-            .padding(start = Dimens.Gutter, end = 4.dp, top = Dimens.RowPaddingV, bottom = Dimens.RowPaddingV),
+            .padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.xs, top = HearthTheme.spacing.rowPaddingV, bottom = HearthTheme.spacing.rowPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
-            Text(leading, Modifier.width(28.dp), color = TextSecondary.copy(alpha = NotOnServerAlpha), style = MaterialTheme.typography.bodyMedium)
+            Text(leading, Modifier.width(28.dp), color = HearthTheme.colors.textSecondary.copy(alpha = NotOnServerAlpha), style = MaterialTheme.typography.bodyMedium)
         }
         if (showCover) {
-            Box(Modifier.size(Dimens.RowCover).clip(HearthShapes.Cover)) { RemoteCover(track.cover, track.displayTitle, 160) }
-            Spacer(Modifier.width(Dimens.CoverGap))
+            Box(Modifier.size(HearthTheme.spacing.rowCover).clip(HearthTheme.shapes.cover)) { RemoteCover(track.cover, track.displayTitle, 160) }
+            Spacer(Modifier.width(HearthTheme.spacing.coverGap))
         }
         Column(Modifier.weight(1f)) {
             Text(
                 track.displayTitle, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (preview != null) accent else Color.White.copy(alpha = NotOnServerAlpha),
+                color = if (preview != null) accent else HearthTheme.colors.text.copy(alpha = NotOnServerAlpha),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AvailabilityIcon(request, previewing = preview != null, loading = preview?.loading == true)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(HearthTheme.spacing.xs))
                 Text(
                     if (preview != null) "Preview" else comingLabel(request) ?: subtitle,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = (if (request?.status == RequestStatus.FAILED) Destructive else TextSecondary).copy(alpha = NotOnServerAlpha),
+                    color = (if (request?.status == RequestStatus.FAILED) HearthTheme.colors.destructive else HearthTheme.colors.textSecondary).copy(alpha = NotOnServerAlpha),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
         GetHeart(request, size = 20.dp) { get.heartTrack(track, request) }
-        IconButton(onClick = { get.menuFor = track }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        IconButton(onClick = { get.menuFor = track }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
     }
 }
 
@@ -106,7 +100,7 @@ fun MissingAlbumCard(album: TidalAlbum, subtitle: String, modifier: Modifier = M
         modifier = modifier,
         dimmed = true,
         subtitleIcon = { AvailabilityIcon(request) },
-        cover = { Box(Modifier.size(Dimens.CardWidth).clip(HearthShapes.Cover)) { RemoteCover(album.cover, album.title) } },
+        cover = { Box(Modifier.size(HearthTheme.spacing.cardWidth).clip(HearthTheme.shapes.cover)) { RemoteCover(album.cover, album.title) } },
     )
 }
 
@@ -121,8 +115,8 @@ fun MissingAlbumRow(album: TidalAlbum, onClick: () -> Unit) {
         onClick = onClick,
         onLongClick = { get.albumMenuFor = album },
         cover = { RemoteCover(album.cover, album.title) },
-        titleColor = Color.White.copy(alpha = NotOnServerAlpha),
-        subtitleColor = TextSecondary.copy(alpha = NotOnServerAlpha),
+        titleColor = HearthTheme.colors.text.copy(alpha = NotOnServerAlpha),
+        subtitleColor = HearthTheme.colors.textSecondary.copy(alpha = NotOnServerAlpha),
         subtitleIcon = { AvailabilityIcon(request) },
     )
 }
@@ -137,8 +131,8 @@ fun MissingArtistRow(artist: TidalArtist, onClick: () -> Unit) {
         onClick = onClick,
         round = true,
         cover = { RemoteCover(artist.picture, artist.name) },
-        titleColor = Color.White.copy(alpha = NotOnServerAlpha),
-        subtitleColor = TextSecondary.copy(alpha = NotOnServerAlpha),
+        titleColor = HearthTheme.colors.text.copy(alpha = NotOnServerAlpha),
+        subtitleColor = HearthTheme.colors.textSecondary.copy(alpha = NotOnServerAlpha),
         subtitleIcon = { AvailabilityIcon(request) },
     )
 }

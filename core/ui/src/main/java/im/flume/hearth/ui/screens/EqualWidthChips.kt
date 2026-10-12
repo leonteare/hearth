@@ -18,16 +18,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.SurfaceHigh
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Android's recommended smallest touch target. */
 private val MIN_TOUCH_TARGET = 48.dp
@@ -56,9 +53,9 @@ fun <T> EqualWidthChips(
         Modifier
             .fillMaxWidth()
             .then(if (scrolls) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
-            .padding(horizontal = Dimens.Gutter, vertical = 4.dp)
+            .padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs)
             .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xs),
     ) {
         options.forEach { f ->
             val on = f == selected
@@ -74,9 +71,9 @@ fun <T> EqualWidthChips(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = minHeight)
-                        .clip(HearthShapes.Chip)
-                        .background(if (on) accent else SurfaceHigh)
-                        .padding(horizontal = if (scrolls) 12.dp else 0.dp),
+                        .clip(HearthTheme.shapes.chip)
+                        .background(if (on) accent else HearthTheme.colors.surfaceHigh)
+                        .padding(horizontal = if (scrolls) HearthTheme.spacing.m else 0.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -84,7 +81,7 @@ fun <T> EqualWidthChips(
                         maxLines = 1,
                         softWrap = false,
                         overflow = if (scrolls) TextOverflow.Visible else TextOverflow.Clip,
-                        color = if (on) MaterialTheme.colorScheme.onPrimary else Color.White,
+                        color = if (on) MaterialTheme.colorScheme.onPrimary else HearthTheme.colors.text,
                         style = textStyle,
                     )
                 }

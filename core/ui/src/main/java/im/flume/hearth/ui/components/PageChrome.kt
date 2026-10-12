@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,22 +35,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.data.DownloadCounts
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.NoticeDot
-import im.flume.hearth.ui.theme.SurfaceHigh
-import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Back arrow; goes back through the system back dispatcher unless [onBack] is given. */
 @Composable
 fun BackButton(onBack: (() -> Unit)? = null) {
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     IconButton(onClick = { if (onBack != null) onBack() else dispatcher?.onBackPressed() }, modifier = Modifier.statusBarsPadding()) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+        Icon(HearthTheme.icons.back, "Back")
     }
 }
 
@@ -65,7 +58,7 @@ fun TopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
-        modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(end = 4.dp),
+        modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(end = HearthTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BackButton(onBack)
@@ -88,7 +81,7 @@ fun PageHeader(title: String, actions: @Composable RowScope.() -> Unit = {}) {
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = Dimens.Gutter, end = 4.dp, top = Dimens.PageTitleTop)
+            .padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.xs, top = HearthTheme.spacing.pageTitleTop)
             .heightIn(min = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -142,9 +135,9 @@ fun DownloadsIndicator(modifier: Modifier = Modifier) {
             } else if (badge.waiting > 0) {
                 CircularProgressIndicator(progress = { 0f }, modifier = Modifier.fillMaxSize(), color = accent, strokeWidth = 2.dp, trackColor = accent.copy(alpha = 0.35f))
             }
-            Icon(Icons.Default.ArrowDownward, null, tint = if (badge.inProgress > 0) accent else TextSecondary, modifier = Modifier.size(16.dp))
+            Icon(HearthTheme.icons.downloadArrow, null, tint = if (badge.inProgress > 0) accent else HearthTheme.colors.textSecondary, modifier = Modifier.size(16.dp))
             if (badge.failed > 0) {
-                Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(HearthShapes.Round).background(NoticeDot))
+                Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(HearthTheme.shapes.round).background(HearthTheme.colors.noticeDot))
             }
         }
     }
@@ -160,10 +153,10 @@ fun SectionHeader(
 ) {
     Row(
         modifier.fillMaxWidth().padding(
-            start = Dimens.Gutter,
-            end = if (trailing != null) 4.dp else Dimens.Gutter,
-            top = 24.dp,
-            bottom = 12.dp,
+            start = HearthTheme.spacing.gutter,
+            end = if (trailing != null) HearthTheme.spacing.xs else HearthTheme.spacing.gutter,
+            top = HearthTheme.spacing.xl,
+            bottom = HearthTheme.spacing.m,
         ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -193,15 +186,15 @@ fun BannerCard(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = Dimens.Gutter, vertical = 8.dp)
-            .clip(HearthShapes.Card)
-            .background(if (tinted) accent.copy(alpha = 0.15f) else SurfaceHigh)
-            .padding(Dimens.CardPadding)
+            .padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s)
+            .clip(HearthTheme.shapes.card)
+            .background(if (tinted) accent.copy(alpha = 0.15f) else HearthTheme.colors.surfaceHigh)
+            .padding(HearthTheme.spacing.cardPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Icon(icon, null, tint = accent)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(HearthTheme.spacing.m))
             }
             Column(Modifier.weight(1f)) {
                 title?.let { Text(it, fontWeight = FontWeight.Bold) }
@@ -209,7 +202,7 @@ fun BannerCard(
                     Text(
                         it,
                         // With no title the body is the message, so it gets full contrast.
-                        color = if (title != null) TextSecondary else Color.Unspecified,
+                        color = if (title != null) HearthTheme.colors.textSecondary else Color.Unspecified,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = bodyMaxLines,
                         overflow = TextOverflow.Ellipsis,
@@ -251,14 +244,14 @@ fun EmptyState(
     onAction: (() -> Unit)? = null,
 ) {
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
+        modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.xxl, vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, null, tint = TextSecondary, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(12.dp))
-        Text(message, color = TextSecondary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+        Icon(icon, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(48.dp))
+        Spacer(Modifier.height(HearthTheme.spacing.m))
+        Text(message, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         if (action != null && onAction != null) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(HearthTheme.spacing.s))
             TextButton(onClick = onAction) { Text(action) }
         }
     }

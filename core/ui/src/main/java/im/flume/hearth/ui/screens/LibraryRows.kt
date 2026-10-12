@@ -4,8 +4,6 @@ package im.flume.hearth.ui.screens
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,7 +23,7 @@ import im.flume.hearth.ui.components.ChoiceSheet
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 @Composable
 fun ArtistRow(a: ArtistEntity) {
@@ -49,11 +47,11 @@ fun SortMenu(options: List<String>, sort: Int, modifier: Modifier = Modifier, on
     var open by remember { mutableStateOf(false) }
     // Shortened with "…" rather than squeezing whatever sits beside it when space is tight.
     TextButton(onClick = { open = true }, modifier = modifier) {
-        Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(4.dp))
+        Icon(HearthTheme.icons.sort, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(HearthTheme.spacing.xs))
         Text(
             options.getOrElse(sort) { options[0] },
-            color = TextSecondary,
+            color = HearthTheme.colors.textSecondary,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

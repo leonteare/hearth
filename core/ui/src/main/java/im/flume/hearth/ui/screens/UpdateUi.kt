@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -32,8 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.update.UpdateState
 import im.flume.hearth.ui.components.BannerCard
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Shown on Home only while there's something to act on. */
 @Composable
@@ -51,7 +48,7 @@ fun UpdateBanner() {
     BannerCard(
         title = "Update available",
         body = line,
-        icon = Icons.Default.SystemUpdate,
+        icon = HearthTheme.icons.update,
         bodyMaxLines = 2,
         trailing = if (state is UpdateState.Available || state is UpdateState.Failed || state is UpdateState.NeedsPermission) {
             { Button(onClick = { updater.install(release) }) { Text("Install") } }
@@ -62,7 +59,7 @@ fun UpdateBanner() {
             LinearProgressIndicator(progress = { d.progress }, modifier = Modifier.fillMaxWidth())
         }
         if (release.notes.isNotBlank() && state is UpdateState.Available) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(HearthTheme.spacing.s))
             Text(release.notes, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -93,9 +90,9 @@ fun UpdateSettingsRow() {
                     else -> updater.checkIfDue(force = true)
                 }
             }
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.m)
     ) {
         Text("Version ${updater.currentVersion}")
-        Text(status, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text(status, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
     }
 }

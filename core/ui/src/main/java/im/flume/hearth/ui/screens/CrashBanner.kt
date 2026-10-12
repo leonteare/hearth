@@ -24,8 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.crashFile
 import im.flume.hearth.ui.components.BannerCard
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Shown on Home after a crash, so the details can be copied and sent on. */
 @Composable
@@ -42,7 +41,7 @@ fun CrashBanner() {
                 context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Hearth crash", text))
                 Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
             }) { Text("Copy details") }
-            TextButton(onClick = { file.delete(); report = null }) { Text("Dismiss", color = TextSecondary) }
+            TextButton(onClick = { file.delete(); report = null }) { Text("Dismiss", color = HearthTheme.colors.textSecondary) }
         },
     )
 }

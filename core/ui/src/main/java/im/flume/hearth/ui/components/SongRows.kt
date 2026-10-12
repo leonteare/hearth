@@ -15,13 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Downloading
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,9 +34,7 @@ import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.DownloadState
 import im.flume.hearth.data.SongEntity
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.DimmedText
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -80,23 +71,23 @@ fun SongRow(
                     if (onLongPress != null) onLongPress() else menu = true
                 },
             )
-            .padding(horizontal = Dimens.Gutter, vertical = Dimens.RowPaddingV),
+            .padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.rowPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selected != null) {
             Icon(
-                if (selected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                if (selected) HearthTheme.icons.selected else HearthTheme.icons.unselected,
                 if (selected) "Selected" else "Not selected",
-                tint = if (selected) accent else TextSecondary,
-                modifier = Modifier.padding(end = Dimens.CoverGap).size(24.dp),
+                tint = if (selected) accent else HearthTheme.colors.textSecondary,
+                modifier = Modifier.padding(end = HearthTheme.spacing.coverGap).size(24.dp),
             )
         }
         if (leading != null) {
-            Text(leading, Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            Text(leading, Modifier.width(28.dp), color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
         }
         if (showCover) {
-            CoverArt(song.coverArt, Dimens.RowCover, requestSize = 150, fallback = song.album)
-            Spacer(Modifier.width(Dimens.CoverGap))
+            CoverArt(song.coverArt, HearthTheme.spacing.rowCover, requestSize = 150, fallback = song.album)
+            Spacer(Modifier.width(HearthTheme.spacing.coverGap))
         }
         Column(Modifier.weight(1f)) {
             Text(
@@ -105,31 +96,31 @@ fun SongRow(
                 overflow = TextOverflow.Ellipsis,
                 color = when {
                     isPlaying -> accent
-                    !playable -> DimmedText
-                    else -> Color.White
+                    !playable -> HearthTheme.colors.textDim
+                    else -> HearthTheme.colors.text
                 },
                 style = MaterialTheme.typography.bodyLarge,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (dl) {
-                    DownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", Modifier.size(11.dp), tint = accent)
-                    DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, "Downloading", Modifier.size(14.dp), tint = TextSecondary)
+                    DownloadState.DONE -> Icon(HearthTheme.icons.downloaded, "Downloaded", Modifier.size(11.dp), tint = accent)
+                    DownloadState.QUEUED, DownloadState.DOWNLOADING -> Icon(HearthTheme.icons.downloading, "Downloading", Modifier.size(14.dp), tint = HearthTheme.colors.textSecondary)
                     // Not just dimmer text: an icon says why it can't play.
-                    else -> if (!playable) Icon(Icons.Default.CloudOff, "Not downloaded", Modifier.size(14.dp), tint = DimmedText)
+                    else -> if (!playable) Icon(HearthTheme.icons.offline, "Not downloaded", Modifier.size(14.dp), tint = HearthTheme.colors.textDim)
                 }
-                if ((dl != null && dl != DownloadState.FAILED) || !playable) Spacer(Modifier.width(4.dp))
+                if ((dl != null && dl != DownloadState.FAILED) || !playable) Spacer(Modifier.width(HearthTheme.spacing.xs))
                 Text(
                     subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (playable) TextSecondary else DimmedText,
+                    color = if (playable) HearthTheme.colors.textSecondary else HearthTheme.colors.textDim,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
-        if (song.starred) Icon(Icons.Default.Favorite, "Liked", Modifier.size(16.dp), tint = accent)
+        if (song.starred) Icon(HearthTheme.icons.likeOn, "Liked", Modifier.size(16.dp), tint = accent)
         if (selected == null) {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+            IconButton(onClick = { menu = true }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
             SongMenu(song, menu, onDismiss = { menu = false }, onRemoveFromPlaylist = onRemoveFromPlaylist)
         }
     }
@@ -140,7 +131,7 @@ fun AlbumRow(title: String, albums: List<AlbumEntity>) {
     if (albums.isEmpty()) return
     val actions = LocalActions.current
     SectionHeader(title)
-    LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+    LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
         items(albums, key = { it.id }) { a -> MediaCard(a.name, a.artist, onClick = { actions.openAlbum(a.id) }, coverArt = a.coverArt) }
     }
 }

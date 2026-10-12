@@ -10,12 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import im.flume.hearth.ui.theme.Background
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Every page gets an opaque background so pages sliding over each other don't show through. */
 fun NavGraphBuilder.screen(route: String, content: @Composable (NavBackStackEntry) -> Unit) {
     composable(route) { entry ->
-        Box(Modifier.fillMaxSize().background(Background)) { content(entry) }
+        Box(Modifier.fillMaxSize().background(HearthTheme.colors.background)) { content(entry) }
     }
 }
 

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // The deprecated globals are defined and used for each other here.
+
 package im.flume.hearth.ui.theme
 
 import androidx.compose.foundation.shape.CircleShape
@@ -39,9 +41,18 @@ val AccentChoices = listOf(
     "Teal" to 0xFF2EC4B6,
     "Gold" to 0xFFFFC53D,
 )
+/*
+ * The colour globals below are the default skin's values. New code reads them by role through
+ * HearthTheme.colors (Tokens.kt), so a skin can change them in one place; these stay so older code keeps
+ * compiling, and they are deprecated (a warning, not an error) to steer callers to the tokens.
+ */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.background", "im.flume.hearth.ui.theme.HearthTheme"))
 val Background = Color(0xFF121212)
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.surface", "im.flume.hearth.ui.theme.HearthTheme"))
 val Surface = Color(0xFF1C1C1C)
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.surfaceHigh", "im.flume.hearth.ui.theme.HearthTheme"))
 val SurfaceHigh = Color(0xFF282828)
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.textSecondary", "im.flume.hearth.ui.theme.HearthTheme"))
 val TextSecondary = Color(0xFFB3B3B3)
 
 /**
@@ -55,58 +66,82 @@ const val DimmedTextAlpha = 0.7f
 const val NotOnServerAlpha = DimmedTextAlpha
 
 /** Secondary text dimmed for something that can't be used right now, still readable on [Background]. */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.textDim", "im.flume.hearth.ui.theme.HearthTheme"))
 val DimmedText = TextSecondary.copy(alpha = DimmedTextAlpha)
 
 /** Tile colour for Liked Songs (shortcuts, quick tiles, page header). */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.liked", "im.flume.hearth.ui.theme.HearthTheme"))
 val LikedColor = Color(0xFF5038A0)
 
 /** Tile colour for Downloads (shortcuts, quick tiles, page header). */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.downloads", "im.flume.hearth.ui.theme.HearthTheme"))
 val DownloadsColor = Color(0xFF1E6B52)
 
 /** Tile colour for Podcasts (Home's quick tiles). */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.podcasts", "im.flume.hearth.ui.theme.HearthTheme"))
 val PodcastsColor = Color(0xFF1E5A8C)
 
 /** Tile colour for Audiobooks (Home's quick tiles). */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.audiobooks", "im.flume.hearth.ui.theme.HearthTheme"))
 val AudiobooksColor = Color(0xFF8C4A1E)
 
 /**
  * Destructive actions. [Destructive] is for text and icons on the dark background (readable pink-red);
  * [DestructiveFill] is for solid fills such as the swipe-to-remove background, with white content on top.
  */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.destructive", "im.flume.hearth.ui.theme.HearthTheme"))
 val Destructive = Color(0xFFF2B8B5)
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.destructiveFill", "im.flume.hearth.ui.theme.HearthTheme"))
 val DestructiveFill = Color(0xFFB3261E)
 
 /** The small red dot for something waiting on you (a playlist invite). */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.noticeDot", "im.flume.hearth.ui.theme.HearthTheme"))
 val NoticeDot = Color(0xFFE5484D)
 
 /** Hairline between groups. Translucent so it reads the same on the page and on sheets. */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.divider", "im.flume.hearth.ui.theme.HearthTheme"))
 val DividerColor = Color.White.copy(alpha = 0.08f)
 
 /** Bottom navigation bar and the landscape side rail. */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.navBar", "im.flume.hearth.ui.theme.HearthTheme"))
 val NavBarColor = Color(0xF0101010)
 
 /** The white, Spotify-style search field and what sits on it. */
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.searchField", "im.flume.hearth.ui.theme.HearthTheme"))
 val SearchFieldColor = Color.White
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.onSearchField", "im.flume.hearth.ui.theme.HearthTheme"))
 val OnSearchField = Color.Black
+@Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.colors.searchFieldHint", "im.flume.hearth.ui.theme.HearthTheme"))
 val SearchFieldHint = Color(0xFF444444)
 
-/** Spacing and sizes shared by rows, cards and carousels. */
+/**
+ * Spacing and sizes shared by rows, cards and carousels. The spacing values are deprecated in favour of
+ * HearthTheme.spacing (same values by default); the corner radii stay, since [HearthShapes] is built from them.
+ */
 object Dimens {
     /** Page side margin. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.gutter", "im.flume.hearth.ui.theme.HearthTheme"))
     val Gutter = 16.dp
     /** Cover size in list rows. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.rowCover", "im.flume.hearth.ui.theme.HearthTheme"))
     val RowCover = 48.dp
     /** Vertical padding of a list row. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.rowPaddingV", "im.flume.hearth.ui.theme.HearthTheme"))
     val RowPaddingV = 8.dp
     /** Gap between a row's cover and its text. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.coverGap", "im.flume.hearth.ui.theme.HearthTheme"))
     val CoverGap = 12.dp
     /** Gap between cards in a horizontal carousel. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.carouselSpacing", "im.flume.hearth.ui.theme.HearthTheme"))
     val CarouselSpacing = 14.dp
     /** Inner padding of banners and cards. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.cardPadding", "im.flume.hearth.ui.theme.HearthTheme"))
     val CardPadding = 14.dp
     /** Width of a card in a carousel. */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.cardWidth", "im.flume.hearth.ui.theme.HearthTheme"))
     val CardWidth = 140.dp
     /** Top padding of a tab page's title (below the status bar). */
+    @Deprecated("Read it from the theme so a skin can change it.", ReplaceWith("HearthTheme.spacing.pageTitleTop", "im.flume.hearth.ui.theme.HearthTheme"))
     val PageTitleTop = 12.dp
 
     val CoverCorner = 4.dp
@@ -181,13 +216,16 @@ fun HearthTheme(
     val reducedMotion = remember(resolver) {
         runCatching { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
     }
+    val accent = Accent
+    // Content on the accent follows the accent the user picked, so a pale or dark custom accent stays readable.
+    val themed = remember(colors, accent) { colors.copy(onAccent = readableOn(accent)) }
     CompositionLocalProvider(
         LocalReducedMotion provides reducedMotion,
-        LocalHearthColors provides colors,
+        LocalHearthColors provides themed,
         LocalHearthSpacing provides spacing,
         LocalHearthShapes provides shapes,
         LocalHearthIcons provides icons,
     ) {
-        MaterialTheme(colorScheme = colorScheme(Accent, colors), typography = Type, content = content)
+        MaterialTheme(colorScheme = colorScheme(accent, themed), typography = Type, content = content)
     }
 }

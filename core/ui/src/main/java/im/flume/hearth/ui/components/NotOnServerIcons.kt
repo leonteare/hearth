@@ -5,12 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,17 +25,15 @@ import im.flume.hearth.api.tidalImageUrl
 import im.flume.hearth.container
 import im.flume.hearth.data.RequestEntity
 import im.flume.hearth.data.RequestStatus
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Album cover or artist picture of music that isn't on the server (public image CDN). Never dimmed. */
 @Composable
 fun RemoteCover(uuid: String?, title: String, size: Int = 320) {
     val url = tidalImageUrl(uuid, size)
     val placeholder = @Composable {
-        Box(Modifier.fillMaxSize().background(SurfaceHigh), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.MusicNote, null, tint = TextSecondary)
+        Box(Modifier.fillMaxSize().background(HearthTheme.colors.surfaceHigh), contentAlignment = Alignment.Center) {
+            Icon(HearthTheme.icons.song, null, tint = HearthTheme.colors.textSecondary)
         }
     }
     if (url == null) placeholder() else SubcomposeAsyncImage(
@@ -63,14 +55,14 @@ fun AvailabilityIcon(request: RequestEntity?, previewing: Boolean = false, loadi
             val progress by LocalContext.current.container.preview.progress.collectAsStateWithLifecycle()
             CircularProgressIndicator(
                 progress = { progress }, modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp,
-                color = accent, trackColor = TextSecondary.copy(alpha = 0.3f),
+                color = accent, trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.3f),
             )
         }
-        request?.status == RequestStatus.FAILED -> Icon(Icons.Outlined.ErrorOutline, "Couldn't get it", Modifier.size(14.dp), tint = Destructive)
+        request?.status == RequestStatus.FAILED -> Icon(HearthTheme.icons.failedOutline, "Couldn't get it", Modifier.size(14.dp), tint = HearthTheme.colors.destructive)
         isComing(request) -> CircularProgressIndicator(
-            Modifier.size(12.dp), strokeWidth = 1.5.dp, color = TextSecondary, trackColor = TextSecondary.copy(alpha = 0.3f),
+            Modifier.size(12.dp), strokeWidth = 1.5.dp, color = HearthTheme.colors.textSecondary, trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.3f),
         )
-        else -> Icon(Icons.Outlined.Cloud, "Not on your server yet", Modifier.size(14.dp), tint = TextSecondary)
+        else -> Icon(HearthTheme.icons.notOnServer, "Not on your server yet", Modifier.size(14.dp), tint = HearthTheme.colors.textSecondary)
     }
 }
 
@@ -84,9 +76,9 @@ fun GetHeart(request: RequestEntity?, size: Dp = 22.dp, onClick: () -> Unit) {
         onClick()
     }) {
         Icon(
-            if (coming) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            if (coming) HearthTheme.icons.likeOn else HearthTheme.icons.like,
             if (coming) "Don't add to Liked Songs" else "Like",
-            tint = if (coming) MaterialTheme.colorScheme.primary else TextSecondary,
+            tint = if (coming) MaterialTheme.colorScheme.primary else HearthTheme.colors.textSecondary,
             modifier = Modifier.size(size),
         )
     }
