@@ -1,0 +1,254 @@
+// Rows for podcasts and audiobooks: episodes, shows, books, chapters and podcast directory results.
+package im.flume.hearth.ui.screens
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import im.flume.hearth.api.AbsPodcastSearchResult
+import im.flume.hearth.container
+import im.flume.hearth.spoken.BookRow
+import im.flume.hearth.spoken.DirectoryState
+import im.flume.hearth.spoken.EpisodeRow
+import im.flume.hearth.spoken.PodcastEntity
+import im.flume.hearth.spoken.SpokenDiscovery
+import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.MediaRow
+import im.flume.hearth.ui.components.plural
+import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.util.userMessage
+import kotlinx.coroutines.launch
+
+/**
+ * One episode: title (two lines), "date · length / time left", how far you got and whether it's on the
+ * phone. Tap plays it; ⋯ (or long-press) opens its menu. [playButton] puts a play button at the end
+ * instead of ⋯ (Home's "New episodes").
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun EpisodeListRow(
+    row: EpisodeRow,
+    modifier: Modifier = Modifier,
+    showCover: Boolean = false,
+    withShow: Boolean = false,
+    playButton: Boolean = false,
+    showGoToShow: Boolean = withShow,
+    /** Put before the usual line (Search's "Episode"), so it reads apart from songs and shows. */
+    label: String? = null,
+) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val haptics = LocalHapticFeedback.current
+    val now = LocalSpokenNow.current
+    var menu by remember { mutableStateOf(false) }
+    val e = row.episode
+    val isCurrent = now?.episodeId == e.id
+    val downloaded = row.downloadState == SpokenDownloadState.DONE
+    val playable = e.ino != null
+    val accent = MaterialTheme.colorScheme.primary
+    val play = { playEpisode(c, actions, e.libraryItemId, e.id, downloaded) }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                enabled = playable,
+                onClick = play,
+                onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
+            )
+            .padding(start = Dimens.Gutter, end = 4.dp, top = Dimens.RowPaddingV, bottom = Dimens.RowPaddingV),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (showCover) {
+            CoverArt(null, Dimens.RowCover, requestSize = 150, fallback = row.podcastTitle, url = c.spokenCover(e.libraryItemId, 150))
+            Spacer(Modifier.width(Dimens.CoverGap))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                e.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyLarge,
+                color = when {
+                    isCurrent -> accent
+                    row.finished || !playable -> TextSecondary
+                    else -> Color.White
+                },
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (row.downloadState != null && row.downloadState != SpokenDownloadState.REMOVED) {
+                    SpokenDownloadIcon(row.downloadState)
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    listOfNotNull(label, SpokenFormat.episodeLine(row, withShow = withShow)).joinToString(" • "),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            SpokenFormat.fraction(row.progressSec, e.durationSec, row.finished)?.let { f ->
+                Spacer(Modifier.height(4.dp))
+                ListenedBar(f, Modifier.width(96.dp))
+            }
+        }
+        if (playButton) {
+            IconButton(onClick = play, enabled = playable) {
+                Icon(Icons.Default.PlayArrow, "Play ${e.title}", tint = Color.White)
+            }
+        } else {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        }
+    }
+    EpisodeMenu(row, menu, onDismiss = { menu = false }, showGoToShow = showGoToShow)
+}
+
+@Composable
+fun PodcastListRow(p: PodcastEntity, newCount: Int = 0, modifier: Modifier = Modifier) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    MediaRow(
+        p.title,
+        listOfNotNull("Podcast", p.author?.takeIf { it.isNotBlank() }, if (newCount > 0) "$newCount new" else null).joinToString(" • "),
+        onClick = { actions.open(podcastRoute(p.id)) },
+        modifier = modifier,
+        coverUrl = c.spokenCover(p.id, 150),
+        subtitleColor = TextSecondary,
+        trailing = if (newCount > 0) {
+            { Box(Modifier.padding(end = 16.dp).size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)) }
+        } else null,
+    )
+}
+
+@Composable
+fun BookListRow(b: BookRow, modifier: Modifier = Modifier) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val book = b.book
+    val status = when {
+        b.finished -> "Finished"
+        (b.progressSec ?: 0.0) > 0 -> SpokenFormat.remaining(book.durationSec - (b.progressSec ?: 0.0))
+        else -> SpokenFormat.length(book.durationSec).ifEmpty { null }
+    }
+    Column(modifier) {
+        MediaRow(
+            book.title,
+            listOfNotNull("Audiobook", book.author, status).joinToString(" • "),
+            onClick = { actions.open(bookRoute(book.id)) },
+            coverUrl = c.spokenCover(book.id, 150),
+            subtitleIcon = if (b.downloadState == SpokenDownloadState.DONE || b.downloadState == SpokenDownloadState.DOWNLOADING || b.downloadState == SpokenDownloadState.QUEUED) {
+                { SpokenDownloadIcon(b.downloadState) }
+            } else null,
+        )
+        SpokenFormat.fraction(b.progressSec, book.durationSec, b.finished)?.let { f ->
+            ListenedBar(f, Modifier.padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, bottom = 6.dp).width(96.dp))
+        }
+    }
+}
+
+/** A chapter in a list: number, title, where it starts and how long it is. Tap to listen from there. */
+@Composable
+fun ChapterRow(index: Int, title: String, startSec: Double, lengthSec: Double, current: Boolean, done: Boolean = false, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        Modifier.fillMaxWidth()
+            .background(if (current) accent.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("${index + 1}", Modifier.width(32.dp), color = if (current) accent else TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Column(Modifier.weight(1f)) {
+            Text(
+                title.ifBlank { "Chapter ${index + 1}" }, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                color = when {
+                    current -> accent
+                    done -> TextSecondary
+                    else -> Color.White
+                },
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(SpokenFormat.clock(startSec), color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+            if (lengthSec > 0) Text(SpokenFormat.length(lengthSec), color = TextSecondary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/**
+ * A podcast from the directory in Search: Follow adds it to the server (if it isn't there yet) and
+ * follows it; one already on the server opens its page.
+ */
+@Composable
+fun DirectoryRow(r: AbsPodcastSearchResult, library: List<PodcastEntity>, username: String?, modifier: Modifier = Modifier) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val (state, existing) = remember(r, library, username) { SpokenDiscovery.state(r, library, username) }
+    var busy by remember(r.feedUrl) { mutableStateOf(false) }
+    MediaRow(
+        r.title,
+        listOfNotNull("Podcast", r.artistName?.takeIf { it.isNotBlank() }, r.trackCount?.takeIf { it > 0 }?.let { plural(it, "episode") }).joinToString(" • ").ifEmpty { null },
+        // On the server: its page. Not yet: the feed's page, where any episode can be fetched.
+        onClick = existing?.let { e -> { actions.open(podcastRoute(e.id)) } } ?: r.feedUrl?.let { f -> { actions.open(podcastFeedRoute(f)) } },
+        modifier = modifier,
+        coverUrl = r.cover,
+        trailing = {
+            if (busy) {
+                CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Box(Modifier.padding(end = 8.dp)) {
+                    FollowButton(following = state == DirectoryState.FOLLOWING) {
+                        if (state == DirectoryState.FOLLOWING) {
+                            existing?.let { actions.open(podcastRoute(it.id)) }
+                            return@FollowButton
+                        }
+                        val feed = r.feedUrl ?: return@FollowButton
+                        busy = true
+                        c.appScope.launch {
+                            c.spoken.addPodcast(feed, r, follow = true).fold(
+                                onSuccess = { actions.showMessage("Following ${r.title}. Its newest episodes are on their way.") },
+                                onFailure = { actions.showMessage("Couldn't follow ${r.title}: ${userMessage(it)}") },
+                            )
+                            busy = false
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
