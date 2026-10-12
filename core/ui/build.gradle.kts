@@ -11,6 +11,7 @@ dependencies {
     api(libs.androidx.activity.compose)
     api(libs.androidx.lifecycle.runtime.compose)
     api(libs.coil.compose)
+    api(libs.navigation.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.palette)
 }
