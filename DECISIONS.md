@@ -2,8 +2,10 @@
 
 Settled choices, so agents don't re-derive or undo them. Add a line when you settle a new one.
 
-- **No DI framework, no ViewModels.** `AppContainer` in `HearthApp.kt` builds every singleton by hand; composables
+- **No DI framework, no ViewModels.** `HearthContainer` in `HearthApp.kt` builds every singleton by hand; composables
   reach it via `LocalContext.current.container`. Small app, one maintainer: wiring stays visible and greppable.
+  Modules below `:app` see it through interfaces: `DomainContainer` (`:core:domain`, for workers and receivers) and
+  `AppContainer` (`:core:playback`, adds the player; what `context.container` returns).
 - **Subsonic token auth.** Requests carry `t`/`s` (md5 token + salt), never the password. The password is kept only
   in `PasswordVault` (Android Keystore), and only because Navidrome's native API (playlist photos, user list) needs a
   real login. Changing what's stored forces everyone to sign in again: ask first.

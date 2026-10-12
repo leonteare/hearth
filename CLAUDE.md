@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Hearth: a single-module Android app (Kotlin, Jetpack Compose, Media3, Room, WorkManager, OkHttp) that plays music
-from a Navidrome/Subsonic server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, all
-code in `app/`. See README.md for features and DECISIONS.md for settled design choices (read before re-litigating one).
+Hearth: an Android app (Kotlin, Jetpack Compose, Media3, Room, WorkManager, OkHttp) that plays music
+from a Navidrome/Subsonic server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, split
+into `:app` and layer modules under `core/` (see Layout; RESTRUCTURE.md has the plan). See README.md for features and DECISIONS.md for settled design choices (read before re-litigating one).
 
 ## Commands
 
@@ -10,7 +10,7 @@ Run from the repo root. There is no CI.
 
 | Purpose | Command |
 |---|---|
-| **Check a change (compile + all unit tests)** | `./verify.sh` (one PASS/FAIL line naming failing tests; `release.sh` runs it too) |
+| **Check a change (compile + all unit tests)** | `./verify.sh` (every module; one PASS/FAIL line naming failing tests; `release.sh` runs it too) |
 | One test class | `./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'` |
 | Compile only | `./gradlew compileDebugKotlin` |
 | Debug APK (installs as `im.flume.hearth.debug`, alongside the release app) | `./gradlew assembleDebug` |
@@ -26,10 +26,22 @@ Run from the repo root. There is no CI.
 
 ## Layout: where new code goes
 
-Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add, move or split a file.**
+Modules (dependencies point down; packages are unchanged, so a package can span modules). Each has
+`src/main/java/im/flume/hearth/...` and `src/test/...`; shared Gradle settings are the `hearth.android.library`
+convention plugin in `build-logic/`.
+- `:core:common`: `util/Errors.kt`, `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), API exceptions.
+- `:core:network`: `api/`. `:core:data`: Room, DAOs, migrations, schemas (`core/data/schemas`), `SessionStore`,
+  `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`. Only module with KSP.
+- `:core:domain`: repositories and logic (rest of `data/`, `spoken/`, `sync/`, `download/`, `requests/`, `update/`,
+  `QueuePlanner`), `DomainContainer` (the container's interface below the player), notification icon.
+- `:core:playback`: `playback/` and `AppContainer` (DomainContainer + player) with `Context.container`.
+- `:core:ui`: `ui/theme/` (+ `Tokens.kt`: `HearthTheme.colors/spacing/shapes/icons`), `ui/components/`, screen pieces
+  several areas share. `:app`: `HearthApp.kt` (`HearthContainer`, the real container), `ui/*.kt`, the rest of `ui/screens/`.
 
-- `HearthApp.kt`: `AppContainer` builds every singleton by hand (no DI, no ViewModels); add new repositories/services
-  here. Composables use `LocalContext.current.container`. Also `logHandledError`, `crashLoggingHandler`, crash files.
+Paths below are under each module's `src/main/java/im/flume/hearth/`. **Update this map when you add, move or split a file.**
+
+- `HearthApp.kt` (`:app`): `HearthContainer` builds every singleton by hand (no DI, no ViewModels); add new
+  repositories/services there and to `DomainContainer`/`AppContainer`. Composables use `LocalContext.current.container`.
 - `api/` (HTTP clients; `@Serializable` models)
   - `SubsonicClient` + `Models.kt`: Navidrome via Subsonic, token+salt auth. Library, stars, playlists, scrobbles, users.
   - `NavidromeNativeApi`: Navidrome's own API (password login): playlist photos, users to share with.
@@ -85,9 +97,10 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
   - `screens/visualiser/`: `VisualiserScreen`, `VisualiserCore` (styles, renderer base), one `*Renderer` per style,
     helpers `FramePacer`, `Retro3d`, `Ridges`, `ScopeTrace`.
   - `theme/`: `Theme` (colours, `Dimens`, `HearthShapes`), `CoverSizes`, `Contrast`.
-- `update/Updater.kt`: self-update from GitHub Releases (`BuildConfig.UPDATE_REPO`). `util/Errors.kt`: `scrubSecrets`,
+- `update/Updater.kt`: self-update from GitHub Releases (`UPDATE_REPO` in `:core:domain`'s BuildConfig). `util/Errors.kt`: `scrubSecrets`,
   `userMessage`, `couldNot`.
-- Tests mirror the package under `app/src/test/java/im/flume/hearth/<pkg>/`; fixtures in `app/src/test/resources/`.
+- Tests live in the module of the code they test, mirroring the package under `<module>/src/test/java/im/flume/hearth/`;
+  fixtures in that module's `src/test/resources/`.
 
 ### Server-side contracts (code on the homelab, `/opt/homelab`)
 
@@ -107,7 +120,7 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
   ``fun `shuffle with a chosen song plays that song first`()``. Use `MockWebServer` for API tests and
   `kotlinx-coroutines-test` for suspend code.
 - **Room schema changes:** bump `version` in `@Database`. Write the SQL as a public `MIGRATION_X_Y_SQL` list and wrap
-  it in `MIGRATION_X_Y`, then add it to `.addMigrations(...)`. Commit the new `app/schemas/.../N.json` that KSP
+  it in `MIGRATION_X_Y`, then add it to `.addMigrations(...)`. Commit the new `core/data/schemas/.../N.json` that KSP
   exports. Add a case to `MigrationTest` that compares the SQL with the exported schema. (`MigrationTest` also fails if a migration isn't
   registered or `version` doesn't match the newest JSON.) Real example:
   ```kotlin
@@ -130,8 +143,9 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
 - **Comments:** KDoc in plain language that explains *why* or what the user sees, not what the code does. Example:
   `/** No destructive fallback: a missing migration should fail loudly, not wipe downloads and history. */`
 - User-facing strings are plain, non-technical English, written in Kotlin. Only the app name is in `strings.xml`.
-- `@Serializable` classes must stay under `im.flume.hearth`. The R8 keep rule in `app/proguard-rules.pro` only
-  covers that package, and release builds are minified.
+- `@Serializable` classes must stay under `im.flume.hearth`. The R8 keep rule (in the `consumer-rules.pro` of each
+  module that has such classes; copy it into a new module that gets one) only covers that package, and release
+  builds are minified.
 - Commit subjects are short, user-facing summaries, e.g. `Compact queue section headers`. `Release x.y.z` commits
   come only from `release.sh`.
 - Add new dependencies through `gradle/libs.versions.toml` and reference them as `libs.*`.
@@ -166,7 +180,7 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
 ### Never
 - Commit secrets: `keystore.properties`, `*.jks`, passwords, Navidrome credentials, tokens, or server URLs from a
   real install.
-- Add `fallbackToDestructiveMigration()`, or edit an already-released `app/schemas/.../N.json`.
+- Add `fallbackToDestructiveMigration()`, or edit an already-released `core/data/schemas/.../N.json`.
 - Sign a release with the debug key or weaken the `requireReleaseKey` check. Installed apps would no longer update.
 - Remove the empty or shrunken library guard in `LibrarySync`, which stops a bad server response from wiping the
   local index.

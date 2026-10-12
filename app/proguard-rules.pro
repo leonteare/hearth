@@ -1,10 +1,3 @@
-# kotlinx.serialization: keep generated serializers for our @Serializable classes
-# (API responses, saved queue, lyrics and mixes are all (de)serialized by name).
--keepattributes *Annotation*, InnerClasses, Signature
--dontnote kotlinx.serialization.**
--keepclassmembers @kotlinx.serialization.Serializable class im.flume.hearth.** {
-    *** Companion;
-    *** INSTANCE;
-    kotlinx.serialization.KSerializer serializer(...);
-}
--keep,includedescriptorclasses class im.flume.hearth.**$$serializer { *; }
+# Keep rules for the app's own classes go here. The kotlinx.serialization rules live in the
+# consumer-rules.pro of each core module that holds @Serializable classes (network, data, domain,
+# playback), so they reach this minified build with the module.
