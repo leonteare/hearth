@@ -110,7 +110,12 @@ abstract class ScreenshotTest {
     private companion object {
         const val SHOT = "screenshot"
         const val SETTLE_MS = 2_000L
-        val OPTIONS = RoborazziOptions()
+        // Allow a hundredth of a percent of the pixels to differ. Text is drawn a shade differently on
+        // Linux than on Windows, so CI saw 4-12 pixels change on glyph edges in images of ~700,000. That is
+        // about 70 pixels of slack here: far below any real change, which moves hundreds of pixels at least.
+        val OPTIONS = RoborazziOptions(
+            compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.0001f),
+        )
     }
 }
 
