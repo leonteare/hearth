@@ -1,21 +1,13 @@
+// Podcasts and audiobooks: the account, the catalogue the UI reads, and the entry points for following,
+// adding and syncing (the work itself is in SpokenFollows, SpokenAdd and SpokenSync).
 package im.flume.hearth.spoken
 
 import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.work.Constraints
-import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import im.flume.hearth.HearthApp
-import im.flume.hearth.api.AbsAuthException
 import im.flume.hearth.api.AbsClient
-import im.flume.hearth.api.AbsFolder
-import im.flume.hearth.api.AbsLibrary
 import im.flume.hearth.api.AbsLibraryItem
 import im.flume.hearth.api.AbsPodcastSearchResult
 import im.flume.hearth.api.AbsTokens
@@ -24,29 +16,21 @@ import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.NetworkMonitor
 import im.flume.hearth.data.SessionStore
 import im.flume.hearth.util.userMessage
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
 
 /** An episode or book with progress, for "Continue listening". */
 data class ContinueItem(
@@ -72,40 +56,38 @@ data class OpmlImportResult(val added: List<String>, val followedExisting: List<
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SpokenRepository(
-    private val context: Context,
+    internal val context: Context,
     private val db: AppDatabase,
     http: OkHttpClient,
     session: SessionStore,
     private val network: NetworkMonitor,
-    private val scope: CoroutineScope,
+    internal val scope: CoroutineScope,
 ) {
     val store = AbsAccountStore(context)
     val api = AbsClient(http.newBuilder().readTimeout(60, TimeUnit.SECONDS).build(), store, ServerClock(store.clockOffsetMs))
     val progress = SpokenProgress(context, db, store, api, scope)
     val downloads = SpokenDownloads(context, db, api, session, { store.settings.value }, network, scope)
+    internal val follows = SpokenFollows(this)
+    internal val sync = SpokenSync(this)
+    private val adder = SpokenAdd(this)
     /** Each show's full feed, and episodes being fetched onto the server from it. */
     val feeds = ShowFeeds(context, this, scope)
     /** Audiobooks from folders on this phone, which can be added to the server. */
     val local = LocalBooks(context, db, this, scope)
     /** No network, or offline mode is on: nothing to ask the server. */
     internal val offline: Boolean get() = network.cannotStream
-    private val dao = db.spoken()
-    private val syncLock = Mutex()
+    internal val dao = db.spoken()
 
     val account: StateFlow<AbsAccount?> = store.account
     val settings: StateFlow<SpokenSettings> = store.settings
 
-    private val _syncing = MutableStateFlow(false)
-    val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
+    val syncing: StateFlow<Boolean> = sync.syncing
 
-    private val _lastError = MutableStateFlow<String?>(null)
     /** Why the last sync failed, in plain words (null after a good one). */
-    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+    val lastError: StateFlow<String?> = sync.lastError
 
     /** "Resumed from where you left off on another device". */
     val resumeNotices: SharedFlow<ResumeNotice> = progress.resumeNotices
-
-    private var libraries: List<AbsLibrary> = emptyList()
 
     init {
         progress.onFinished = { id, ep -> downloads.onFinished(id, ep) }
@@ -116,7 +98,7 @@ class SpokenRepository(
     fun start() {
         local.start()
         if (store.account.value != null) {
-            schedulePeriodicSync()
+            sync.schedulePeriodicSync()
             scope.launch { refresh(force = false) }
         }
         scope.launch(Dispatchers.Main) {
@@ -141,7 +123,7 @@ class SpokenRepository(
             if (previous != null && previous.userId != resp.user.id) progress.clearLocal()
             store.signedIn(url, resp.user.username, resp.user.id, AbsTokens(access, refresh))
             store.clockOffsetMs = api.clock.offsetMs
-            schedulePeriodicSync()
+            sync.schedulePeriodicSync()
             scope.launch { refresh(force = true) }
             null
         } catch (e: Exception) {
@@ -169,7 +151,7 @@ class SpokenRepository(
         WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK)
     }
 
-    private val username: String? get() = store.account.value?.username
+    internal val username: String? get() = store.account.value?.username
 
     // ------------------------------------------------------------------ catalogue (Flows for the UI)
 
@@ -225,7 +207,7 @@ class SpokenRepository(
     fun progress(libraryItemId: String, episodeId: String? = null): Flow<SpokenProgressEntity?> = progress.progressFlow(libraryItemId, episodeId)
 
     /** When each podcast's / book's details last changed on the server, to version its cover URL. */
-    private val coverVersions = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val coverVersions = ConcurrentHashMap<String, Long>()
 
     init {
         scope.launch { dao.podcasts().collect { list -> list.forEach { coverVersions[it.id] = it.updatedAt } } }
@@ -249,121 +231,10 @@ class SpokenRepository(
     }
 
     /**
-     * Follows (or unfollows) a podcast for this user: reads the podcast's tags fresh from the server,
-     * adds or removes only this user's follower tag, writes them back, and reads again to check another
-     * phone didn't write at the same moment (retrying if it did). Following also turns on the server's
-     * auto-download for the show. Returns null on success, or the reason it failed.
+     * Follows (or unfollows) a podcast for this user, checked against the server ([SpokenFollows.setFollowing]).
+     * Returns null on success, or the reason it failed.
      */
-    suspend fun setFollowing(podcastId: String, follow: Boolean): String? {
-        val user = username ?: return "Not signed in to podcasts & audiobooks"
-        val before = dao.podcastOnce(podcastId)
-        before?.let { dao.setPodcastTags(podcastId, FollowTags.nextTags(it.tagList, user, follow, api.clock.serverNow()).joinToString("\n")) } // instant UI
-        rememberIntent(podcastId, user, follow)
-        try {
-            repeat(3) {
-                val item = api.item(podcastId) ?: run {
-                    removeItems(listOf(podcastId), podcast = true)
-                    forgetIntent(podcastId)
-                    return "This podcast is no longer on the server"
-                }
-                val tags = item.media.tags
-                val wasFollowing = FollowTags.isFollowing(tags, user)
-                // Already unfollowed and marked: leave the marker's time alone.
-                val alreadyDone = !follow && !FollowTags.isFollowing(tags, user) && (FollowTags.followers(tags).isNotEmpty() || tags.any(FollowTags::isUnfollowedMarker))
-                val next = if (alreadyDone) tags else FollowTags.nextTags(tags, user, follow, api.clock.serverNow())
-                if (next != tags) api.setTags(podcastId, next)
-                if (follow && item.media.autoDownloadEpisodes != true) {
-                    api.setAutoDownload(podcastId, true)
-                    dao.setPodcastAutoDownload(podcastId, true)
-                }
-                val check = api.item(podcastId)?.media?.tags ?: next
-                dao.setPodcastTags(podcastId, check.joinToString("\n"))
-                if (FollowTags.isFollowing(check, user) == follow) {
-                    if (follow) {
-                        // A show already on the server (an episode picked from its page, or followed before)
-                        // gets its newest episodes too, as a newly added one does.
-                        if (!wasFollowing) runCatching { fetchNewestOnServer(item, NEWEST_ON_FOLLOW) }
-                        downloads.onFollowed(podcastId)
-                        dao.podcastOnce(podcastId)?.let { downloads.planAutoDownloads(listOf(it)) }
-                    } else {
-                        downloads.onUnfollowed(podcastId)
-                        clearFromServerSoon(podcastId)
-                    }
-                    return null
-                }
-            }
-            return "Couldn't save that on the server; try again"
-        } catch (e: Exception) {
-            before?.let { dao.setPodcastTags(podcastId, it.tags) }
-            return userMessage(e)
-        }
-    }
-
-    /**
-     * Once Undo has had its chance, clears an unfollowed show's episodes off the server if nobody follows
-     * it any more. Anything this misses (app closed, offline) the server's hourly cleanup removes.
-     */
-    private fun clearFromServerSoon(podcastId: String) {
-        scope.launch {
-            delay(UNFOLLOW_CLEAR_DELAY_MS)
-            try {
-                val user = username ?: return@launch
-                val item = api.item(podcastId) ?: return@launch
-                if (!UnfollowServerCleanup.shouldClear(item.media.tags)) return@launch
-                // No new episodes arriving for a show nobody follows.
-                if (item.media.autoDownloadEpisodes == true) {
-                    api.setAutoDownload(podcastId, false)
-                    dao.setPodcastAutoDownload(podcastId, false)
-                }
-                val othersPartWay = api.users().filter { !it.username.equals(user, ignoreCase = true) }
-                    .flatMap { api.user(it.id).mediaProgress }
-                    .filter { it.libraryItemId == podcastId && !it.isFinished }
-                    .mapNotNullTo(HashSet()) { it.episodeId }
-                val current = downloads.current?.takeIf { it.libraryItemId == podcastId }?.episodeId
-                val gone = UnfollowServerCleanup.toDelete(item.media.episodes.orEmpty().map { it.id }, othersPartWay, current)
-                gone.forEach { api.deleteEpisode(podcastId, it) }
-                if (gone.isNotEmpty()) refresh(force = true)
-            } catch (e: Exception) {
-                im.flume.hearth.logHandledError(context, "spoken unfollow cleanup", e)
-            }
-        }
-    }
-
-    /** Has the server fetch the show's newest [count] episodes that it doesn't already have. */
-    private suspend fun fetchNewestOnServer(item: AbsLibraryItem, count: Int) {
-        val feedUrl = item.media.metadata.feedUrl ?: return
-        val newest = FeedParse.episodes(api.podcastFeed(feedUrl).episodes).sortedByDescending { it.first.publishedAt }.take(count)
-        val onServer = item.media.episodes.orEmpty().map { ServerEpisodeRef(it.id, it.enclosure?.url, it.guid, it.title, it.publishedAt ?: it.addedAt) }
-        val have = FeedMatch.match(newest.map { it.first }, onServer)
-        val missing = newest.filter { it.first.key !in have }.map { it.second }
-        if (missing.isNotEmpty()) api.downloadEpisodesOnServer(item.id, JsonArray(missing))
-    }
-
-    private fun rememberIntent(podcastId: String, user: String, follow: Boolean) =
-        store.updateFollowIntents { it + (podcastId to FollowIntent(podcastId, user.lowercase(), follow, System.currentTimeMillis())) }
-
-    private fun forgetIntent(podcastId: String) = store.updateFollowIntents { it - podcastId }
-
-    /**
-     * Self-heal after a sync: where this user recently followed (or unfollowed) a show on this phone and
-     * the server's tags say otherwise, write the choice again. Choices expire after a few days, so a
-     * later change made on another device isn't fought over for ever.
-     */
-    private suspend fun healFollows(items: List<AbsLibraryItem>) {
-        val user = username ?: return
-        val now = System.currentTimeMillis()
-        val byId = items.associateBy { it.id }
-        val intents = store.followIntents()
-        store.updateFollowIntents { m -> m.filterValues { now - it.at < FollowTags.INTENT_TTL_MS && it.podcastId in byId } }
-        for (intent in intents.values) {
-            if (now - intent.at >= FollowTags.INTENT_TTL_MS || !intent.username.equals(user, ignoreCase = true)) continue
-            val item = byId[intent.podcastId] ?: continue
-            if (FollowTags.heal(intent.follow, item.media.tags, user) != FollowTags.Heal.NONE) {
-                im.flume.hearth.logHandledError(context, "spoken follow heal", IllegalStateException("Follow tag out of step; writing it again"))
-                setFollowing(intent.podcastId, intent.follow)
-            }
-        }
-    }
+    suspend fun setFollowing(podcastId: String, follow: Boolean): String? = follows.setFollowing(podcastId, follow)
 
     suspend fun follow(podcastId: String): String? = setFollowing(podcastId, true)
 
@@ -373,200 +244,25 @@ class SpokenRepository(
     suspend fun searchDirectory(term: String): List<AbsPodcastSearchResult> = api.searchPodcasts(term)
 
     /** The podcast already in the library with this feed, if any. */
-    suspend fun findByFeed(feedUrl: String): PodcastEntity? = dao.podcastsOnce().firstOrNull { sameFeed(it.feedUrl, feedUrl) }
+    suspend fun findByFeed(feedUrl: String): PodcastEntity? = dao.podcastsOnce().firstOrNull { FeedUrls.same(it.feedUrl, feedUrl) }
 
-    /**
-     * Adds a podcast to the server's Podcasts library (or finds it if it's already there) and, if
-     * [follow], follows it. A new show gets its newest [downloadLatest] episodes fetched by the server
-     * right away, so there's something to play. Returns the podcast's id.
-     */
-    suspend fun addPodcast(feedUrl: String, directoryEntry: AbsPodcastSearchResult? = null, follow: Boolean = true, downloadLatest: Int = NEWEST_ON_FOLLOW): Result<String> = runCatching {
-        val user = username ?: throw AbsAuthException("Not signed in to podcasts & audiobooks")
-        findByFeed(feedUrl)?.let { existing ->
-            if (follow) setFollowing(existing.id, true)?.let { throw IllegalStateException(it) }
-            return@runCatching existing.id
-        }
-        val (library, folder) = podcastFolder()
-        val feed = api.podcastFeed(feedUrl)
-        val item = api.createPodcast(
-            library.id, folder.id, folder.fullPath, feed.metadata, feedUrl, directoryEntry,
-            tags = if (follow) listOf(FollowTags.tagFor(user)) else FollowTags.nextTags(emptyList(), user, false, api.clock.serverNow()),
-            autoDownload = follow,
-        )
-        dao.upsertPodcasts(listOf(item.toPodcast(null)))
-        if (follow) {
-            // Make sure the follower tag really landed (the server's cleanup relies on it): read the new
-            // item back and, if the tag is missing, write it the careful way (read-modify-write, verified).
-            rememberIntent(item.id, user, true)
-            val tags = runCatching { api.item(item.id)?.media?.tags }.getOrNull()
-            if (tags == null || !FollowTags.isFollowing(tags, user)) {
-                setFollowing(item.id, true)?.let { if (setFollowing(item.id, true) != null) throw IllegalStateException("Added the podcast, but couldn't follow it: $it") }
-            } else {
-                dao.setPodcastTags(item.id, tags.joinToString("\n"))
-            }
-        }
-        if (downloadLatest > 0) {
-            val newest = feed.episodes.sortedByDescending { e -> e.jsonObject["publishedAt"]?.jsonPrimitive?.longOrNull ?: 0L }.take(downloadLatest)
-            if (newest.isNotEmpty()) runCatching { api.downloadEpisodesOnServer(item.id, JsonArray(newest)) }
-        }
-        item.id
-    }
+    /** Adds a podcast to the server and, if [follow], follows it ([SpokenAdd.addPodcast]). Returns the podcast's id. */
+    suspend fun addPodcast(feedUrl: String, directoryEntry: AbsPodcastSearchResult? = null, follow: Boolean = true, downloadLatest: Int = NEWEST_ON_FOLLOW): Result<String> =
+        adder.addPodcast(feedUrl, directoryEntry, follow, downloadLatest)
 
-    /**
-     * Imports an OPML export (e.g. from another podcast app): every feed is added if it isn't in the
-     * library yet and followed for this user. One at a time, so a big file doesn't swamp the server.
-     */
-    suspend fun importOpml(opmlText: String): OpmlImportResult {
-        val feeds = api.parseOpml(opmlText)
-        val added = ArrayList<String>(); val existing = ArrayList<String>(); val failed = ArrayList<Pair<String, String>>()
-        for (f in feeds) {
-            val name = f.title ?: f.feedUrl
-            val already = findByFeed(f.feedUrl)
-            addPodcast(f.feedUrl, follow = true, downloadLatest = 1).fold(
-                onSuccess = { if (already != null) existing += name else added += name },
-                onFailure = { failed += name to userMessage(it) },
-            )
-        }
-        scope.launch { refresh(force = true) }
-        return OpmlImportResult(added, existing, failed)
-    }
-
-    private suspend fun podcastFolder(): Pair<AbsLibrary, AbsFolder> {
-        if (libraries.isEmpty()) libraries = api.libraries()
-        val lib = libraries.firstOrNull { it.mediaType == "podcast" } ?: throw IllegalStateException("The server has no podcast library")
-        return lib to (lib.folders.firstOrNull() ?: throw IllegalStateException("The podcast library has no folder"))
-    }
-
-    private fun sameFeed(a: String?, b: String?): Boolean = FeedUrls.same(a, b)
+    /** Adds and follows every feed in an OPML export ([SpokenAdd.importOpml]). */
+    suspend fun importOpml(opmlText: String): OpmlImportResult = adder.importOpml(opmlText)
 
     // ------------------------------------------------------------------ sync
 
-    /**
-     * Brings the catalogue and progress up to date: sends unsent progress, lists both libraries, fetches
-     * episodes / tracks only for items that changed (or every 12 hours), merges progress, then
-     * auto-downloads and auto-deletes. [force] skips the "synced in the last few minutes" shortcut.
-     */
-    suspend fun refresh(force: Boolean = true): Boolean = syncLock.withLock {
-        val account = store.account.value ?: return@withLock false
-        if (account.needsSignIn) { _lastError.value = "Sign in to podcasts & audiobooks again in Settings"; return@withLock false }
-        val now = System.currentTimeMillis()
-        if (!force && now - lastSyncAt < 5 * 60_000) return@withLock true
-        _syncing.value = true
-        try {
-            progress.flush()
-            libraries = api.libraries()
-            val full = now - store.lastFullSyncAt > 12 * 3_600_000L
-            for (lib in libraries) {
-                val items = api.allLibraryItems(lib.id)
-                when (lib.mediaType) {
-                    "podcast" -> syncPodcasts(lib, items, full)
-                    "book" -> syncBooks(lib, items, full)
-                }
-            }
-            // Podcasts / books from libraries that no longer exist.
-            val libIds = libraries.mapTo(HashSet()) { it.id }
-            dao.podcastsOnce().filter { it.libraryId !in libIds }.map { it.id }.takeIf { it.isNotEmpty() }?.let { removeItems(it, podcast = true) }
-            dao.booksOnce().filter { it.libraryId !in libIds }.map { it.id }.takeIf { it.isNotEmpty() }?.let { removeItems(it, podcast = false) }
-
-            progress.applyServer(api.me().mediaProgress)
-            store.clockOffsetMs = api.clock.offsetMs
-            if (full) store.lastFullSyncAt = now
-            lastSyncAt = now
-            username?.let { u -> downloads.planAutoDownloads(dao.podcastsTaggedOnce(FollowTags.tagFor(u))) }
-            downloads.autoDeleteFinished()
-            _lastError.value = null
-            true
-        } catch (e: Exception) {
-            _lastError.value = userMessage(e)
-            im.flume.hearth.logHandledError(context, "spoken sync", e)
-            false
-        } finally {
-            _syncing.value = false
-        }
-    }
-
-    @Volatile private var lastSyncAt = 0L
-
-    private suspend fun syncPodcasts(lib: AbsLibrary, items: List<AbsLibraryItem>, full: Boolean) {
-        val local = dao.podcastsOnce().filter { it.libraryId == lib.id }.associateBy { it.id }
-        dao.upsertPodcasts(items.map { it.toPodcast(local[it.id]) })
-        // Remembered per show, so its page can still list the feed if the server removes the show.
-        items.forEach { item -> item.media.metadata.feedUrl?.let { feeds.rememberShow(item.id, it) } }
-        val gone = local.keys - items.mapTo(HashSet()) { it.id }
-        if (gone.isNotEmpty()) removeItems(gone.toList(), podcast = true)
-        for (item in items) {
-            val old = local[item.id]
-            if (full || old == null || old.updatedAt != item.updatedAt || old.episodesFetchedAt == 0L) fetchItem(item.id)
-        }
-        healFollows(items)
-    }
-
-    private suspend fun syncBooks(lib: AbsLibrary, items: List<AbsLibraryItem>, full: Boolean) {
-        val local = dao.booksOnce().filter { it.libraryId == lib.id }.associateBy { it.id }
-        dao.upsertBooks(items.map { it.toBook(local[it.id]) })
-        val gone = local.keys - items.mapTo(HashSet()) { it.id }
-        if (gone.isNotEmpty()) removeItems(gone.toList(), podcast = false)
-        for (item in items) {
-            val old = local[item.id]
-            if (full || old == null || old.updatedAt != item.updatedAt || old.detailsFetchedAt == 0L) fetchItem(item.id)
-        }
-    }
-
-    private suspend fun removeItems(ids: List<String>, podcast: Boolean) {
-        downloads.onItemsRemoved(ids)
-        if (podcast) { dao.deleteEpisodesOf(ids); dao.deletePodcasts(ids) } else { dao.deleteTracks(ids); dao.deleteBooks(ids) }
-        dao.deleteChaptersOf(ids)
-    }
+    /** Brings the catalogue and progress up to date ([SpokenSync.refresh]); [force] skips the "synced recently" shortcut. */
+    suspend fun refresh(force: Boolean = true): Boolean = sync.refresh(force)
 
     /** Fetches one podcast's episodes or one book's tracks and chapters (pull-to-refresh on its page). */
-    suspend fun fetchItem(libraryItemId: String) {
-        val item = api.item(libraryItemId) ?: run {
-            val isPodcast = dao.podcastOnce(libraryItemId) != null
-            removeItems(listOf(libraryItemId), podcast = isPodcast)
-            return
-        }
-        storeItem(item)
-    }
+    suspend fun fetchItem(libraryItemId: String) = sync.fetchItem(libraryItemId)
 
     /** Saves a podcast's episodes or a book's tracks and chapters, as just read from the server (expanded). */
-    internal suspend fun storeItem(item: AbsLibraryItem) {
-        val libraryItemId = item.id
-        val now = System.currentTimeMillis()
-        if (item.mediaType == "podcast") {
-            val old = dao.podcastOnce(libraryItemId)
-            dao.upsertPodcasts(listOf(item.toPodcast(old)))
-            val episodes = item.media.episodes.orEmpty()
-            val oldEpisodes = dao.episodesOnce(libraryItemId).associate { it.episode.id to it.episode.ino }
-            val removed = oldEpisodes.keys - episodes.mapTo(HashSet()) { it.id }
-            if (removed.isNotEmpty()) downloads.onEpisodesRemoved(libraryItemId, removed, oldEpisodes)
-            dao.replaceEpisodes(
-                libraryItemId,
-                episodes.map { it.toEntity(libraryItemId) },
-                episodes.flatMap { e -> e.chapters.mapIndexed { i, c -> ChapterEntity(libraryItemId, e.id, i, c.start, c.end, c.title) } },
-                removed.toList(), now, item.updatedAt,
-            )
-        } else {
-            val tracks = item.media.tracks.orEmpty().sortedBy { it.index }
-            var offset = 0.0
-            val trackRows = tracks.mapIndexedNotNull { i, t ->
-                val ino = t.ino ?: t.contentUrl?.substringAfterLast('/') ?: return@mapIndexedNotNull null
-                TrackEntity(libraryItemId, i, ino, offset, t.duration, t.mimeType, t.metadata?.size ?: 0).also { offset += t.duration }
-            }
-            val chapters = item.media.chapters.orEmpty().mapIndexed { i, c -> ChapterEntity(libraryItemId, "", i, c.start, c.end, c.title) }
-            dao.replaceBookDetails(item.toBook(dao.bookOnce(libraryItemId)).copy(detailsFetchedAt = now, updatedAt = item.updatedAt), trackRows, chapters)
-        }
-    }
-
-    private fun schedulePeriodicSync() {
-        runCatching {
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                SYNC_WORK, ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<SpokenSyncWorker>(4, TimeUnit.HOURS)
-                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                    .build(),
-            )
-        }
-    }
+    internal suspend fun storeItem(item: AbsLibraryItem) = sync.storeItem(item)
 
     companion object {
         const val SYNC_WORK = "abs-sync"
@@ -575,82 +271,6 @@ class SpokenRepository(
         /** Longer than the Undo snackbar, so undoing an unfollow never finds the episodes already gone. */
         const val UNFOLLOW_CLEAR_DELAY_MS = 15_000L
     }
-}
-
-/** Every few hours: send unsent progress, refresh the catalogue, auto-download new episodes. */
-class SpokenSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val spoken = (applicationContext as HearthApp).container.spoken
-        if (spoken.account.value == null) return Result.success()
-        spoken.refresh(force = true)
-        return Result.success()
-    }
-}
-
-// ------------------------------------------------------------------ mapping
-
-internal fun AbsLibraryItem.toPodcast(old: PodcastEntity?): PodcastEntity = PodcastEntity(
-    id = id,
-    libraryId = libraryId ?: old?.libraryId.orEmpty(),
-    title = media.metadata.title ?: old?.title ?: "Untitled podcast",
-    author = media.metadata.author,
-    description = media.metadata.descriptionPlain ?: media.metadata.description,
-    feedUrl = media.metadata.feedUrl,
-    imageUrl = media.metadata.imageUrl,
-    language = media.metadata.language,
-    explicit = media.metadata.explicit == true,
-    tags = media.tags.joinToString("\n"),
-    autoDownloadEpisodes = media.autoDownloadEpisodes == true,
-    numEpisodes = media.numEpisodes ?: media.episodes?.size ?: old?.numEpisodes ?: 0,
-    addedAt = addedAt,
-    // Kept as the version the episodes were fetched at; fetchItem sets it.
-    updatedAt = old?.updatedAt ?: 0,
-    episodesFetchedAt = old?.episodesFetchedAt ?: 0,
-)
-
-internal fun AbsLibraryItem.toBook(old: BookEntity?): BookEntity {
-    val m = media.metadata
-    return BookEntity(
-        id = id,
-        libraryId = libraryId ?: old?.libraryId.orEmpty(),
-        title = m.title ?: old?.title ?: "Untitled book",
-        subtitle = m.subtitle,
-        author = m.authorName ?: m.authors.joinToString(", ") { it.name }.ifEmpty { null },
-        narrator = m.narratorName ?: m.narrators.joinToString(", ").ifEmpty { null },
-        series = m.seriesName ?: m.series.joinToString(", ") { s -> s.sequence?.let { "${s.name} #$it" } ?: s.name }.ifEmpty { null },
-        description = m.descriptionPlain ?: m.description,
-        publishedYear = m.publishedYear,
-        durationSec = media.duration ?: old?.durationSec ?: 0.0,
-        sizeBytes = media.size ?: old?.sizeBytes ?: 0,
-        numTracks = media.numTracks ?: media.tracks?.size ?: old?.numTracks ?: 0,
-        numChapters = media.numChapters ?: media.chapters?.size ?: old?.numChapters ?: 0,
-        tags = media.tags.joinToString("\n"),
-        addedAt = addedAt,
-        updatedAt = old?.updatedAt ?: 0,
-        detailsFetchedAt = old?.detailsFetchedAt ?: 0,
-    )
-}
-
-internal fun im.flume.hearth.api.AbsEpisode.toEntity(libraryItemId: String): EpisodeEntity {
-    val file = audioTrack?.let { it.ino to it } ?: audioFile?.let { it.ino to null }
-    return EpisodeEntity(
-        id = id,
-        libraryItemId = libraryItemId,
-        title = title.ifBlank { "Untitled episode" },
-        subtitle = subtitle?.takeIf { it.isNotBlank() },
-        description = description,
-        publishedAt = publishedAt ?: addedAt,
-        durationSec = duration ?: audioFile?.duration ?: audioTrack?.duration ?: 0.0,
-        sizeBytes = size ?: audioFile?.metadata?.size ?: 0,
-        ino = file?.first,
-        mimeType = audioFile?.mimeType ?: audioTrack?.mimeType,
-        season = season?.takeIf { it.isNotBlank() },
-        episode = episode?.takeIf { it.isNotBlank() },
-        episodeType = episodeType,
-        addedAt = addedAt,
-        enclosureUrl = enclosure?.url?.trim()?.takeIf { it.isNotEmpty() },
-        guid = guid?.takeIf { it.isNotBlank() },
-    )
 }
 
 /** A book's title, writer and cover as the player and notification show them. */
