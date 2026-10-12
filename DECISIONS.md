@@ -31,6 +31,9 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **Tests are JVM-only** (JUnit 4, no instrumented tests): logic goes in pure objects/functions. The one exception is
   screenshot tests (Roborazzi + Robolectric, still on the JVM, no device), approved to prove refactors leave the look
   unchanged. Plain test runs verify against committed PNGs; recording is opt-in (`-Proborazzi.test.record=true`).
+  `:core:playback` also has two small Robolectric integration tests (queue edits on a real ExoPlayer, the song data
+  source chain over a real cache), since the playback service can't be covered by pure tests alone. Nothing plays
+  audio or touches the network; playback logic still goes into pure objects first.
 - **Modules by layer, then by feature** (2.20.0). `core:common ← network ← data ← domain ← playback ← ui ←
   feature:* ← app`; features never depend on each other and reach each other's pages by route. Why: parallel agents
   can each own one module without merge fights, builds recompile less, and the boundaries are enforced by Gradle
