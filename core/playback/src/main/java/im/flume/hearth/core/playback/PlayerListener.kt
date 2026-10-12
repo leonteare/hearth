@@ -8,7 +8,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
-import im.flume.hearth.core.playback.PlaybackService.Companion.SLEEP_END_OF_SONG
 import im.flume.hearth.core.playback.PlaybackService.Companion.TICK_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -38,7 +37,8 @@ internal class PlayerListener(private val service: PlaybackService) : Player.Lis
             // Offline and the next song isn't on the phone: go straight to one that is, rather than
             // waiting for it to fail (only for automatic advances; a song picked by hand gets its try).
             // Not for audiobooks: their files must play in order.
-            if (!mediaItem.isSpoken && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && !c.network.isOnline.value && !isOnPhone(mediaItem.mediaId)) {
+            val automatic = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+            if (PlaybackErrors.skipAheadOffline(mediaItem.isSpoken, automatic, c.network.isOnline.value) { isOnPhone(mediaItem.mediaId) }) {
                 scope.launch { jumpToPlayable() }
             }
             applyVolumeLevelling()
@@ -78,7 +78,7 @@ internal class PlayerListener(private val service: PlaybackService) : Player.Lis
                         delay(TICK_MS)
                         if (spokenNow != null) tracker.tick(spokenPositionSec(), TICK_MS) else scrobbler.onListened(TICK_MS)
                         // Cheap: unless the queue itself changed, only the position file is written (see QueueStore).
-                        if (System.currentTimeMillis() - lastSave > 15_000) {
+                        if (QueueSaves.positionSaveDue(lastSave, System.currentTimeMillis())) {
                             saveQueue()
                             lastSave = System.currentTimeMillis()
                         }
@@ -106,7 +106,7 @@ internal class PlayerListener(private val service: PlaybackService) : Player.Lis
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
         with(service) {
-            if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && sleepAt == SLEEP_END_OF_SONG) {
+            if (SleepTimerPolicy.endOfSongReached(playWhenReady, reason, sleepAt)) {
                 player.pauseAtEndOfMediaItems = false
                 sleepAt = 0
                 publishExtras()
@@ -152,7 +152,7 @@ internal class PlayerListener(private val service: PlaybackService) : Player.Lis
             val action = PlaybackErrors.classify(error.errorCode, httpStatus(error))
             // Offline mode / no network fail on purpose; only a real failure says anything about the server.
             // (Audiobookshelf failing says nothing about Navidrome.)
-            if (action == ErrorAction.WAIT_FOR_CONNECTION && !c.network.cannotStream && spokenNow == null) c.network.reportServerFailure()
+            if (PlaybackErrors.blamesServer(action, c.network.cannotStream, spoken = spokenNow != null)) c.network.reportServerFailure()
             scope.launch { recover(action) }
         }
     }

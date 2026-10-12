@@ -39,6 +39,43 @@ object PlaybackErrors {
     /** First index after [current] (of [count]) that [playable] says can play without the server, or null. */
     fun nextPlayable(current: Int, count: Int, playable: (Int) -> Boolean): Int? =
         (current + 1 until count).firstOrNull(playable)
+
+    /** Broken songs skipped in a row before stopping, so a queue that's all broken isn't run through to the end. */
+    const val MAX_SKIPS_IN_A_ROW = 3
+
+    /** After a broken song, whether to move on to the next: [consecutiveErrors] already counts this one. */
+    fun keepSkipping(consecutiveErrors: Int, hasNext: Boolean): Boolean =
+        consecutiveErrors < MAX_SKIPS_IN_A_ROW && hasNext
+
+    /**
+     * How long to wait before retry number [attempt] (from 0), or null to give up and stay paused. The first
+     * wait for a connection starts at once (waiting for the server is the pause); after that each retry
+     * backs off further, so a half-working server isn't hammered.
+     */
+    fun retryDelayMs(
+        attempt: Int,
+        waitForConnection: Boolean,
+        maxAttempts: Int = PlaybackService.MAX_RECOVERY_ATTEMPTS,
+    ): Long? = when {
+        attempt >= maxAttempts -> null
+        attempt > 0 || !waitForConnection -> minOf(60_000L, 3_000L shl attempt)
+        else -> 0L
+    }
+
+    /**
+     * Whether a failure says the music server is down. Offline mode or no network fail on purpose, and
+     * Audiobookshelf (spoken word) failing says nothing about Navidrome.
+     */
+    fun blamesServer(action: ErrorAction, cannotStream: Boolean, spoken: Boolean): Boolean =
+        action == ErrorAction.WAIT_FOR_CONNECTION && !cannotStream && !spoken
+
+    /**
+     * Offline, and the player moved on by itself to a song that isn't on the phone: go straight to one that
+     * is rather than wait for it to fail. A song picked by hand gets its try; audiobook files play in order.
+     * [onPhone] is only asked when everything else says skip (it looks at downloads and the cache).
+     */
+    fun skipAheadOffline(spoken: Boolean, automatic: Boolean, online: Boolean, onPhone: () -> Boolean): Boolean =
+        !spoken && automatic && !online && !onPhone()
 }
 
 /** What the service does after a failed song (see [PlaybackErrors.recover]). */

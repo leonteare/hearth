@@ -5,6 +5,7 @@ package im.flume.hearth.core.playback
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import im.flume.hearth.core.data.spoken.SpokenProgressEntity
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import im.flume.hearth.domain.music.playback.SavedQueue
@@ -41,8 +42,7 @@ internal suspend fun PlaybackService.loadSavedSpoken(saved: SavedQueue): Triple<
     val itemId = saved.spokenItemId ?: return null
     val (now, items) = loadSpoken(itemId, saved.spokenEpisodeId) ?: return null
     val local = c.spoken.progress.local(itemId, saved.spokenEpisodeId)
-    val pos = local?.takeIf { !it.isFinished }?.currentTime ?: saved.spokenPositionSec ?: 0.0
-    return Triple(now, items, pos to (local?.isFinished == true))
+    return Triple(now, items, QueueRestore.spokenStart(local, saved.spokenPositionSec))
 }
 
 internal fun PlaybackService.saveQueue() {
@@ -77,7 +77,7 @@ internal suspend fun PlaybackService.restoreQueue(playWhenReady: Boolean) {
     val (saved, items) = loadSavedItems() ?: return
     if (player.mediaItemCount > 0) return
     applySavedState(saved)
-    player.setMediaItems(items, saved.index.coerceIn(0, items.lastIndex), saved.positionMs)
+    player.setMediaItems(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs)
     player.prepare()
     player.playWhenReady = playWhenReady
     publishExtras()
@@ -89,4 +89,22 @@ internal fun PlaybackService.applySavedState(saved: SavedQueue) {
     shuffled = saved.shuffled
     sourceLabel = saved.label
     player.repeatMode = saved.repeatMode
+}
+
+/** Where a saved queue picks up again. */
+internal object QueueRestore {
+    /**
+     * The song to start on among the [itemCount] (at least one) songs that could be loaded. Songs gone from
+     * the library are dropped, so the saved index is only kept within range.
+     */
+    fun startIndex(savedIndex: Int, itemCount: Int): Int = savedIndex.coerceIn(0, itemCount - 1)
+
+    /**
+     * Seconds into the episode or book to start at, and whether it was finished. The phone's own record
+     * wins unless it says finished; then the position saved with the queue, else the start.
+     */
+    fun spokenStart(local: SpokenProgressEntity?, savedSec: Double?): Pair<Double, Boolean> {
+        val pos = local?.takeIf { !it.isFinished }?.currentTime ?: savedSec ?: 0.0
+        return pos to (local?.isFinished == true)
+    }
 }

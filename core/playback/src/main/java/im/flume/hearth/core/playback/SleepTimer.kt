@@ -3,6 +3,7 @@
 package im.flume.hearth.core.playback
 
 import androidx.annotation.OptIn
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import im.flume.hearth.core.playback.PlaybackService.Companion.SLEEP_END_OF_CHAPTER
 import im.flume.hearth.core.playback.PlaybackService.Companion.SLEEP_END_OF_SONG
@@ -24,15 +25,14 @@ internal fun PlaybackService.setSleepTimer(ms: Long) {
     sleepJob?.cancel()
     player.pauseAtEndOfMediaItems = false
     val spoken = spokenNow
-    if (ms == SLEEP_END_OF_CHAPTER && spoken != null) {
+    val plan = SleepTimerPolicy.plan(ms, spoken = spoken != null)
+    if (plan == SleepPlan.END_OF_CHAPTER && spoken != null) {
         val end = spoken.timeline.chapterEndSec(spokenPositionSec())
         sleepAt = SLEEP_END_OF_CHAPTER
         sleepJob = scope.launch {
             while (isActive) {
-                val left = end - spokenPositionSec()
-                if (left <= 0.05) break
-                // Wake often enough to stop within a fraction of a second, at any speed.
-                delay(((left / player.playbackParameters.speed.coerceAtLeast(0.1f)) * 1000).toLong().coerceIn(20, 500))
+                val wait = SleepTimerPolicy.chapterCheckMs(end - spokenPositionSec(), player.playbackParameters.speed) ?: break
+                delay(wait)
             }
             player.pause()
             sleepAt = 0
@@ -41,9 +41,9 @@ internal fun PlaybackService.setSleepTimer(ms: Long) {
         publishExtras()
         return
     }
-    sleepAt = when {
-        ms == SLEEP_END_OF_SONG -> SLEEP_END_OF_SONG.also { player.pauseAtEndOfMediaItems = true }
-        ms > 0 -> (System.currentTimeMillis() + ms).also {
+    sleepAt = when (plan) {
+        SleepPlan.END_OF_SONG -> SLEEP_END_OF_SONG.also { player.pauseAtEndOfMediaItems = true }
+        SleepPlan.AFTER_DELAY -> (System.currentTimeMillis() + ms).also {
             sleepJob = scope.launch {
                 delay(ms)
                 player.pause()
@@ -54,4 +54,29 @@ internal fun PlaybackService.setSleepTimer(ms: Long) {
         else -> 0
     }
     publishExtras()
+}
+
+internal enum class SleepPlan { END_OF_CHAPTER, END_OF_SONG, AFTER_DELAY, CANCEL }
+
+/** The sleep timer's decisions, apart from the player and the clock. */
+internal object SleepTimerPolicy {
+    /** What a sleep-timer request means. End of chapter only exists for spoken word; for music it cancels. */
+    fun plan(ms: Long, spoken: Boolean): SleepPlan = when {
+        ms == SLEEP_END_OF_CHAPTER && spoken -> SleepPlan.END_OF_CHAPTER
+        ms == SLEEP_END_OF_SONG -> SleepPlan.END_OF_SONG
+        ms > 0 -> SleepPlan.AFTER_DELAY
+        else -> SleepPlan.CANCEL
+    }
+
+    /**
+     * With [leftSec] of the chapter to go at [speed], how long to sleep before looking again, or null once
+     * it's over. Wakes often enough to stop within a fraction of a second, at any speed.
+     */
+    fun chapterCheckMs(leftSec: Double, speed: Float): Long? =
+        if (leftSec <= 0.05) null
+        else ((leftSec / speed.coerceAtLeast(0.1f)) * 1000).toLong().coerceIn(20, 500)
+
+    /** The player paused itself at the end of a song because of the end-of-song timer, which is now spent. */
+    fun endOfSongReached(playWhenReady: Boolean, reason: Int, sleepAt: Long): Boolean =
+        !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && sleepAt == SLEEP_END_OF_SONG
 }

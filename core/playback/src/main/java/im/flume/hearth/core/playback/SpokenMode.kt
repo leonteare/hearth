@@ -13,6 +13,7 @@ import im.flume.hearth.domain.spoken.LocalBookIds
 import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.data.spoken.SpokenPlayPrefEntity
 import im.flume.hearth.domain.spoken.SpokenTimeline
+import im.flume.hearth.domain.spoken.StartPoint
 import im.flume.hearth.domain.spoken.TimelineTrack
 import kotlin.math.abs
 import kotlinx.coroutines.launch
@@ -140,7 +141,7 @@ internal suspend fun PlaybackService.backToMusic() = queueOps.withLock {
     store.clearMusic()
     if (items.isEmpty()) { publishExtras(); return@withLock }
     applySavedState(saved)
-    player.setMediaItems(items, saved.index.coerceIn(0, items.lastIndex), saved.positionMs)
+    player.setMediaItems(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs)
     player.prepare()
     player.play()
     publishExtras()
@@ -153,7 +154,7 @@ internal fun PlaybackService.spokenPositionSec(): Double =
 
 internal fun PlaybackService.seekSpokenTo(sec: Double) {
     val now = spokenNow ?: return
-    val (index, ms) = now.timeline.locate(sec.coerceIn(0.0, now.timeline.durationSec))
+    val (index, ms) = SpokenSeeking.locate(now.timeline, sec)
     player.seekTo(index, ms)
 }
 
@@ -161,7 +162,7 @@ internal fun PlaybackService.skipSpokenBy(deltaSec: Double) = seekSpokenTo(spoke
 
 internal fun PlaybackService.setSpeed(speed: Float) {
     val now = spokenNow ?: return
-    val s = speed.coerceIn(MIN_SPEED, MAX_SPEED)
+    val s = SpokenSeeking.speed(speed)
     player.setPlaybackSpeed(s)
     publishExtras()
     c.appScope.launch { c.db.spoken().setSpeed(SpokenPlayPrefEntity(now.libraryItemId, s)) }
@@ -174,6 +175,26 @@ internal fun PlaybackService.setSpeed(speed: Float) {
 internal suspend fun PlaybackService.checkServerPosition() {
     val now = spokenNow ?: return
     val start = c.spoken.progress.resolveStart(now.libraryItemId, now.episodeId, now.title, online = !c.network.cannotStream)
-    if (spokenNow !== now || start.finished) return
-    if (start.notice != null || abs(start.positionSec - spokenPositionSec()) > 2 && start.serverWon) seekSpokenTo(start.positionSec)
+    if (spokenNow !== now) return
+    if (SpokenSeeking.jumpToServer(start, spokenPositionSec())) seekSpokenTo(start.positionSec)
+}
+
+/** Seeking, skipping, speed and the server's position on the whole episode or book. */
+internal object SpokenSeeking {
+    /** Seconds the server's position may differ from the phone's before it's worth a jump. */
+    const val SERVER_JUMP_SEC = 2.0
+
+    /** The file and offset (ms) for [sec] on [timeline]; skipping past either end stops at it. */
+    fun locate(timeline: SpokenTimeline, sec: Double): Pair<Int, Long> =
+        timeline.locate(sec.coerceIn(0.0, timeline.durationSec))
+
+    fun speed(requested: Float): Float = requested.coerceIn(MIN_SPEED, MAX_SPEED)
+
+    /**
+     * Whether a restored episode or book should move to the server's position [start] from [hereSec]. Always
+     * when the user is told about it (a notice); otherwise only when the server's newer and it's a real
+     * difference. Never for something finished.
+     */
+    fun jumpToServer(start: StartPoint, hereSec: Double): Boolean =
+        !start.finished && (start.notice != null || abs(start.positionSec - hereSec) > SERVER_JUMP_SEC && start.serverWon)
 }

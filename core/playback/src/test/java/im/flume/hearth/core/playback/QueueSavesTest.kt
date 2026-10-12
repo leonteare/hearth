@@ -65,6 +65,13 @@ class QueueSavesTest {
     }
 
     @Test
+    fun `while playing the place is saved every fifteen seconds`() {
+        assertFalse(QueueSaves.positionSaveDue(lastSaveMs = 100_000, nowMs = 114_000))
+        assertFalse(QueueSaves.positionSaveDue(lastSaveMs = 100_000, nowMs = 115_000))
+        assertTrue(QueueSaves.positionSaveDue(lastSaveMs = 100_000, nowMs = 115_001))
+    }
+
+    @Test
     fun `revisions keep increasing even if the clock goes back`() {
         assertEquals(1_000L, QueueSaves.nextRevision(previous = 0, nowMs = 1_000))
         assertEquals(2_001L, QueueSaves.nextRevision(previous = 2_000, nowMs = 1_000))

@@ -16,6 +16,14 @@ internal object PrefetchPolicy {
         bitrateKbps <= 0 -> 0
         else -> METERED
     }
+
+    /** Queue positions to save ahead: the [count] songs after [current], as far as the queue of [size] goes. */
+    fun window(current: Int, size: Int, count: Int): IntRange =
+        current + 1 until minOf(size, current + 1 + count)
+
+    /** Songs whose pinned bitrate is kept: the current one and up to [ahead] after it (all that can be prefetched). */
+    fun pinnedWindow(current: Int, size: Int, ahead: Int): IntRange =
+        current..minOf(size - 1, current + ahead)
 }
 
 /**
@@ -32,4 +40,15 @@ internal object WakeModePolicy {
      */
     fun localOnly(onPhone: List<Boolean>): Boolean =
         onPhone.isNotEmpty() && onPhone.take(LOOKAHEAD + 1).all { it }
+
+    /** Queue positions [localOnly] looks at: the current song and [LOOKAHEAD] after it. Null leaves the mode as it is. */
+    fun window(current: Int, size: Int): IntRange? =
+        if (size == 0 || current !in 0 until size) null
+        else current until minOf(size, current + 1 + LOOKAHEAD)
+}
+
+/** When the service goes away with the app. */
+internal object ServiceLifetime {
+    /** Swiping the app away stops the service unless music is playing (or about to). */
+    fun stopOnTaskRemoved(playWhenReady: Boolean, itemCount: Int): Boolean = !playWhenReady || itemCount == 0
 }
