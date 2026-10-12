@@ -40,7 +40,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.api.Credentials
 import im.flume.hearth.container
+import im.flume.hearth.ui.screens.SpokenSignInForm
 import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.util.userMessage
+import java.security.cert.CertificateException
+import javax.net.ssl.SSLException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -98,8 +102,8 @@ fun LoginScreen() {
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         // The technical hints (Tailscale, certificates) are there for whoever set up the server, not up front.
         errorHelp?.let { help ->
-            androidx.compose.material3.TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "Less info" else "More info") }
-            if (showHelp) Text(help, color = im.flume.hearth.ui.theme.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "Less info" else "More info") }
+            if (showHelp) Text(help, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
         }
         Button(
             onClick = {
@@ -115,12 +119,12 @@ fun LoginScreen() {
                         if (c.spoken.account.value?.needsSignIn == false) finish(creds) else signedIn = creds
                     }.onFailure { e ->
                         showHelp = false
-                        if (generateSequence(e) { it.cause }.any { it is javax.net.ssl.SSLException || it is java.security.cert.CertificateException }) {
+                        if (generateSequence(e) { it.cause }.any { it is SSLException || it is CertificateException }) {
                             error = "Couldn't sign in: this phone doesn't trust the server's security certificate."
                             errorHelp = "If it's your own certificate (e.g. Caddy's local one), install its root certificate on the phone, " +
                                 "or use a plain http:// address over Tailscale."
                         } else {
-                            error = "Couldn't sign in. ${im.flume.hearth.util.userMessage(e)}"
+                            error = "Couldn't sign in. ${userMessage(e)}"
                             errorHelp = "Check the server address, and that Tailscale is connected if your server uses it."
                         }
                     }
@@ -155,7 +159,7 @@ private fun SpokenStep(onDone: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
-        im.flume.hearth.ui.screens.SpokenSignInForm(
+        SpokenSignInForm(
             secondary = { TextButton(onClick = onDone) { Text("Skip") } },
             onSignedIn = onDone,
         )

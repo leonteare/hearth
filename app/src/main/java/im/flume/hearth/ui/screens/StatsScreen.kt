@@ -57,6 +57,7 @@ import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.AccentDeep
 import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
+import java.time.Month
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.format.TextStyle
@@ -199,7 +200,7 @@ private fun MonthChart(minutes: List<Long>) {
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.fillMaxWidth().fillMaxHeight(0.85f * m / max + 0.01f).clip(RoundedCornerShape(3.dp)).background(MaterialTheme.colorScheme.primary))
                 Spacer(Modifier.height(4.dp))
-                Text(java.time.Month.of(i + 1).getDisplayName(TextStyle.NARROW, Locale.getDefault()), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Text(Month.of(i + 1).getDisplayName(TextStyle.NARROW, Locale.getDefault()), style = MaterialTheme.typography.labelMedium, color = TextSecondary)
             }
         }
     }

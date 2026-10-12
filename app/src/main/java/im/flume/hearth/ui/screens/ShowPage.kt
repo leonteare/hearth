@@ -66,8 +66,10 @@ import im.flume.hearth.spoken.FetchPhase
 import im.flume.hearth.spoken.FetchProgress
 import im.flume.hearth.spoken.FetchThen
 import im.flume.hearth.spoken.FollowTags
+import im.flume.hearth.spoken.PodcastEntity
 import im.flume.hearth.spoken.ServerFetch
 import im.flume.hearth.spoken.ShowEpisodes
+import im.flume.hearth.spoken.ShowFeeds
 import im.flume.hearth.spoken.ShowListEntry
 import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenFormat
@@ -80,6 +82,7 @@ import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.UnavailablePage
 import im.flume.hearth.ui.components.plural
+import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.Destructive
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
@@ -88,6 +91,8 @@ import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,7 +119,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
         c.spoken.podcasts().map { list -> Lookup(list.firstOrNull { it.id == id } ?: byFeed?.let { f -> list.firstOrNull { FeedUrls.same(it.feedUrl, f) } }) }
     }.collectAsStateWithLifecycle(null)
     val p = podcastLookup?.podcast
-    val episodes by remember(p?.id) { p?.id?.let { c.spoken.episodes(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+    val episodes by remember(p?.id) { p?.id?.let { c.spoken.episodes(it) } ?: flowOf(emptyList()) }
         .collectAsStateWithLifecycle(null)
     val account by c.spoken.account.collectAsStateWithLifecycle()
     val now = LocalSpokenNow.current
@@ -140,7 +145,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
         if (p != null && showFeedUrl != null) c.spoken.feeds.rememberShow(p.id, showFeedUrl)
     }
     val feedState by remember(showFeedUrl) {
-        showFeedUrl?.let { c.spoken.feeds.state(it) } ?: kotlinx.coroutines.flow.MutableStateFlow(im.flume.hearth.spoken.ShowFeeds.FeedState())
+        showFeedUrl?.let { c.spoken.feeds.state(it) } ?: MutableStateFlow(ShowFeeds.FeedState())
     }.collectAsStateWithLifecycle()
     LaunchedEffect(showFeedUrl, account != null) {
         if (showFeedUrl != null && account != null) c.spoken.feeds.load(showFeedUrl)
@@ -163,7 +168,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
     val latest = remember(serverList) { SpokenLists.playLatest(serverList) }
     val title = p?.title ?: feed?.title ?: "Podcast"
     val author = p?.author ?: feed?.author
-    val coverUrl = p?.let { c.spokenCover(it.id, im.flume.hearth.ui.theme.CoverSize.LARGE) } ?: feed?.image
+    val coverUrl = p?.let { c.spokenCover(it.id, CoverSize.LARGE) } ?: feed?.image
     val playingThisShow = p != null && now?.libraryItemId == p.id
     val onServerCount = merged.count { it.server != null }
     val countLine = when {
@@ -421,4 +426,4 @@ private fun FeedEpisodeRow(ep: FeedEpisode, podcastId: String?, feedUrl: String,
 }
 
 /** The show found for the page (null: not on the server), once the phone's list has been read. */
-private class Lookup(val podcast: im.flume.hearth.spoken.PodcastEntity?)
+private class Lookup(val podcast: PodcastEntity?)

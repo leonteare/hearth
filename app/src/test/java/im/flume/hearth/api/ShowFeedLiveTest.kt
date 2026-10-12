@@ -2,6 +2,7 @@ package im.flume.hearth.api
 
 import im.flume.hearth.spoken.FeedMatch
 import im.flume.hearth.spoken.FeedParse
+import im.flume.hearth.spoken.FeedUrls
 import im.flume.hearth.spoken.FetchPhase
 import im.flume.hearth.spoken.FetchProgress
 import im.flume.hearth.spoken.FollowTags
@@ -117,6 +118,6 @@ class ShowFeedLiveTest {
     }
 
     private object FeedMatchUrls {
-        fun same(a: String?, b: String?) = im.flume.hearth.spoken.FeedUrls.same(a, b)
+        fun same(a: String?, b: String?) = FeedUrls.same(a, b)
     }
 }

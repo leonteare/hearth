@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import im.flume.hearth.api.PasswordNeededException
 import im.flume.hearth.api.WrongPasswordException
 import im.flume.hearth.container
 import im.flume.hearth.data.PlaylistItem
@@ -49,6 +50,8 @@ import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.util.couldNot
+import java.io.IOException
 import kotlinx.coroutines.launch
 
 private fun roleLabel(role: ShareRole) = when (role) {
@@ -80,17 +83,17 @@ fun InviteBanner(item: PlaylistItem) {
                                 val me = c.session.credentials.value?.username ?: return@showUndo
                                 c.session.setPlaylistDecision(item.playlist.id, null)
                                 runCatching { c.library.updateSharing(item.playlist.id) { it.withRole(me, invite) } }
-                                    .onFailure { e -> actions.showMessage(im.flume.hearth.util.couldNot("Couldn't bring the invite back", e, !c.network.isOnline.value)) }
+                                    .onFailure { e -> actions.showMessage(couldNot("Couldn't bring the invite back", e, !c.network.isOnline.value)) }
                             }
                         }
-                        .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't decline the invite", it, !c.network.isOnline.value)) }
+                        .onFailure { actions.showMessage(couldNot("Couldn't decline the invite", it, !c.network.isOnline.value)) }
                 }
             }) { Text("Decline", color = TextSecondary) }
             TextButton(onClick = {
                 c.appScope.launch {
                     runCatching { c.library.answerInvite(item.playlist.id, accept = true) }
                         .onSuccess { actions.showMessage("Added to Your Library") }
-                        .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't accept the invite", it, !c.network.isOnline.value)) }
+                        .onFailure { actions.showMessage(couldNot("Couldn't accept the invite", it, !c.network.isOnline.value)) }
                 }
             }) { Text("Accept") }
         },
@@ -141,7 +144,7 @@ fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
                         }
                     )
                 }
-                .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't update sharing", it, !c.network.isOnline.value)) }
+                .onFailure { actions.showMessage(couldNot("Couldn't update sharing", it, !c.network.isOnline.value)) }
         }
     }
 
@@ -233,7 +236,7 @@ fun PasswordDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                     result.onSuccess { onSaved() }.onFailure { e ->
                         error = when (e) {
                             is WrongPasswordException -> "That password didn't work"
-                            is java.io.IOException -> "Couldn't reach the server"
+                            is IOException -> "Couldn't reach the server"
                             else -> "Couldn't save the password on this phone"
                         }
                     }
@@ -246,10 +249,10 @@ fun PasswordDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
 
 /** Error text for a failed photo change; a stale saved password is forgotten so the next try asks again. */
 internal fun photoError(e: Throwable, clearPassword: () -> Unit): String = when (e) {
-    is WrongPasswordException, is im.flume.hearth.api.PasswordNeededException -> {
+    is WrongPasswordException, is PasswordNeededException -> {
         clearPassword()
         "Navidrome didn't accept your saved password. Try again to enter it."
     }
-    is java.io.IOException -> e.message?.takeIf { it.startsWith("That photo") } ?: im.flume.hearth.util.couldNot("Couldn't change the photo", e)
+    is IOException -> e.message?.takeIf { it.startsWith("That photo") } ?: couldNot("Couldn't change the photo", e)
     else -> "Couldn't use that photo"
 }

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import im.flume.hearth.data.SongEntity
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -26,7 +27,7 @@ const val EXTRA_TRACK_PEAK = "trackPeak"
 /** Identifies one entry in the queue (the same song can be queued twice), so the UI can address it safely. */
 const val EXTRA_QUEUE_KEY = "queueKey"
 
-private val queueKeys = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+private val queueKeys = AtomicLong(System.currentTimeMillis())
 
 fun newQueueKey(): String = queueKeys.incrementAndGet().toString(36)
 

@@ -1,6 +1,7 @@
 package im.flume.hearth.ui.screens.visualiser
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -59,7 +60,7 @@ class RibbonRenderer : VisualiserRenderer() {
         drawRect(Color.Black)
         // Horizon haze along the mirror line.
         drawRect(
-            pal.color(0), topLeft = Offset(0f, cy - h * 0.002f), size = androidx.compose.ui.geometry.Size(w, h * 0.004f),
+            pal.color(0), topLeft = Offset(0f, cy - h * 0.002f), size = Size(w, h * 0.004f),
             alpha = 0.15f + 0.3f * a.beat, blendMode = BlendMode.Plus,
         )
 

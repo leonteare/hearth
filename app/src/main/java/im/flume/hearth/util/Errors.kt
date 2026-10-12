@@ -1,5 +1,13 @@
 package im.flume.hearth.util
 
+import im.flume.hearth.api.AbsHttpException
+import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.api.WrongPasswordException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+
 private val urlPattern = Regex("""https?://\S+""")
 
 // Subsonic login parameters: t (token), s (salt), p (password, plain or enc:hex), plus spelled-out forms.
@@ -37,10 +45,10 @@ fun userMessage(e: Throwable, fallback: String = GENERIC_ERROR_MESSAGE): String 
     val code = chain.firstNotNullOfOrNull(::statusCode)
     val text = chain.joinToString(" ") { it.message.orEmpty() }.lowercase()
     return when {
-        chain.any { it is java.net.SocketTimeoutException } || "timed out" in text || "timeout" in text -> TIMEOUT_MESSAGE
-        chain.any { it is java.net.UnknownHostException || it is java.net.ConnectException || it is java.net.NoRouteToHostException } ->
+        chain.any { it is SocketTimeoutException } || "timed out" in text || "timeout" in text -> TIMEOUT_MESSAGE
+        chain.any { it is UnknownHostException || it is ConnectException || it is NoRouteToHostException } ->
             NO_CONNECTION_MESSAGE
-        code == 401 || code == 403 || chain.any { it is im.flume.hearth.api.WrongPasswordException } -> SIGN_IN_REFUSED_MESSAGE
+        code == 401 || code == 403 || chain.any { it is WrongPasswordException } -> SIGN_IN_REFUSED_MESSAGE
         code != null && code in 500..599 -> SERVER_PROBLEM_MESSAGE
         else -> {
             val message = e.message?.takeIf { it.isNotBlank() }?.let(::scrubSecrets)
@@ -67,11 +75,11 @@ fun couldNot(what: String, e: Throwable?, offline: Boolean = false): String = wh
 
 /** The HTTP status [e] carries, if any (Subsonic and podcast-server errors, or an "HTTP 502" message). */
 private fun statusCode(e: Throwable): Int? = when (e) {
-    is im.flume.hearth.api.SubsonicException -> when (e.code) {
+    is SubsonicException -> when (e.code) {
         40, 41 -> 401 // Subsonic: wrong username or password, or token sign-in not allowed
         in 100..599 -> e.code
         else -> null
     }
-    is im.flume.hearth.api.AbsHttpException -> e.code
+    is AbsHttpException -> e.code
     else -> e.message?.let { httpCode.find(it)?.groupValues?.get(1)?.toInt() }
 }

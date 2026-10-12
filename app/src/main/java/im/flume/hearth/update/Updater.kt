@@ -11,6 +11,8 @@ import android.provider.Settings
 import androidx.core.content.edit
 import im.flume.hearth.BuildConfig
 import im.flume.hearth.container
+import im.flume.hearth.util.scrubSecrets
+import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,7 +94,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
             }
             if (release != null && isNewer(release.version, currentVersion)) UpdateState.Available(release) else UpdateState.UpToDate
         } catch (e: Exception) {
-            UpdateState.Failed("Couldn't check for updates (${im.flume.hearth.util.userMessage(e)})")
+            UpdateState.Failed("Couldn't check for updates (${userMessage(e)})")
         }
     }
 
@@ -137,7 +139,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
                 delay(INSTALL_TIMEOUT)
                 if (_state.value === installing) _state.value = UpdateState.Available(release)
             } catch (e: Exception) {
-                _state.value = UpdateState.Failed("Update failed (${im.flume.hearth.util.userMessage(e)})", release)
+                _state.value = UpdateState.Failed("Update failed (${userMessage(e)})", release)
             }
         }
     }
@@ -202,7 +204,7 @@ class Updater(private val context: Context, private val http: OkHttpClient, priv
             _state.value = if (status == PackageInstaller.STATUS_FAILURE_ABORTED && release != null) {
                 UpdateState.Available(release)
             } else {
-                UpdateState.Failed("Update failed: ${message?.let { im.flume.hearth.util.scrubSecrets(it) } ?: "status $status"}", release)
+                UpdateState.Failed("Update failed: ${message?.let { scrubSecrets(it) } ?: "status $status"}", release)
             }
         }
     }

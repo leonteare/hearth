@@ -1,5 +1,16 @@
 package im.flume.hearth.ui.screens
 
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.Dp
+import im.flume.hearth.AppContainer
+import im.flume.hearth.data.DownloadCounts
+import im.flume.hearth.data.ServerMixes
+import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.spoken.SpokenLists
+import im.flume.hearth.ui.components.BannerCard
+import im.flume.hearth.ui.theme.CoverSize
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -85,12 +96,12 @@ fun HomeScreen() {
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     // Yours and ones you've joined; everyone else's stay out of sight.
     val playlists = remember(playlistItems) { PlaylistRules.joined(playlistItems) }
-    val serverMixes = remember(playlistItems) { im.flume.hearth.data.ServerMixes.mine(playlistItems) }
+    val serverMixes = remember(playlistItems) { ServerMixes.mine(playlistItems) }
     // Podcasts and audiobooks, once signed in: what you're part-way through, and new episodes of shows you follow.
     val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
     val continueListening by remember { c.spoken.continueListening(12) }.collectAsStateWithLifecycle(emptyList())
     val latestEpisodes by remember { c.spoken.latestEpisodes(50) }.collectAsStateWithLifecycle(emptyList())
-    val newEpisodes = remember(latestEpisodes) { im.flume.hearth.spoken.SpokenLists.newEpisodes(latestEpisodes, 5) }
+    val newEpisodes = remember(latestEpisodes) { SpokenLists.newEpisodes(latestEpisodes, 5) }
 
     var mixes by remember { mutableStateOf<List<Mix>>(emptyList()) }
     LaunchedEffect(songCount > 0) { if (songCount > 0) mixes = runCatching { c.mixes.today(online) }.getOrDefault(emptyList()) }
@@ -119,12 +130,12 @@ fun HomeScreen() {
         }
         (sync as? SyncState.Failed)?.let { f ->
             item {
-                im.flume.hearth.ui.components.BannerCard(
+                BannerCard(
                     title = "Library sync failed",
                     body = f.message,
                     icon = Icons.Default.CloudOff,
                     actions = {
-                        androidx.compose.material3.TextButton(onClick = {
+                        TextButton(onClick = {
                             c.appScope.launch { c.sync.fullSync(runCatching { c.api.scanStatus()?.lastScan }.getOrNull()) }
                         }) { Text("Try again") }
                     },
@@ -158,7 +169,7 @@ fun HomeScreen() {
                 LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
                     items(serverMixes, key = { it.playlist.id }) { item ->
                         val p = item.playlist
-                        MediaCard(p.name, im.flume.hearth.data.ServerMixes.description(p), onClick = { actions.openPlaylist(p.id) }, subtitleLines = 2, coverArt = p.coverArt)
+                        MediaCard(p.name, ServerMixes.description(p), onClick = { actions.openPlaylist(p.id) }, subtitleLines = 2, coverArt = p.coverArt)
                     }
                 }
             }
@@ -191,11 +202,11 @@ fun HomeScreen() {
 }
 
 @Composable
-fun MixCover(mix: Mix, size: androidx.compose.ui.unit.Dp) {
+fun MixCover(mix: Mix, size: Dp) {
     val covers = (mix.covers + List(4) { null }).take(4)
     Column(Modifier.size(size).clip(HearthShapes.Cover)) {
         for (row in 0..1) Row(Modifier.weight(1f)) {
-            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = im.flume.hearth.ui.theme.CoverSize.MEDIUM)
+            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = CoverSize.MEDIUM)
         }
     }
 }
@@ -247,11 +258,11 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
 }
 
 /** Songs plus podcast episodes and audiobooks downloading to this phone, for the downloads icon in page headers. */
-fun im.flume.hearth.AppContainer.allDownloadCounts(): kotlinx.coroutines.flow.Flow<im.flume.hearth.data.DownloadCounts> =
-    kotlinx.coroutines.flow.combine(downloads.counts, spoken.downloads.rows) { songs, rows ->
-        im.flume.hearth.data.DownloadCounts(
-            queued = songs.queued + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.QUEUED },
-            downloading = songs.downloading + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.DOWNLOADING },
-            failed = songs.failed + rows.count { it.state == im.flume.hearth.spoken.SpokenDownloadState.FAILED },
+fun AppContainer.allDownloadCounts(): Flow<DownloadCounts> =
+    combine(downloads.counts, spoken.downloads.rows) { songs, rows ->
+        DownloadCounts(
+            queued = songs.queued + rows.count { it.state == SpokenDownloadState.QUEUED },
+            downloading = songs.downloading + rows.count { it.state == SpokenDownloadState.DOWNLOADING },
+            failed = songs.failed + rows.count { it.state == SpokenDownloadState.FAILED },
         )
     }

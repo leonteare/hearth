@@ -32,46 +32,61 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
   here. Composables use `LocalContext.current.container`. Also `logHandledError`, `crashLoggingHandler`, crash files.
 - `api/` (HTTP clients; `@Serializable` models)
   - `SubsonicClient` + `Models.kt`: Navidrome via Subsonic, token+salt auth. Library, stars, playlists, scrobbles, users.
-  - `NavidromeNativeApi`: Navidrome's own API (session from a password login): playlist photos and listing users to
-    share with.
-  - `AbsClient` + `AbsModels.kt`: Audiobookshelf (JWT login/refresh, `ServerClock` skew, safe file names).
+  - `NavidromeNativeApi`: Navidrome's own API (password login): playlist photos, users to share with.
+  - `AbsClient` + `AbsModels`: Audiobookshelf (JWT login/refresh, `ServerClock` skew, uploads, safe file names).
   - `TidarrClient`: Tidarr/Tidal search, artist/album pages, queueing downloads, preview stream info.
 - `data/`
-  - `Entities.kt`, `Database.kt` (DAOs, `AppDatabase`, migrations; spoken DAOs live in `spoken/`).
-  - `LibraryRepository` (queries, `LibraryOrder` sorting, `YourLibrary`), `SearchIndex` + `SearchHits` (search/ranking).
+  - Room: `Entities`, `AppDatabase` (+ `Converters`), `Migrations` (`MIGRATION_X_Y_SQL`), DAOs in `LibraryDao`,
+    `DownloadDao` (+ `DownloadCounts`), `RequestDao`. Spoken DAOs live in `spoken/*Entities.kt`.
+  - `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`, `YourLibrary`), `SearchIndex` + `SearchHits` (ranking).
   - `SessionStore` (prefs, `Settings`), `PasswordVault` (Keystore password), `NetworkMonitor`, `Usage` (local counts).
   - `PlaylistSharing` (sharing info in the playlist comment), `PlaylistEdits`, `PhotoPrep` (playlist photo JPEGs).
-  - `ServerMixes`: server-built mixes (see contract below). `Mixes.kt`: on-phone artist mixes. `Stats`, `Lyrics`.
+  - `ServerMixes`: server-built mixes (see contract below). `Mixes`: on-phone artist mixes. `Stats`, `Lyrics`.
   - `Availability` (owned vs missing music, preview window), `RequestIntent`/`RequestMatching` (Tidarr request logic).
-- `requests/Requests.kt`: "get music you don't have": `RequestsRepository` + worker follow a Tidarr request through
-  Navidrome's scan, then like it and/or download it.
-- `sync/LibrarySync.kt`: full library sync (shrink guard). `download/Downloads.kt`: repository, `DownloadPolicy`, worker.
+- `requests/`: "get music you don't have". `RequestsRepository` (state, lock), `RequestPolling` (poll loop, background
+  scheduling), `RequestArrival` (found on server: like/download, notify), `RequestsWorker`.
+- `sync/LibrarySync.kt`: full library sync (shrink guard).
+- `download/`: `DownloadRepository` (files, queue, sync clean-up), `DownloadWorker` (parallel lanes), `DownloadPolicy`.
 - `spoken/` (Audiobookshelf podcasts and audiobooks)
-  - `SpokenRepository` (sync, follow, OPML) + `SpokenEntities` (Room + `SpokenDao`), `AbsAccountStore` (ABS sign-in).
+  - `SpokenRepository` (facade, Continue listening), `SpokenSync` (+ `SpokenSyncWorker`), `SpokenFollows`, `SpokenAdd`
+    (feeds, OPML), `SpokenMapping` (API -> entities), `SpokenEntities` (Room + `SpokenDao`), `AbsAccountStore`.
   - `SpokenProgress` (resume points, outbox worker), `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`).
-  - `SpokenDownloads`, `SpokenPresentation` (formatting, chapters, speed, search, discovery).
+  - `SpokenDownloads` (+ worker), `SpokenPresentation` (formatting, chapters, speed, search, `FeedUrls`).
   - `ShowFeed` (RSS parse/match to server episodes) + `ShowFeeds` (fetch/cache feeds for show pages).
-  - Phone audiobooks: `LocalBooks` (folders, upload worker), `LocalBookLogic` (scan/naming), `LocalBookEntities`,
-    `LocalBookDetails`, `BookMatch` (match to metadata providers), `EmbeddedChapters` (MP4/ID3 chapter parsing).
+  - Phone audiobooks: `LocalBooks` (folders, facade), `LocalBookScanner`, `LocalBookUpload` (+ `LocalBookUploadWorker`),
+    `LocalBookChapters`, `LocalBookLogic` (scan/naming), `LocalBookEntities` (+ `LocalBookDao`), `LocalBookDetails`,
+    `BookMatch` (metadata search matching), `EmbeddedChapters` (MP4/ID3 chapter parsing).
 - `playback/`
-  - `PlaybackService` (MediaSessionService, queue commands), `PlayerConnection` (UI handle, `PlayerUiState`).
-  - `QueuePlanner`/`QueueStore` (window of ~50, saved queue), `SongDataSource` (download → cache → stream),
-    `Scrobbler`, `PlaybackErrors`, `CoverArt` (artwork, cache keys), `SpokenPlayback` (episode/book media items).
+  - `PlaybackService` (MediaSessionService lifecycle). Its logic is split into extension files: `PlayerSetup`,
+    `PlayerListener`, `SessionCallback` (connect, custom commands), `SessionExtras` (lock-screen buttons), `QueueEdits`,
+    `QueuePersistence`, `PlaybackRecovery`, `StreamCaching` (prefetch, wake mode), `SpokenMode`, `SleepTimer`,
+    `VolumeLevelling`, `SpokenAwarePlayer` (headset skips in spoken mode).
+  - `PlayerConnection` (UI handle, `PlayerUiState`), `QueuePlanner`/`QueueStore` (window of ~50, saved queue),
+    `SongDataSource` (download -> cache -> stream), `Scrobbler`, `PlaybackErrors`, `PlaybackPolicy`, `CoverArt`
+    (session artwork, cache keys), `SpokenPlayback` (episode/book media items, listening tracker).
   - `PreviewPlayer`: separate 30 s preview player for music not on the server.
   - Visualiser audio: `AudioAnalyzer` (tap via `ForwardingAudioSink`), `AudioAnalysis` (FFT, bands), `BeatTracker`,
     `TimedRing`.
 - `ui/`
-  - `AppRoot.kt` (NavHost; add routes as `screen("name/{arg}") { ... }`), `MainActivity`, `LoginScreen`.
-  - `components/`: `Components.kt` (`LocalActions`, rows, menus), `MediaItems`, `PageChrome` (headers, empty states),
-    `NotOnServer` (missing-music UI, `LocalGetMusic`), `PlaylistPicker`, `CoverColor`, `CoverPrefetcher`.
-  - `screens/`: Home, SearchLibrary (search + Library + browse), LibraryTabs, MusicPages (album/artist),
-    CollectionScreens (playlist/mix/genre/liked), PlayerScreens (now playing, queue, lyrics), Spoken{Screens,Player},
-    ShowPage, LocalBookScreens, Downloads, Settings, Stats, InfoSections, PlaylistSharingUi, UpdateUi, CrashBanner.
+  - `AppRoot` (state, wiring), `Routes` (NavHost; add routes as `screen("name/{arg}") { ... }`), `AppActions` (the
+    `Actions` implementation), `NavBar` (bottom bar/side rail), `PlayerOverlays`, `MainActivity`, `LoginScreen`.
+  - `components/`: `Actions` (`LocalActions`), `SongRows`, `MediaItems`, `MissingRows`, `SongMenu`, `Sheets`,
+    `PageChrome` (headers, empty states), `CoverArt`, `CoverColor`, `CoverPrefetcher`, `GetMusic` (+ `GetMusicSheets`,
+    `NotOnServer` with `LocalGetMusic`, `NotOnServerIcons`), `PreviewBar`, `PlayShuffleButtons`, `PlaylistPicker`,
+    `LiveRows`/`RowContext`, `Formatters`.
+  - `screens/` (one page or part per file; names say which): Home, Search{Screen,Field,Results}, Library{Screen,Tabs,
+    Controls,Lists,Rows}, BrowseScreens, Album/Artist{Screen,Layout}, MusicPageLoading, Collection{Screen,Header,
+    SongList,Selection,DownloadDialogs} (playlist/mix/genre/liked), Playlist{Screen,EditScreen,Menu,SharingUi},
+    LikedGenreMixScreens; player: MiniPlayer, NowPlaying{Screen,Menu}, PlayerControls, PlayerPosition, LyricsView,
+    Queue{Screen,Rows}; spoken: Spoken{Common,Rows,Menus,Sheets,Controls,Home,Info,Queue,NowPlayingScreen,PlayerMenu,
+    DownloadRows}, ShowPage, BookScreen, LocalBook{Screen,Rows,Settings}, FindDetailsSheet, OpmlImport; Downloads
+    {Screen,Rows}; Settings{Screen,Rows} + General/Appearance/Storage/GetMusic/PodcastsAndAudiobooks settings pages;
+    Stats, InfoSections, EqualWidthChips, UpdateUi, CrashBanner.
   - `screens/visualiser/`: `VisualiserScreen`, `VisualiserCore` (styles, renderer base), one `*Renderer` per style,
-    helpers `Retro3d`, `Ridges`, `ScopeTrace`.
-  - `theme/Theme.kt`: colours, `Dimens`, `HearthShapes`.
+    helpers `FramePacer`, `Retro3d`, `Ridges`, `ScopeTrace`.
+  - `theme/`: `Theme` (colours, `Dimens`, `HearthShapes`), `CoverSizes`, `Contrast`.
 - `update/Updater.kt`: self-update from GitHub Releases (`BuildConfig.UPDATE_REPO`). `util/Errors.kt`: `scrubSecrets`,
-  `userMessage`.
+  `userMessage`, `couldNot`.
 - Tests mirror the package under `app/src/test/java/im/flume/hearth/<pkg>/`; fixtures in `app/src/test/resources/`.
 
 ### Server-side contracts (code on the homelab, `/opt/homelab`)
@@ -127,7 +142,7 @@ Paths under `app/src/main/java/im/flume/hearth/`. **Update this map when you add
 ## Parallel agents (several worktrees at once)
 
 - One feature per worktree and branch. Commit there; don't touch other worktrees or the main checkout.
-- Hot files (`AppRoot.kt`, `SearchLibrary.kt`, `CollectionScreens.kt`, `Database.kt`, `HearthApp.kt`) are edited by
+- Hot files (`HearthApp.kt`, `ui/Routes.kt`, `ui/AppActions.kt`, `data/Migrations.kt`, `data/LibraryDao.kt`) are edited by
   many agents: keep changes small and localised (add, don't reorder or reformat), so merges stay clean. Put new
   screens/logic in new files rather than growing these.
 - Never edit `version.properties` (only `release.sh` does). Two schema bumps in parallel collide: rebase and renumber.

@@ -26,10 +26,12 @@ import im.flume.hearth.api.AbsClient
 import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.NetworkMonitor
 import im.flume.hearth.data.SessionStore
+import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -347,11 +349,11 @@ class SpokenDownloadWorker(context: Context, params: WorkerParameters) : Corouti
                 if (row.state == SpokenDownloadState.REMOVED) continue
                 val n = (tries[key] ?: 0) + 1
                 tries[key] = n
-                val message = im.flume.hearth.util.userMessage(e)
+                val message = userMessage(e)
                 repo.reportError(message)
                 dao.upsertDownload(row.copy(state = if (n < 3 && e is IOException) SpokenDownloadState.QUEUED else SpokenDownloadState.FAILED, addedAt = if (n < 3) System.currentTimeMillis() else row.addedAt, error = message))
                 if (n >= 3) continue
-                kotlinx.coroutines.delay(5_000L * n)
+                delay(5_000L * n)
             }
         }
         return Result.success()

@@ -1,5 +1,6 @@
 package im.flume.hearth.api
 
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -268,7 +269,7 @@ class TidarrClientTest {
 
     @Test
     fun `artist page asks tidal through the proxy with the country and filters`() = runTest {
-        val seen = java.util.concurrent.CopyOnWriteArrayList<okhttp3.HttpUrl>()
+        val seen = CopyOnWriteArrayList<okhttp3.HttpUrl>()
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
                 val url = request.requestUrl!!
