@@ -44,7 +44,7 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 | Module | Holds |
 |---|---|
 | `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `ApiExceptions`, `EXTRA_ROUTE`, `ic_notification` (`im.flume.hearth.core.common.R`) |
-| `:core:network` | `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
+| `:core:network` | `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` + `AbsAuth` (tokens, JWT, server clock) + `AbsUploads` (new podcast, book upload, `PodcastPaths`), `TidarrClient` + `TidarrModels` + `TidarrParsing` |
 | `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas/im.flume.hearth.core.data.AppDatabase/`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`; `SearchIndex` (`SearchMatch`, `Scored`, `SongFilter`: text matching music and spoken share) |
 | `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning (below); `MusicContainer` |
 | `:domain:spoken` | Podcasts and audiobooks (below); `SpokenContainer` |
@@ -64,12 +64,14 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 
 ### Where things live (relative to each module's root package)
 
-- **domain:music**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
+- **domain:music**: `LibraryRepository` (queries, playlist edits), `PlaySource`, `LibraryOrder` (+ `SongOrder`,
+  `YourLibrary`), `Stats`, `Usage`, `Lyrics`
   (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`, `PlaylistEdits`,
   `PhotoPrep`, `Availability`, `RequestMatching` (is Tidal music on the server; `Availability` needs it).
-- **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
-  `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
-- **domain:requests**: Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker.
+- **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadPins`
+  (removal plans, missing songs), `DownloadScheduling` (worker start/stop, Wi-Fi/app-start wake), `DownloadWorker`, `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
+- **domain:requests**: Tidarr: `RequestsRepository` (facade), `TidalBrowse` (search, artist/album lookups),
+  `RequestActions` (request/retry/cancel/drop), `FollowIntents`, `RequestPolling` (start, poll), `RequestArrival`, worker.
 - **domain:spoken**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
   `SpokenMapping`, `SpokenProgress`, `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`), `SpokenDownloads`,
   `SpokenPresentation`, `ShowFeed`/`ShowFeeds`; phone books: `LocalBooks`, `LocalBookScanner`, `LocalBookUpload`(+Worker),

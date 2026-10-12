@@ -1,29 +1,12 @@
 package im.flume.hearth.domain.music.download
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.work.Constraints
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
 import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.core.data.DownloadCounts
 import im.flume.hearth.core.data.DownloadEntity
 import im.flume.hearth.core.data.DownloadState
-import im.flume.hearth.core.data.DownloadStateRow
-import im.flume.hearth.core.data.NetworkMonitor
 import im.flume.hearth.core.data.PinnedEntity
 import im.flume.hearth.core.data.SessionStore
-import im.flume.hearth.core.data.SongDownloadPrefEntity
 import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.core.common.logHandledError
 import java.io.File
@@ -42,13 +25,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
 
 /**
  * Songs kept on the phone for offline play. Files live in app-private storage; the playback data
  * source checks [localFile] before streaming, so a downloaded song never touches the network.
+ * Starting and waking the worker lives in DownloadScheduling.kt, reading pins in DownloadPins.kt.
  */
 class DownloadRepository(
     private val context: Context,
@@ -57,6 +40,7 @@ class DownloadRepository(
     private val scope: CoroutineScope,
 ) {
     private val dao = db.downloads()
+    private val pins = DownloadPins(db)
     private val done = ConcurrentHashMap<String, String>()
     /** In-flight HTTP calls by song id, so removing a download stops it immediately. */
     internal val active = ConcurrentHashMap<String, Call>()
@@ -123,7 +107,7 @@ class DownloadRepository(
     fun cancelPending() = scope.launch {
         val ids = dao.pendingIds()
         cancelled.addAll(ids)
-        setPrefs(ids, wanted = false)
+        pins.setPrefs(ids, wanted = false)
         dao.deletePending()
         ids.forEach { active.remove(it)?.cancel() }
     }
@@ -147,27 +131,8 @@ class DownloadRepository(
             // Signing in again (after an accidental sign-out) carries on with whatever was queued.
             session.credentials.map { it != null }.distinctUntilChanged().collect { signedIn -> if (signedIn) resumeIfWaiting() }
         }
-        // The worker gives up rather than waiting hours for Wi-Fi; start it again when Wi-Fi turns up.
-        runCatching {
-            context.getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
-                NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
-                object : ConnectivityManager.NetworkCallback() {
-                    // Capabilities change often (signal strength); only react the first time a network is Wi-Fi.
-                    private val wifiNetworks: MutableSet<Network> = ConcurrentHashMap.newKeySet()
-                    override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                        if (!NetworkMonitor.isWifi(caps)) wifiNetworks.remove(network)
-                        else if (wifiNetworks.add(network) && session.settings.value.wifiOnlyDownloads) resumeIfWaiting()
-                    }
-                    override fun onLost(network: Network) { wifiNetworks.remove(network) }
-                },
-            )
-        }
-        // Opening the app is a good moment to carry on with anything left over.
-        scope.launch(Dispatchers.Main) {
-            ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-                override fun onStart(owner: LifecycleOwner) { resumeIfWaiting() }
-            })
-        }
+        resumeWhenWifiArrives(context, session, ::resumeIfWaiting)
+        resumeOnAppStart(scope, ::resumeIfWaiting)
     }
 
     /** Starts the worker if songs are queued and nothing is holding them back on purpose. */
@@ -182,12 +147,7 @@ class DownloadRepository(
      */
     private suspend fun requeueStale() {
         dao.requeueFailed()
-        if (!workerRunning()) dao.requeueInterrupted()
-    }
-
-    private suspend fun workerRunning(): Boolean = withContext(Dispatchers.IO) {
-        runCatching { WorkManager.getInstance(context).getWorkInfosForUniqueWork(WORK_NAME).get() }.getOrDefault(emptyList())
-            .any { it.state == WorkInfo.State.RUNNING }
+        if (!downloadWorkerRunning(context)) dao.requeueInterrupted()
     }
 
     fun localFile(songId: String): File? = done[songId]?.let(::File)?.takeIf { it.exists() }
@@ -205,11 +165,9 @@ class DownloadRepository(
      * caller carries on. Queued songs stay queued.
      */
     suspend fun stopWorker() {
-        withContext(Dispatchers.IO) {
-            runCatching { WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME).result.get() }
-        }
+        cancelDownloadWorker(context)
         active.values.forEach { it.cancel() }
-        withTimeoutOrNull(15_000) { while (workerRunning()) delay(200) }
+        withTimeoutOrNull(15_000) { while (downloadWorkerRunning(context)) delay(200) }
     }
 
     /**
@@ -239,7 +197,7 @@ class DownloadRepository(
     /** The user downloaded these songs themselves: that wins over any album or playlist being removed. */
     fun download(songs: List<SongEntity>) = scope.launch {
         tellUserDownload(songs.map { it.id })
-        setPrefs(songs.map { it.id }, wanted = true)
+        pins.setPrefs(songs.map { it.id }, wanted = true)
         _storageFull.value = false
         enqueue(songs)
     }
@@ -257,7 +215,7 @@ class DownloadRepository(
 
     /** The user removed these songs' downloads: syncing a downloaded album or playlist won't bring them back. */
     fun remove(songIds: List<String>) = scope.launch {
-        setPrefs(songIds, wanted = false)
+        pins.setPrefs(songIds, wanted = false)
         deleteDownloads(songIds)
     }
 
@@ -268,13 +226,6 @@ class DownloadRepository(
         songIds.chunked(500).forEach { dao.delete(it) }
         songIds.forEach { id -> active.remove(id)?.cancel(); done.remove(id); File(dir, id).delete() }
     }
-
-    private suspend fun setPrefs(songIds: List<String>, wanted: Boolean) {
-        val now = System.currentTimeMillis()
-        songIds.distinct().chunked(500).forEach { chunk -> dao.upsertPrefs(chunk.map { SongDownloadPrefEntity(it, wanted, now) }) }
-    }
-
-    private suspend fun prefMap(): Map<String, Boolean> = dao.prefs().associate { it.songId to it.wanted }
 
     /** Downloading an album or playlist (again) brings back songs of it the user had removed one by one. */
     fun pinAndDownload(kind: String, id: String, songs: List<SongEntity>) = scope.launch {
@@ -292,17 +243,7 @@ class DownloadRepository(
      * Songs of the collection [kind]/[id] that would go if its download were removed: ones other
      * downloaded albums, playlists or Liked Songs need, or that the user downloaded on their own, stay.
      */
-    suspend fun removalPlan(kind: String?, id: String?, songIds: List<String>): RemovalPlan {
-        val rows = dao.allOnce().mapTo(HashSet()) { it.songId }
-        // No collection (a genre, a mix): the user is removing these songs themselves, so all of them go.
-        val ids = if (kind == null) songIds.distinct().filter { it in rows } else {
-            val others = dao.pinned().filterNot { it.kind == kind && it.id == id }
-            val stillWanted = others.flatMapTo(HashSet()) { p -> songsFor(p).map { it.id } }
-            DownloadPolicy.removeOnUnpin(songIds, stillWanted, prefMap()).filter { it in rows }
-        }
-        val bytes = ids.chunked(500).sumOf { dao.bytesOf(it) }
-        return RemovalPlan(ids, bytes)
-    }
+    suspend fun removalPlan(kind: String?, id: String?, songIds: List<String>): RemovalPlan = pins.removalPlan(kind, id, songIds)
 
     /** Songs still wanted by other downloaded albums, playlists or Liked Songs are kept. */
     fun unpinAndRemove(kind: String, id: String, songIds: List<String>) = scope.launch {
@@ -338,28 +279,11 @@ class DownloadRepository(
         refreshPinned()
     }
 
-    private suspend fun songsFor(p: PinnedEntity): List<SongEntity> {
-        val lib = db.library()
-        return when (p.kind) {
-            KIND_PLAYLIST -> lib.playlistSongsOnce(p.id)
-            KIND_ALBUM -> lib.albumSongsOnce(p.id)
-            KIND_LIKED -> lib.starredSongsOnce()
-            else -> emptyList()
-        }
-    }
-
     /**
      * After a library sync or a like, fetch songs of downloaded albums, playlists and Liked Songs that
      * aren't on the phone or on their way yet. Songs the user removed one by one are skipped.
      */
-    suspend fun refreshPinned() = refreshLock.withLock {
-        val pins = dao.pinned()
-        if (pins.isEmpty()) return@withLock
-        val wanted = LinkedHashMap<String, SongEntity>()
-        pins.forEach { p -> songsFor(p).forEach { wanted.putIfAbsent(it.id, it) } }
-        val existing = dao.allOnce().mapTo(HashSet()) { it.songId }
-        enqueue(DownloadPolicy.toQueue(wanted.keys, existing, prefMap()).map(wanted::getValue))
-    }
+    suspend fun refreshPinned() = refreshLock.withLock { enqueue(pins.missingSongs()) }
 
     fun removeAll() = scope.launch {
         dao.clearPinned()
@@ -376,18 +300,7 @@ class DownloadRepository(
      */
     fun schedule() {
         if (session.credentials.value == null) return // nothing can download while signed out
-        scope.launch(Dispatchers.IO) {
-            val wm = WorkManager.getInstance(context)
-            val infos = runCatching { wm.getWorkInfosForUniqueWork(WORK_NAME).get() }.getOrDefault(emptyList())
-            val running = infos.any { it.state == WorkInfo.State.RUNNING }
-            val followUpWaiting = infos.any { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
-            if (running && followUpWaiting) return@launch
-            val request = OneTimeWorkRequestBuilder<DownloadWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .build()
-            wm.enqueueUniqueWork(WORK_NAME, if (running) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE, request)
-        }
+        scope.launch(Dispatchers.IO) { enqueueDownloadWorker(context) }
     }
 
     companion object {
@@ -397,10 +310,3 @@ class DownloadRepository(
         const val KIND_LIKED = "liked"
     }
 }
-
-/**
- * Song id → download state, sent again only when a state changes. The table is written on every
- * bit of download progress, and each new map would otherwise redraw every song row on screen.
- */
-internal fun Flow<List<DownloadStateRow>>.toStateMap(): Flow<Map<String, DownloadState>> =
-    map { rows -> rows.associate { it.songId to it.state } }.distinctUntilChanged()

@@ -1,5 +1,8 @@
 package im.flume.hearth.domain.requests
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -25,6 +28,21 @@ private const val SCAN_WAIT_MS = 5 * 60_000L
 private const val SCAN_POLL_MS = 10_000L
 
 internal suspend fun RequestsRepository.hasActive() = dao.active().any(this::mine)
+
+/** The body of [RequestsRepository.start]: poll in the foreground while the app is open, else in the background. */
+internal fun RequestsRepository.followAppLifecycle() {
+    scope.launch(Dispatchers.Main) {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) { foreground = true; startLoop() }
+            override fun onStop(owner: LifecycleOwner) {
+                foreground = false
+                loop?.cancel(); loop = null
+                scope.launch { if (hasActive()) scheduleBackground() }
+            }
+        })
+    }
+    scope.launch { if (hasActive()) scheduleBackground() }
+}
 
 internal fun RequestsRepository.ensureTracking() {
     scheduleBackground()
