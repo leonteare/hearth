@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import im.flume.hearth.AppContainer
 import im.flume.hearth.container
 import im.flume.hearth.playback.SpokenNowPlaying
@@ -456,7 +457,7 @@ internal fun SpokenHeader(
                 im.flume.hearth.ui.components.DownloadsIndicator(Modifier.statusBarsPadding())
                 if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.statusBarsPadding()) { Icon(Icons.Default.MoreVert, "More") }
             }
-            CoverArt(null, artSize, requestSize = 600, fallback = title, url = coverUrl)
+            CoverArt(null, artSize, requestSize = im.flume.hearth.ui.theme.CoverSize.LARGE, fallback = title, url = coverUrl)
             Spacer(Modifier.height(16.dp))
             Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
             lines.filter { it.isNotBlank() }.forEach { line ->
@@ -521,11 +522,15 @@ fun BookScreen(id: String) {
     val isThis = now?.libraryItemId == id && now.episodeId == null
     // Where you are: live while it's playing, otherwise your saved progress.
     var livePosSec by remember { mutableStateOf<Double?>(null) }
-    LaunchedEffect(isThis, playerState.isPlaying) {
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(isThis, playerState.isPlaying, lifecycle) {
         if (!isThis) { livePosSec = null; return@LaunchedEffect }
-        while (true) {
-            livePosSec = c.player.spokenPositionMs / 1000.0
-            kotlinx.coroutines.delay(if (playerState.isPlaying) 1000 else 3000)
+        // Only while the app is in the foreground: nothing shows it in the background.
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                livePosSec = c.player.spokenPositionMs / 1000.0
+                kotlinx.coroutines.delay(if (playerState.isPlaying) 1000 else 3000)
+            }
         }
     }
     val posSec = livePosSec ?: row.progressSec ?: 0.0
@@ -533,7 +538,7 @@ fun BookScreen(id: String) {
     val downloaded = row.downloadState == SpokenDownloadState.DONE
     val downloading = row.downloadState == SpokenDownloadState.QUEUED || row.downloadState == SpokenDownloadState.DOWNLOADING
     val started = (row.progressSec ?: 0.0) > 0 && !row.finished
-    val coverUrl = c.spokenCover(id, 600)
+    val coverUrl = c.spokenCover(id, im.flume.hearth.ui.theme.CoverSize.LARGE)
 
     if (confirmRemove) {
         androidx.compose.material3.AlertDialog(

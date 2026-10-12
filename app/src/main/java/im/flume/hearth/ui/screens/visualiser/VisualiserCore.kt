@@ -116,6 +116,9 @@ class VisPalette {
         }
     }
 
+    /** True once the colours have reached their target, so a paused visualiser can stop drawing. */
+    val settled: Boolean get() = current.contentEquals(target)
+
     /** Eases towards the target; call once per frame. */
     fun step(dt: Float) {
         val k = 1f - exp(-dt / 0.3f)

@@ -50,6 +50,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import im.flume.hearth.data.DownloadStateRow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -150,7 +152,8 @@ class DownloadRepository(
     }
     val dir: File = File(context.filesDir, "music").apply { mkdirs() }
 
-    val states: Flow<Map<String, DownloadState>> = dao.all().map { list -> list.associate { it.songId to it.state } }
+    /** Every song's download state; quiet while a download only makes progress (see [toStateMap]). */
+    val states: Flow<Map<String, DownloadState>> = dao.states().toStateMap().flowOn(Dispatchers.Default)
     val totalBytes: Flow<Long> = dao.totalBytes()
     val pinned: Flow<Set<String>> = dao.pinnedFlow().map { list -> list.map { "${it.kind}:${it.id}" }.toSet() }
     /** Waiting, downloading and failed counts; the Downloads page is only offered while something's going on. */
@@ -753,3 +756,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         private const val SUPERVISE_MS = 3_000L
     }
 }
+
+/**
+ * Song id → download state, sent again only when a state changes. The table is written on every
+ * bit of download progress, and each new map would otherwise redraw every song row on screen.
+ */
+internal fun Flow<List<DownloadStateRow>>.toStateMap(): Flow<Map<String, DownloadState>> =
+    map { rows -> rows.associate { it.songId to it.state } }.distinctUntilChanged()

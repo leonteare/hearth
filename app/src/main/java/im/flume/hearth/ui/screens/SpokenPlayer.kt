@@ -112,19 +112,16 @@ import kotlinx.coroutines.launch
 // The player while a podcast episode or audiobook plays: −15 / +30 instead of previous / next, speed,
 // chapters, "end of chapter" sleep timer and "Back to music". No shuffle, repeat, like, lyrics or visualiser.
 
-/** Position on the whole episode / book (not the current file), polled while visible. */
+/** Position on the whole episode / book (not the current file), polled while visible (see [rememberPolledPosition]). */
 @Composable
-internal fun rememberSpokenPosition(state: PlayerUiState): Long {
+internal fun rememberSpokenPositionState(state: PlayerUiState): androidx.compose.runtime.LongState {
     val player = LocalContext.current.container.player
-    var pos by remember { mutableLongStateOf(player.spokenPositionMs) }
-    LaunchedEffect(state.current?.mediaId, state.isPlaying) {
-        while (true) {
-            pos = player.spokenPositionMs
-            delay(if (state.isPlaying) 250 else 1000)
-        }
-    }
-    return pos
+    return rememberPolledPosition(state) { player.spokenPositionMs }
 }
+
+/** The current value of [rememberSpokenPositionState], for screens that redraw with it anyway. */
+@Composable
+internal fun rememberSpokenPosition(state: PlayerUiState): Long = rememberSpokenPositionState(state).longValue
 
 /** Title and show / author of what's playing, from the catalogue (falls back to the player's own). */
 private data class SpokenInfo(val title: String, val subtitle: String, val isBook: Boolean, val downloadState: SpokenDownloadState?, val finished: Boolean)
@@ -179,7 +176,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
     val info = rememberSpokenInfo(state, spoken)
     val chapters by remember(spoken.libraryItemId, spoken.episodeId) { c.spoken.chapters(spoken.libraryItemId, spoken.episodeId) }
         .collectAsStateWithLifecycle(emptyList())
-    val coverUrl = c.spokenCover(spoken.libraryItemId, 1000)
+    val coverUrl = c.spokenCover(spoken.libraryItemId, im.flume.hearth.ui.theme.CoverSize.LARGE)
     val topColor = rememberCoverColor(null, imageUrl = c.spokenCover(spoken.libraryItemId, 300))
     val pageRoute = if (spoken.isBook) bookRoute(spoken.libraryItemId) else podcastRoute(spoken.libraryItemId)
     val openPage = { onClose(); actions.open(pageRoute) }
@@ -220,7 +217,7 @@ internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlayi
             Box(m.then(dragToClose), contentAlignment = Alignment.Center) {
                 CoverArt(
                     null, null, Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true),
-                    corner = Dimens.CardCorner, requestSize = 1000, fallback = info.subtitle.ifBlank { info.title }, url = coverUrl,
+                    corner = Dimens.CardCorner, requestSize = im.flume.hearth.ui.theme.CoverSize.LARGE, fallback = info.subtitle.ifBlank { info.title }, url = coverUrl,
                 )
             }
         }

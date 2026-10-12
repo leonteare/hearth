@@ -300,12 +300,12 @@ fun SongRow(
     /** The line under the title; Search puts "Song • " in front so it reads apart from albums and shows. */
     subtitle: String = song.artist,
 ) {
-    val ctx = LocalRowContext.current
+    val rowState by rememberSongRowState(song.id)
     val haptics = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
-    val dl = ctx.downloads[song.id]
-    val playable = ctx.online || dl == DownloadState.DONE
-    val isPlaying = ctx.playingId == song.id
+    val dl = rowState.downloadState
+    val playable = rowState.playable
+    val isPlaying = rowState.isPlaying
     val accent = MaterialTheme.colorScheme.primary
     Row(
         Modifier
@@ -376,7 +376,7 @@ fun SongRow(
 @Composable
 fun SongMenu(song: SongEntity, expanded: Boolean, onDismiss: () -> Unit, onRemoveFromPlaylist: (() -> Unit)? = null) {
     val actions = LocalActions.current
-    val dl = LocalRowContext.current.downloads[song.id]
+    val dl = rememberSongRowState(song.id).value.downloadState
     var info by remember { mutableStateOf(false) }
     ActionSheet(expanded, onDismiss, title = song.title, subtitle = song.artist, coverArt = song.coverArt, fallback = song.album) {
         MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { actions.playNext(listOf(song.id)); onDismiss() }

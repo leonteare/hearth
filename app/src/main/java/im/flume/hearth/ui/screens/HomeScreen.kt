@@ -183,7 +183,7 @@ fun MixCover(mix: Mix, size: androidx.compose.ui.unit.Dp) {
     val covers = (mix.covers + List(4) { null }).take(4)
     Column(Modifier.size(size).clip(HearthShapes.Cover)) {
         for (row in 0..1) Row(Modifier.weight(1f)) {
-            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = 200)
+            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = im.flume.hearth.ui.theme.CoverSize.MEDIUM)
         }
     }
 }

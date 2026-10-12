@@ -120,6 +120,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.runtime.LongState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.media3.common.Player
 import im.flume.hearth.container
 import im.flume.hearth.data.Lyrics
@@ -159,23 +164,43 @@ import kotlin.math.roundToInt
 private val PlayerUiState.coverArt: String? get() = current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
 
 /** Cover sizes asked of the server by the players; the prefetch asks for the same so caches match. */
-private const val MINI_COVER_SIZE = 150
-private const val MINI_SPOKEN_COVER_SIZE = 300
-private const val NOW_PLAYING_COVER_SIZE = 900
+private const val MINI_COVER_SIZE = im.flume.hearth.ui.theme.CoverSize.SMALL
+private const val MINI_SPOKEN_COVER_SIZE = im.flume.hearth.ui.theme.CoverSize.MEDIUM
+private const val NOW_PLAYING_COVER_SIZE = im.flume.hearth.ui.theme.CoverSize.LARGE
 
-/** Polls playback position while visible. */
+/**
+ * Polls [read] (a playback position) 4 times a second while playing, once a second while paused,
+ * and not at all while the app is in the background, where nothing is drawn. Hand the state to
+ * whatever draws it rather than reading it at the top of a big composable: each new value only
+ * redraws what reads it.
+ */
 @Composable
-internal fun rememberPosition(state: PlayerUiState): Long {
-    val player = LocalContext.current.container.player
-    var pos by remember { mutableLongStateOf(player.positionMs) }
-    LaunchedEffect(state.current?.mediaId, state.isPlaying) {
-        while (true) {
-            pos = player.positionMs
-            delay(if (state.isPlaying) 250 else 1000)
+internal fun rememberPolledPosition(state: PlayerUiState, read: () -> Long): LongState {
+    val pos = remember { mutableLongStateOf(read()) }
+    val latestRead by rememberUpdatedState(read)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val playing = state.isPlaying
+    LaunchedEffect(state.current?.mediaId, playing, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                pos.longValue = latestRead()
+                delay(if (playing) 250 else 1000)
+            }
         }
     }
     return pos
 }
+
+/** Position in the current song, polled while visible (see [rememberPolledPosition]). */
+@Composable
+internal fun rememberPositionState(state: PlayerUiState): LongState {
+    val player = LocalContext.current.container.player
+    return rememberPolledPosition(state) { player.positionMs }
+}
+
+/** The current value of [rememberPositionState], for screens that redraw with it anyway (the seek bar, lyrics). */
+@Composable
+internal fun rememberPosition(state: PlayerUiState): Long = rememberPositionState(state).longValue
 
 @Composable
 fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
@@ -185,7 +210,8 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     // A podcast episode or audiobook: its cover, −15 / +30 instead of previous / next, no swipe to skip.
     val spoken = state.spoken
     val spokenCover = spoken?.let { c.spokenCover(it.libraryItemId, MINI_SPOKEN_COVER_SIZE) }
-    val pos = if (spoken != null) rememberSpokenPosition(state) else rememberPosition(state)
+    // Read only by the progress bar's draw, so the rest of the mini player doesn't redraw 4 times a second.
+    val pos = if (spoken != null) rememberSpokenPositionState(state) else rememberPositionState(state)
     val durationMs = spoken?.durationMs ?: state.durationMs
     val tint = lerp(rememberCoverColor(if (spoken != null) null else state.coverArt, imageUrl = spokenCover), Color.Black, 0.15f)
     val haptics = LocalHapticFeedback.current
@@ -249,7 +275,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             }
         }
         LinearProgressIndicator(
-            progress = { if (durationMs > 0) (pos.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
+            progress = { if (durationMs > 0) (pos.longValue.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
             modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = 8.dp),
             color = Color.White,
             trackColor = Color.White.copy(alpha = 0.2f),

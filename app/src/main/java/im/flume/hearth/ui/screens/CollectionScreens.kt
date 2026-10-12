@@ -308,7 +308,7 @@ fun CollectionScreen(
         when {
             remote != null -> Box(Modifier.size(size).clip(HearthShapes.Cover)) { RemoteCover(remote.coverUuid, title, 640) }
             headerIcon != null -> headerIcon(size)
-            else -> CoverArt(cover, size, requestSize = 600, fallback = title)
+            else -> CoverArt(cover, size, requestSize = im.flume.hearth.ui.theme.CoverSize.LARGE, fallback = title)
         }
     }
     val statusLine: @Composable (TextAlign) -> Unit = { align ->
