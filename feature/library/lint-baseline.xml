@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="RememberInComposition"
+        message="Calling a @RememberInComposition annotated declaration inside composition without using `remember`"
+        errorLine1="                        searchFocus = FocusRequester(), onHeightChanged = {}, headerActions = {},"
+        errorLine2="                                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/test/java/im/flume/hearth/feature/library/LibraryScreenshots.kt"
+            line="68"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var sort by remember { mutableStateOf(prefs.getInt(prefKey, 0)) }"
+        errorLine2="                           ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/BrowseScreens.kt"
+            line="115"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var sort by remember(tab) { mutableStateOf(sortPrefs.getInt(&quot;sort-${tab.name}&quot;, 0)) }"
+        errorLine2="                                ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/LibraryScreen.kt"
+            line="74"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var sort by remember { mutableStateOf(prefs.getInt(&quot;sort-LIKED&quot;, 0)) }"
+        errorLine2="                           ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/LikedGenreMixScreens.kt"
+            line="91"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                prefs.edit().putInt(prefKey, it).apply()"
+        errorLine2="                ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/BrowseScreens.kt"
+            line="121"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))"
+        errorLine2="                                                                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/InfoSections.kt"
+            line="84"
+            column="74"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        sortPrefs.edit().putString(&quot;place&quot;, LibraryTabs.save(next)).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/LibraryScreen.kt"
+            line="55"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                sortPrefs.edit().putInt(&quot;sort-${tab.name}&quot;, it).apply()"
+        errorLine2="                ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/LibraryScreen.kt"
+            line="130"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                prefs.edit().putInt(&quot;sort-LIKED&quot;, it).apply()"
+        errorLine2="                ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/library/LikedGenreMixScreens.kt"
+            line="106"
+            column="17"/>
+    </issue>
+
+</issues>

@@ -1,0 +1,1060 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="WrongConstant"
+        message="Must be one of: SessionResult.RESULT_SUCCESS, SessionError.INFO_CANCELLED, SessionError.ERROR_UNKNOWN, SessionError.ERROR_INVALID_STATE, SessionError.ERROR_BAD_VALUE, SessionError.ERROR_PERMISSION_DENIED, SessionError.ERROR_IO, SessionError.ERROR_SESSION_DISCONNECTED, SessionError.ERROR_NOT_SUPPORTED, SessionError.ERROR_SESSION_AUTHENTICATION_EXPIRED, SessionError.ERROR_SESSION_PREMIUM_ACCOUNT_REQUIRED, SessionError.ERROR_SESSION_CONCURRENT_STREAM_LIMIT, SessionError.ERROR_SESSION_PARENTAL_CONTROL_RESTRICTED, SessionError.ERROR_SESSION_NOT_AVAILABLE_IN_REGION, SessionError.ERROR_SESSION_SKIP_LIMIT_REACHED, SessionError.ERROR_SESSION_SETUP_REQUIRED"
+        errorLine1="                else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))"
+        errorLine2="                                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/SessionCallback.kt"
+            line="129"
+            column="70"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        maxAttempts: Int = PlaybackService.MAX_RECOVERY_ATTEMPTS,"
+        errorLine2="                           ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlaybackErrors.kt"
+            line="58"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        maxAttempts: Int = PlaybackService.MAX_RECOVERY_ATTEMPTS,"
+        errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlaybackErrors.kt"
+            line="58"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))"
+        errorLine2="                                                                 ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="76"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            shuffle = extras.getBoolean(PlaybackService.EXTRA_SHUFFLE),"
+        errorLine2="                                        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="110"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            shuffle = extras.getBoolean(PlaybackService.EXTRA_SHUFFLE),"
+        errorLine2="                                                        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="110"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            sourceLabel = extras.getString(PlaybackService.EXTRA_SOURCE_LABEL).orEmpty(),"
+        errorLine2="                                           ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="111"
+            column="44"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            sourceLabel = extras.getString(PlaybackService.EXTRA_SOURCE_LABEL).orEmpty(),"
+        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="111"
+            column="60"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            pendingCount = extras.getInt(PlaybackService.EXTRA_PENDING_COUNT),"
+        errorLine2="                                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="113"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            pendingCount = extras.getInt(PlaybackService.EXTRA_PENDING_COUNT),"
+        errorLine2="                                                         ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="113"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            sleepAt = extras.getLong(PlaybackService.EXTRA_SLEEP_AT),"
+        errorLine2="                                     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="114"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            sleepAt = extras.getLong(PlaybackService.EXTRA_SLEEP_AT),"
+        errorLine2="                                                     ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="114"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            spoken = extras.getString(PlaybackService.EXTRA_SPOKEN_ITEM)?.let { id ->"
+        errorLine2="                                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="116"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            spoken = extras.getString(PlaybackService.EXTRA_SPOKEN_ITEM)?.let { id ->"
+        errorLine2="                                                      ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="116"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    episodeId = extras.getString(PlaybackService.EXTRA_SPOKEN_EPISODE),"
+        errorLine2="                                                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="119"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    episodeId = extras.getString(PlaybackService.EXTRA_SPOKEN_EPISODE),"
+        errorLine2="                                                                 ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="119"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    durationMs = extras.getLong(PlaybackService.EXTRA_SPOKEN_TOTAL_MS),"
+        errorLine2="                                                ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="120"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    durationMs = extras.getLong(PlaybackService.EXTRA_SPOKEN_TOTAL_MS),"
+        errorLine2="                                                                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="120"
+            column="65"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    speed = extras.getFloat(PlaybackService.EXTRA_SPEED, 1f),"
+        errorLine2="                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="121"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    speed = extras.getFloat(PlaybackService.EXTRA_SPEED, 1f),"
+        errorLine2="                                                            ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="121"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    canGoBackToMusic = extras.getBoolean(PlaybackService.EXTRA_HAS_MUSIC_QUEUE),"
+        errorLine2="                                                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="122"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                    canGoBackToMusic = extras.getBoolean(PlaybackService.EXTRA_HAS_MUSIC_QUEUE),"
+        errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="122"
+            column="74"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        send(PlaybackService.CMD_PLAY_SOURCE, Bundle().apply {"
+        errorLine2="             ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="153"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        send(PlaybackService.CMD_PLAY_SOURCE, Bundle().apply {"
+        errorLine2="                             ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="153"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putBundle(PlaybackService.ARG_SOURCE, safe.toBundle())"
+        errorLine2="                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="154"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putBundle(PlaybackService.ARG_SOURCE, safe.toBundle())"
+        errorLine2="                                      ~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="154"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putString(PlaybackService.ARG_START_ID, startSongId)"
+        errorLine2="                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="155"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putString(PlaybackService.ARG_START_ID, startSongId)"
+        errorLine2="                                      ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="155"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putBoolean(PlaybackService.ARG_SHUFFLE, shuffle)"
+        errorLine2="                       ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="156"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            putBoolean(PlaybackService.ARG_SHUFFLE, shuffle)"
+        errorLine2="                                       ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="156"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_PLAY_NEXT, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="164"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_PLAY_NEXT, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                 ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="164"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_PLAY_NEXT, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                    ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="164"
+            column="85"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_PLAY_NEXT, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                                    ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="164"
+            column="101"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_ADD_TO_QUEUE, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="170"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_ADD_TO_QUEUE, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="170"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_ADD_TO_QUEUE, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                       ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="170"
+            column="88"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_ADD_TO_QUEUE, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                                       ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="170"
+            column="104"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_KEY, e.item.queueKey)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="175"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_KEY, e.item.queueKey)"
+        errorLine2="                                  ~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="175"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_SONG_ID, e.item.mediaId)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="176"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_SONG_ID, e.item.mediaId)"
+        errorLine2="                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="176"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun moveToNext(e: QueueEntry) = send(PlaybackService.CMD_MOVE_NEXT, entryArgs(e))"
+        errorLine2="                                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="180"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun moveToNext(e: QueueEntry) = send(PlaybackService.CMD_MOVE_NEXT, entryArgs(e))"
+        errorLine2="                                                         ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="180"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipTo(e: QueueEntry) = send(PlaybackService.CMD_SKIP_TO, entryArgs(e))"
+        errorLine2="                                     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="182"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipTo(e: QueueEntry) = send(PlaybackService.CMD_SKIP_TO, entryArgs(e))"
+        errorLine2="                                                     ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="182"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun remove(e: QueueEntry) = send(PlaybackService.CMD_REMOVE, entryArgs(e))"
+        errorLine2="                                     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="184"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun remove(e: QueueEntry) = send(PlaybackService.CMD_REMOVE, entryArgs(e))"
+        errorLine2="                                                     ~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="184"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun moveAfter(e: QueueEntry, after: QueueEntry?) = send(PlaybackService.CMD_MOVE_AFTER, entryArgs(e).apply {"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="187"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun moveAfter(e: QueueEntry, after: QueueEntry?) = send(PlaybackService.CMD_MOVE_AFTER, entryArgs(e).apply {"
+        errorLine2="                                                                            ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="187"
+            column="77"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_AFTER_KEY, after?.item?.queueKey)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="188"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_AFTER_KEY, after?.item?.queueKey)"
+        errorLine2="                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="188"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun restore(e: QueueEntry, after: QueueEntry?, before: QueueEntry?) = send(PlaybackService.CMD_RESTORE, entryArgs(e).apply {"
+        errorLine2="                                                                               ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="192"
+            column="80"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun restore(e: QueueEntry, after: QueueEntry?, before: QueueEntry?) = send(PlaybackService.CMD_RESTORE, entryArgs(e).apply {"
+        errorLine2="                                                                                               ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="192"
+            column="96"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putBoolean(PlaybackService.ARG_MANUAL, e.item.isManual)"
+        errorLine2="                   ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="193"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putBoolean(PlaybackService.ARG_MANUAL, e.item.isManual)"
+        errorLine2="                                   ~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="193"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_AFTER_KEY, after?.item?.queueKey)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="194"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_AFTER_KEY, after?.item?.queueKey)"
+        errorLine2="                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="194"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_BEFORE_KEY, before?.item?.queueKey)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="195"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_BEFORE_KEY, before?.item?.queueKey)"
+        errorLine2="                                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="195"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_REMOVE_QUEUED, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="201"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_REMOVE_QUEUED, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="201"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_REMOVE_QUEUED, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="201"
+            column="89"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            send(PlaybackService.CMD_REMOVE_QUEUED, Bundle().apply { putStringArrayList(PlaybackService.ARG_SONG_IDS, ArrayList(chunk)) })"
+        errorLine2="                                                                                                        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="201"
+            column="105"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    private fun playSpoken(libraryItemId: String, episodeId: String?, startSec: Double?) = send(PlaybackService.CMD_PLAY_SPOKEN, Bundle().apply {"
+        errorLine2="                                                                                                ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="216"
+            column="97"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    private fun playSpoken(libraryItemId: String, episodeId: String?, startSec: Double?) = send(PlaybackService.CMD_PLAY_SPOKEN, Bundle().apply {"
+        errorLine2="                                                                                                                ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="216"
+            column="113"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_ITEM_ID, libraryItemId)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="217"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_ITEM_ID, libraryItemId)"
+        errorLine2="                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="217"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_EPISODE_ID, episodeId)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="218"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        putString(PlaybackService.ARG_EPISODE_ID, episodeId)"
+        errorLine2="                                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="218"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        startSec?.let { putDouble(PlaybackService.ARG_START_SEC, it) }"
+        errorLine2="                                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="219"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        startSec?.let { putDouble(PlaybackService.ARG_START_SEC, it) }"
+        errorLine2="                                                  ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="219"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipBack() = send(PlaybackService.CMD_SKIP_BACK, Bundle.EMPTY)"
+        errorLine2="                          ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="222"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipBack() = send(PlaybackService.CMD_SKIP_BACK, Bundle.EMPTY)"
+        errorLine2="                                          ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="222"
+            column="43"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipForward() = send(PlaybackService.CMD_SKIP_FORWARD, Bundle.EMPTY)"
+        errorLine2="                             ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="224"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun skipForward() = send(PlaybackService.CMD_SKIP_FORWARD, Bundle.EMPTY)"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="224"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun seekSpoken(positionMs: Long) = send(PlaybackService.CMD_SEEK_SPOKEN, Bundle().apply { putLong(PlaybackService.ARG_POSITION_MS, positionMs) })"
+        errorLine2="                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="227"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun seekSpoken(positionMs: Long) = send(PlaybackService.CMD_SEEK_SPOKEN, Bundle().apply { putLong(PlaybackService.ARG_POSITION_MS, positionMs) })"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="227"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun seekSpoken(positionMs: Long) = send(PlaybackService.CMD_SEEK_SPOKEN, Bundle().apply { putLong(PlaybackService.ARG_POSITION_MS, positionMs) })"
+        errorLine2="                                                                                                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="227"
+            column="103"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun seekSpoken(positionMs: Long) = send(PlaybackService.CMD_SEEK_SPOKEN, Bundle().apply { putLong(PlaybackService.ARG_POSITION_MS, positionMs) })"
+        errorLine2="                                                                                                                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="227"
+            column="119"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })"
+        errorLine2="                                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="230"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })"
+        errorLine2="                                                      ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="230"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })"
+        errorLine2="                                                                                               ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="230"
+            column="96"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })"
+        errorLine2="                                                                                                               ~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="230"
+            column="112"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun backToMusic() = send(PlaybackService.CMD_BACK_TO_MUSIC, Bundle.EMPTY)"
+        errorLine2="                             ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="233"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun backToMusic() = send(PlaybackService.CMD_BACK_TO_MUSIC, Bundle.EMPTY)"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="233"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun sleepAtEndOfChapter() = setSleepTimer(PlaybackService.SLEEP_END_OF_CHAPTER)"
+        errorLine2="                                              ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="236"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun sleepAtEndOfChapter() = setSleepTimer(PlaybackService.SLEEP_END_OF_CHAPTER)"
+        errorLine2="                                                              ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="236"
+            column="63"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })"
+        errorLine2="                                       ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="245"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })"
+        errorLine2="                                                       ~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="245"
+            column="56"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })"
+        errorLine2="                                                                                           ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="245"
+            column="92"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun setSleepTimer(ms: Long) = send(PlaybackService.CMD_SLEEP, Bundle().apply { putLong(PlaybackService.ARG_SLEEP_MS, ms) })"
+        errorLine2="                                                                                                           ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="245"
+            column="108"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun toggleShuffle() = send(PlaybackService.CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)"
+        errorLine2="                               ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="247"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    fun toggleShuffle() = send(PlaybackService.CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/PlayerConnection.kt"
+            line="247"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        .setUri(SongDataSource.uriFor(id))"
+        errorLine2="                ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/QueueStore.kt"
+            line="41"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        .setUri(SongDataSource.uriFor(id))"
+        errorLine2="                               ~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/playback/QueueStore.kt"
+            line="41"
+            column="32"/>
+    </issue>
+
+</issues>
