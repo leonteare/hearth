@@ -4,12 +4,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
+import im.flume.hearth.playback.PlaybackService
+import im.flume.hearth.spoken.ChapterEntity
 import im.flume.hearth.testing.Samples
 import im.flume.hearth.testing.ScreenshotTest
 import im.flume.hearth.ui.theme.Dimens
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
-/** The mini player, the player controls and the queue. Moves to :feature:player with those screens. */
+/** The mini player, the player controls and the queue. */
 class PlayerScreenshots : ScreenshotTest() {
     private val songs = Samples.songs(5)
     private val state = Samples.playerState(songs[1], songs)
@@ -74,5 +77,38 @@ class PlayerScreenshots : ScreenshotTest() {
     @Test
     fun `the now playing screen`() = snapScreen("now_playing") {
         Box { NowPlayingScreen(state, onClose = {}, onOpenQueue = {}, onOpenVisualiser = {}) }
+    }
+
+    @Test
+    fun `the chapters sheet with the first chapter playing`() {
+        val spokenState = Samples.spokenPlayerState()
+        val spoken = spokenState.spoken!!
+        val titles = listOf("Opening", "The night shift", "Streetlights", "", "The mayor's plan", "Morning")
+        val chapters = titles.mapIndexed { i, t -> ChapterEntity("pod1", "ep1", i, i * 420.0, (i + 1) * 420.0, t) }
+        snapScreen("chapters_sheet") { ChaptersSheet(chapters, spoken, spokenState, onDismiss = {}) }
+    }
+
+    @Test
+    fun `the spoken sleep timer sheet, set to the end of the chapter`() = snapScreen("spoken_sleep_sheet") {
+        SpokenSleepSheet(PlaybackService.SLEEP_END_OF_CHAPTER, hasChapters = true, isBook = false, onDismiss = {})
+    }
+
+    @Test
+    fun `the podcast queue, the episode playing then more from the show`() {
+        val spokenState = Samples.spokenPlayerState()
+        val episodes = listOf(
+            Samples.episode(),
+            Samples.episode(id = "ep2", title = "Rivers under the city", publishedAt = Samples.PUBLISHED_MS + 7 * DAY_MS),
+            Samples.episode(id = "ep3", title = "The last lamplighter", publishedAt = Samples.PUBLISHED_MS - 7 * DAY_MS),
+        )
+        runBlocking {
+            container.db.spoken().upsertPodcasts(listOf(Samples.podcast()))
+            container.db.spoken().upsertEpisodes(episodes)
+        }
+        snapScreen("spoken_queue") { SpokenQueueScreen(spokenState, spokenState.spoken!!, onBack = {}) }
+    }
+
+    private companion object {
+        const val DAY_MS = 86_400_000L
     }
 }

@@ -5,8 +5,6 @@ package im.flume.hearth.ui.screens
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,17 +14,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -55,9 +47,9 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.playback.QueueEntry
 import im.flume.hearth.playback.isManual
 import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.playerBackdrop
 import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.Background
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -66,6 +58,9 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 fun QueueScreen(onBack: (() -> Unit)? = null) {
     val c = LocalContext.current.container
     val actions = LocalActions.current
+    val colors = HearthTheme.colors
+    val icons = HearthTheme.icons
+    val spacing = HearthTheme.spacing
     val player = c.player
     val state by player.state.collectAsStateWithLifecycle()
     state.spoken?.let { spoken -> return SpokenQueueScreen(state, spoken, onBack) }
@@ -144,12 +139,10 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
         Modifier
             .fillMaxSize()
             .graphicsLayer { translationY = dragDown.value }
-            .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
-            .clickable(enabled = false) {}
-            .safeDrawingPadding()
+            .playerBackdrop(topColor)
     ) {
         QueueTopBar(state.sourceLabel, dragDown, onBack)
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = spacing.xl)) {
             if (history.isNotEmpty()) {
                 item(key = "h-prev") { Box(Modifier.animateItem()) { QueueHeader("Previously played", 0.6f) } }
                 items(history, key = { "p:${it.key}" }) { e -> QueueRow(e, alpha = 0.5f, onClick = { player.skipTo(e) }, modifier = Modifier.animateItem()) }
@@ -162,7 +155,7 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
             }
             if (repeatOne) {
                 item(key = "repeat-one") {
-                    RepeatNote(Icons.Default.RepeatOne, "Repeating this song. The songs below play once you turn repeat off.")
+                    RepeatNote(icons.repeatOne, "Repeating this song. The songs below play once you turn repeat off.")
                 }
             }
             if (manual.isNotEmpty()) {
@@ -179,21 +172,21 @@ fun QueueScreen(onBack: (() -> Unit)? = null) {
             if (state.repeatMode == Player.REPEAT_MODE_ALL) {
                 item(key = "repeat-all") {
                     RepeatNote(
-                        Icons.Default.Repeat,
+                        icons.repeat,
                         if (state.shuffle) "Repeat is on: when this runs out it reshuffles and starts again."
                         else "Repeat is on: when this runs out it starts again from the top.",
                     )
                 }
             }
             if (state.current != null && local.isEmpty() && state.pendingCount == 0 && state.repeatMode == Player.REPEAT_MODE_OFF) {
-                item(key = "end") { Text("Nothing after this song", color = TextSecondary, modifier = Modifier.padding(16.dp)) }
+                item(key = "end") { Text("Nothing after this song", color = colors.textSecondary, modifier = Modifier.padding(spacing.l)) }
             }
             item(key = "hint") {
                 Text(
                     "Swipe right to play next, swipe left to remove, drag ≡ to reorder",
-                    color = TextSecondary.copy(alpha = 0.6f),
+                    color = colors.textSecondary.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(spacing.l),
                 )
             }
         }
@@ -206,7 +199,7 @@ private fun QueueTopBar(sourceLabel: String, dragDown: Animatable<Float, Animati
     val scope = rememberCoroutineScope()
     val closeAt = with(LocalDensity.current) { 120.dp.toPx() }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 24.dp).pointerInput(Unit) {
+        Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.xl).pointerInput(Unit) {
             var dy = 0f
             detectVerticalDragGestures(
                 onDragStart = { dy = 0f },
@@ -220,9 +213,9 @@ private fun QueueTopBar(sourceLabel: String, dragDown: Animatable<Float, Animati
         },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Default.KeyboardArrowDown, "Close queue", Modifier.size(32.dp)) }
+        IconButton(onClick = { onBack?.invoke() }) { Icon(HearthTheme.icons.collapse, "Close queue", Modifier.size(32.dp)) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("QUEUE", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text("QUEUE", style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary)
             Text(sourceLabel.ifBlank { "Your queue" }, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.size(48.dp)) // balances the close arrow so the title stays centred

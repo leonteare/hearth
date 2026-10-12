@@ -11,8 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,11 +24,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +39,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -61,11 +55,11 @@ import im.flume.hearth.data.Usage
 import im.flume.hearth.playback.PlayerUiState
 import im.flume.hearth.ui.components.CoverPrefetcher
 import im.flume.hearth.ui.components.PlayerCoverArt
+import im.flume.hearth.ui.components.playerBackdrop
 import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -93,6 +87,7 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
     val density = LocalDensity.current
     val closeAt = with(density) { 140.dp.toPx() }
     val skipAt = with(density) { 90.dp.toPx() }
+    val spacing = HearthTheme.spacing
 
     // Drag down anywhere on the header or cover to close; drag the cover sideways to skip.
     fun Modifier.playerGestures(allowSkip: Boolean) = pointerInput(allowSkip) {
@@ -130,28 +125,26 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
         Modifier
             .fillMaxSize()
             .graphicsLayer { translationY = dragDown.value }
-            .background(Brush.verticalGradient(listOf(topColor, Background, Background)))
-            .clickable(enabled = false) {}
-            .safeDrawingPadding()
+            .playerBackdrop(topColor)
     ) {
         val landscape = maxWidth > maxHeight
         val artOrLyrics: @Composable (Modifier) -> Unit = { m ->
             CoverOrLyrics(showLyrics, song, state, coverSwipe, skipAt, if (showLyrics) m else m.playerGestures(allowSkip = true))
         }
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = spacing.xl)) {
             NowPlayingHeader(state, song, onClose, Modifier.playerGestures(allowSkip = false))
             if (landscape) {
-                Row(Modifier.weight(1f).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).padding(vertical = spacing.s), verticalAlignment = Alignment.CenterVertically) {
                     artOrLyrics(Modifier.weight(1f).fillMaxHeight())
-                    Spacer(Modifier.width(32.dp))
+                    Spacer(Modifier.width(spacing.xxl))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                         PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
                     }
                 }
             } else {
-                artOrLyrics(Modifier.weight(1f).fillMaxWidth().padding(vertical = 16.dp))
+                artOrLyrics(Modifier.weight(1f).fillMaxWidth().padding(vertical = spacing.l))
                 PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(spacing.s))
             }
         }
     }
@@ -161,9 +154,9 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
 @Composable
 private fun NowPlayingHeader(state: PlayerUiState, song: SongEntity?, onClose: () -> Unit, modifier: Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClose) { Icon(Icons.Default.KeyboardArrowDown, "Close", Modifier.size(32.dp)) }
+        IconButton(onClick = onClose) { Icon(HearthTheme.icons.collapse, "Close", Modifier.size(32.dp)) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("PLAYING FROM", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Text("PLAYING FROM", style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary)
             Text(state.sourceLabel.ifBlank { "Your queue" }, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             SleepStatus(state.sleepAt)
         }

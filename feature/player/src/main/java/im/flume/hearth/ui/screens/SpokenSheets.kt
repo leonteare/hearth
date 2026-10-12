@@ -13,11 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.TimerOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -50,9 +44,7 @@ import im.flume.hearth.spoken.SpokenSpeed
 import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.SurfaceHigh
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlin.math.abs
 
 /** Any speed from 0.5× to 3×: drag, nudge by 0.05 or tap a common one. Changes are heard straight away. */
@@ -63,14 +55,17 @@ internal fun SpeedSheet(speed: Float, onDismiss: () -> Unit, onSpeed: (Float) ->
         val snapped = SpokenSpeed.snap(v)
         if (snapped != value) { value = snapped; onSpeed(snapped) }
     }
+    val colors = HearthTheme.colors
+    val icons = HearthTheme.icons
+    val spacing = HearthTheme.spacing
     ActionSheet(true, onDismiss, title = "Playback speed", showCover = false) {
         Text(
             SpokenFormat.speed(value), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.s), textAlign = TextAlign.Center,
         )
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = spacing.s), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { set(SpokenSpeed.step(value, up = false)) }, enabled = value > SpokenSpeed.MIN) {
-                Icon(Icons.Default.Remove, "Slower")
+                Icon(icons.slower, "Slower")
             }
             Slider(
                 value = value, onValueChange = { set(it) },
@@ -79,22 +74,22 @@ internal fun SpeedSheet(speed: Float, onDismiss: () -> Unit, onSpeed: (Float) ->
                 colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary, activeTrackColor = MaterialTheme.colorScheme.primary),
             )
             IconButton(onClick = { set(SpokenSpeed.step(value, up = true)) }, enabled = value < SpokenSpeed.MAX) {
-                Icon(Icons.Default.Add, "Faster")
+                Icon(icons.faster, "Faster")
             }
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = spacing.gutter, vertical = spacing.m),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SpokenSpeed.PRESETS.forEach { p ->
                 val on = abs(p - value) < 0.001f
                 Box(
-                    Modifier.weight(1f).heightIn(min = 40.dp).clip(HearthShapes.Card)
-                        .background(if (on) MaterialTheme.colorScheme.primary else SurfaceHigh)
+                    Modifier.weight(1f).heightIn(min = 40.dp).clip(HearthTheme.shapes.card)
+                        .background(if (on) MaterialTheme.colorScheme.primary else colors.surfaceHigh)
                         .clickable(role = Role.Button) { set(p) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(SpokenFormat.speed(p), color = if (on) Color.Black else Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(SpokenFormat.speed(p), color = if (on) colors.onAccent else colors.text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -109,12 +104,13 @@ internal fun SpokenSleepSheet(sleepAt: Long, hasChapters: Boolean, isBook: Boole
         c.player.setSleepTimer(ms)
         onDismiss()
     }
+    val icons = HearthTheme.icons
     ActionSheet(true, onDismiss, title = "Sleep timer", showCover = false) {
-        if (hasChapters) MenuItem("End of this chapter", Icons.Outlined.Timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }
-        listOf(15, 30, 45, 60).forEach { m -> MenuItem("$m minutes", Icons.Outlined.Timer) { pick(m * 60_000L) } }
+        if (hasChapters) MenuItem("End of this chapter", icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }
+        listOf(15, 30, 45, 60).forEach { m -> MenuItem("$m minutes", icons.timer) { pick(m * 60_000L) } }
         // A book is several files, so "end of this file" would stop at an odd place; episodes are one file.
-        if (!isBook) MenuItem("End of this episode", Icons.Outlined.Timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }
-        if (sleepAt != 0L) MenuItem("Turn off timer", Icons.Outlined.TimerOff, tint = MaterialTheme.colorScheme.primary, tintText = true) { pick(0) }
+        if (!isBook) MenuItem("End of this episode", icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }
+        if (sleepAt != 0L) MenuItem("Turn off timer", icons.timerOff, tint = MaterialTheme.colorScheme.primary, tintText = true) { pick(0) }
     }
 }
 

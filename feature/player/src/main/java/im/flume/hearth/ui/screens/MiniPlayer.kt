@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,8 +45,7 @@ import im.flume.hearth.ui.components.PlayerCoverArt
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.theme.CoverSize
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -61,6 +57,8 @@ private const val MINI_SPOKEN_COVER_SIZE = CoverSize.MEDIUM
 fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     val c = LocalContext.current.container
     val player = c.player
+    val colors = HearthTheme.colors
+    val spacing = HearthTheme.spacing
     val meta = state.current?.mediaMetadata ?: return
     // A podcast episode or audiobook: its cover, −15 / +30 instead of previous / next, no swipe to skip.
     val spoken = state.spoken
@@ -76,8 +74,8 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(HearthShapes.Card)
+            .padding(horizontal = spacing.s)
+            .clip(HearthTheme.shapes.card)
             .background(tint)
             .clickable(onClick = onOpen)
             // Swipe sideways to skip, like Spotify (songs only).
@@ -100,7 +98,7 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
             }
     ) {
         Row(
-            Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp).graphicsLayer {
+            Modifier.padding(start = spacing.s, top = spacing.s, bottom = spacing.s).graphicsLayer {
                 translationX = swipe.value * 0.6f
                 alpha = 1f - (abs(swipe.value) / (threshold * 3)).coerceAtMost(0.6f)
             },
@@ -117,23 +115,23 @@ fun MiniPlayer(state: PlayerUiState, onOpen: () -> Unit) {
                 // A book's player items are its files ("Title (2/5)"); its album title is the book's own.
                 val title = if (spoken?.isBook == true) meta.albumTitle else meta.title
                 Text(title?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                Text(meta.artist?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                Text(meta.artist?.toString().orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, color = colors.textSecondary, style = MaterialTheme.typography.labelMedium)
             }
             if (spoken != null) {
                 SpokenMiniControls(state)
             } else {
-                IconButton(onClick = { player.previous() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
+                IconButton(onClick = { player.previous() }) { Icon(HearthTheme.icons.previous, "Previous") }
                 IconButton(onClick = { player.playPause() }) {
                     PlayPauseIcon(state.isPlaying, Modifier.size(30.dp))
                 }
-                IconButton(onClick = { player.next() }) { Icon(Icons.Default.SkipNext, "Next") }
+                IconButton(onClick = { player.next() }) { Icon(HearthTheme.icons.next, "Next") }
             }
         }
         LinearProgressIndicator(
             progress = { if (durationMs > 0) (pos.longValue.toFloat() / durationMs).coerceIn(0f, 1f) else 0f },
-            modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = 8.dp),
-            color = Color.White,
-            trackColor = Color.White.copy(alpha = 0.2f),
+            modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = spacing.s),
+            color = colors.onCover,
+            trackColor = colors.onCover.copy(alpha = 0.2f),
             gapSize = 0.dp,
             drawStopIndicator = {},
         )
