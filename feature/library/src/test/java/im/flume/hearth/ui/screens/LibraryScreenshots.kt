@@ -2,18 +2,30 @@ package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import im.flume.hearth.data.AlbumItem
+import im.flume.hearth.data.Discography
+import im.flume.hearth.data.PlaylistAccess
+import im.flume.hearth.data.PlaylistItem
+import im.flume.hearth.data.ShareRole
+import im.flume.hearth.data.SongItem
+import im.flume.hearth.testing.FakeActions
 import im.flume.hearth.testing.Samples
 import im.flume.hearth.testing.ScreenshotTest
 import im.flume.hearth.testing.liveRows
+import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.PlayShuffleButtons
 import im.flume.hearth.ui.components.SongRow
 import org.junit.Test
 
-/** Your Library's controls and a collection page. Moves to :feature:library with those screens. */
+/** Your Library's controls and lists, a collection page and an artist page. */
 class LibraryScreenshots : ScreenshotTest() {
     /** The top of Your Library as LibraryScreen draws it: Music · Podcasts · Audiobooks, then that section's controls. */
     @Composable
@@ -61,6 +73,55 @@ class LibraryScreenshots : ScreenshotTest() {
                     songs, keys = songs.map { it.id }, tracks = null, filtered = null, query = "", showTrackNumbers = true,
                 ) { _, song -> SongRow(song, onClick = {}, showCover = false, leading = song.track.toString()) }
             }
+        }
+    }
+
+    @Test
+    fun `your playlists, with one waiting for an answer to an invite`() {
+        val yours = PlaylistAccess(owner = "leon", isOwner = true, role = null, invite = null, sharing = null)
+        val invited = PlaylistAccess(owner = "sam", isOwner = false, role = null, invite = ShareRole.ADD, sharing = null)
+        val playlists = listOf(
+            PlaylistItem(Samples.playlist(), yours),
+            PlaylistItem(Samples.playlist(id = "pl2", name = "Road Trip", owner = "sam"), invited),
+        )
+        snap("list_playlists") {
+            LazyColumn {
+                playlistsList(playlists, FakeActions())
+                libraryFooter("2 playlists")
+            }
+        }
+    }
+
+    @Test
+    fun `saved albums before anything is saved`() = snap("list_albums_empty") {
+        LazyColumn { albumsList(emptyList(), FakeActions()) }
+    }
+
+    @Test
+    fun `podcasts before following any show`() = snap("list_podcasts_none") {
+        LazyColumn {
+            podcastsList(
+                signedIn = true, noneFollowed = true, podcasts = emptyList(), newCounts = emptyMap(),
+                importOpml = {}, actions = FakeActions(),
+            )
+        }
+    }
+
+    @Test
+    fun `an artist page header, popular songs and albums`() {
+        val songs = Samples.songs(4)
+        val albums = listOf(Samples.album(), Samples.album(id = "al2", name = "Harbour Lights", year = 2018))
+        snapScreen("artist_page", live = liveRows(playingId = songs[0].id)) {
+            ArtistLayout(
+                name = "The Quiet Hours",
+                headerColor = Color(0xFF5D3A62),
+                art = { size -> CoverArt(null, size, Modifier.clip(CircleShape), fallback = "The Quiet Hours") },
+                counts = "2 albums • 4 songs",
+                buttons = { PlayShuffleButtons(onPlay = {}, onShuffle = {}, extra = { FollowButton(true) {} }) },
+                popular = songs.map { SongItem.Owned(it) },
+                onPlayOwned = {},
+                discography = Discography(albums.map { AlbumItem.Owned(it) }, emptyList()),
+            )
         }
     }
 }

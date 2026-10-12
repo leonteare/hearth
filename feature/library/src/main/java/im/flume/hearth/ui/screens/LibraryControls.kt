@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -26,8 +23,7 @@ import im.flume.hearth.data.SearchFilter
 import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * Second row: Music's lists on the left, then the sort (and Podcasts' "+") on the right.
@@ -47,17 +43,17 @@ internal fun LibraryControls(
     val actions = LocalActions.current
     val tab = place.tab
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = Dimens.Gutter, end = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (place.section == LibrarySection.MUSIC) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
                 LibraryTabs.musicTabs.forEach { t ->
                     FilterChip(
                         selected = tab == t,
                         onClick = { onGoTo(LibraryTabs.goTo(place, t)) },
                         label = { Text(t.label) },
-                        shape = HearthShapes.Chip,
+                        shape = HearthTheme.shapes.chip,
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -70,12 +66,12 @@ internal fun LibraryControls(
             // Shuffle sits with Music only: it plays your music (liked songs and saved albums), never shows or books.
             if (place.section == LibrarySection.MUSIC) {
                 IconButton(onClick = { actions.play(PlaySource.MyLibrary, shuffle = true) }) {
-                    Icon(Icons.Default.Shuffle, "Shuffle your music", tint = MaterialTheme.colorScheme.primary)
+                    Icon(HearthTheme.icons.shuffle, "Shuffle your music", tint = MaterialTheme.colorScheme.primary)
                 }
             }
             if (showAddPodcasts) {
                 IconButton(onClick = onAddPodcasts) {
-                    Icon(Icons.Default.Add, "Add podcasts", tint = MaterialTheme.colorScheme.primary)
+                    Icon(HearthTheme.icons.add, "Add podcasts", tint = MaterialTheme.colorScheme.primary)
                 }
             }
             SortMenu(sortOptions, sort, onSort = onSort)
@@ -92,11 +88,11 @@ internal fun AddPodcastsSheet(open: Boolean, onDismiss: () -> Unit, onImport: ()
     val actions = LocalActions.current
     ActionSheet(open, onDismiss = onDismiss, title = "Add podcasts", showCover = false) {
         // The Search tab itself (not a page on top of this one), so Your Library still comes back here.
-        MenuItem("Find a podcast", Icons.Default.Search) {
+        MenuItem("Find a podcast", HearthTheme.icons.search) {
             onDismiss()
             actions.openSearchTab(SearchFilter.PODCASTS)
         }
-        MenuItem("Import podcasts (OPML)", Icons.Default.UploadFile) {
+        MenuItem("Import podcasts (OPML)", HearthTheme.icons.importFile) {
             onDismiss()
             onImport()
         }

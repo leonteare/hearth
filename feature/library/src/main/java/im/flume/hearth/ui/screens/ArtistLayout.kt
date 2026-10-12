@@ -1,8 +1,6 @@
 // The artist page's layout (header, Popular, album carousels).
 package im.flume.hearth.ui.screens
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,14 +17,11 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -36,6 +31,7 @@ import im.flume.hearth.data.Discography
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.SongItem
 import im.flume.hearth.ui.components.BackButton
+import im.flume.hearth.ui.components.CoverGradientHeader
 import im.flume.hearth.ui.components.DownloadsIndicator
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaCard
@@ -45,9 +41,8 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.albumKind
 import im.flume.hearth.ui.components.remoteAlbumId
-import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.TextSecondary
 
 /** The artist page layout, shared by artists on the server and ones that aren't. */
 @Composable
@@ -66,10 +61,10 @@ internal fun ArtistLayout(
 ) {
     val actions = LocalActions.current
     val wide = isWideWindow()
-    val titleColor = if (dimmed) Color.White.copy(alpha = NotOnServerAlpha) else Color.Unspecified
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    val titleColor = if (dimmed) HearthTheme.colors.onCover.copy(alpha = NotOnServerAlpha) else Color.Unspecified
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
         item(key = "header") {
-            Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))) {
+            CoverGradientHeader(headerColor) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         BackButton()
@@ -77,20 +72,20 @@ internal fun ArtistLayout(
                         DownloadsIndicator(Modifier.statusBarsPadding())
                     }
                     if (wide) {
-                        Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(start = HearthTheme.spacing.gutter), verticalAlignment = Alignment.CenterVertically) {
                             art(160.dp)
-                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text(name, style = MaterialTheme.typography.headlineMedium, color = titleColor, modifier = Modifier.padding(horizontal = Dimens.Gutter))
-                                Text(counts, color = TextSecondary, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp))
-                                status?.let { Box(Modifier.padding(horizontal = Dimens.Gutter)) { it() } }
+                            Column(Modifier.weight(1f).padding(start = HearthTheme.spacing.s)) {
+                                Text(name, style = MaterialTheme.typography.headlineMedium, color = titleColor, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter))
+                                Text(counts, color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs))
+                                status?.let { Box(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) { it() } }
                                 buttons()
                             }
                         }
                     } else {
                         art(180.dp)
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(HearthTheme.spacing.l))
                         Text(name, style = MaterialTheme.typography.headlineMedium, color = titleColor, textAlign = TextAlign.Center)
-                        if (counts.isNotBlank()) Text(counts, color = TextSecondary, modifier = Modifier.padding(4.dp))
+                        if (counts.isNotBlank()) Text(counts, color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(HearthTheme.spacing.xs))
                         status?.invoke()
                     }
                 }
@@ -119,7 +114,7 @@ private fun LazyListScope.albumCarousel(key: String, title: String, albums: List
     item(key = key) {
         Column(Modifier.animateItem()) {
             SectionHeader(title)
-            LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+            LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
                 items(albums, key = { it.key }) { a ->
                     when (a) {
                         is AlbumItem.Owned -> MediaCard(

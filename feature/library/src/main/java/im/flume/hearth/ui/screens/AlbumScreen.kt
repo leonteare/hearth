@@ -7,15 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,8 +49,7 @@ import im.flume.hearth.ui.components.remoteArtistId
 import im.flume.hearth.ui.components.trackKey
 import im.flume.hearth.ui.components.willDownload
 import im.flume.hearth.ui.components.willLike
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -107,15 +97,15 @@ fun AlbumScreen(id: String) {
             coverArt = a?.coverArt ?: songs.firstOrNull()?.coverArt, fallback = albumName,
         ) {
             if (ids.isNotEmpty()) {
-                MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { albumMenu = false; actions.playNext(ids) }
-                MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { albumMenu = false; actions.addToQueue(ids) }
-                MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { albumMenu = false; actions.addToPlaylist(ids) }
+                MenuItem("Play next", HearthTheme.icons.playNext) { albumMenu = false; actions.playNext(ids) }
+                MenuItem("Add to queue", HearthTheme.icons.queue) { albumMenu = false; actions.addToQueue(ids) }
+                MenuItem("Add to playlist", HearthTheme.icons.addToPlaylist) { albumMenu = false; actions.addToPlaylist(ids) }
             }
             a?.artistId?.let { artistId ->
-                MenuItem("Go to artist", Icons.Default.Person) { albumMenu = false; actions.openArtist(artistId) }
+                MenuItem("Go to artist", HearthTheme.icons.artist) { albumMenu = false; actions.openArtist(artistId) }
             }
             if (missing.isNotEmpty()) {
-                MenuItem("Add missing songs to server", Icons.Outlined.CloudUpload) {
+                MenuItem("Add missing songs to server", HearthTheme.icons.addToServer) {
                     albumMenu = false
                     getMissing("Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server")
                 }
@@ -142,7 +132,7 @@ fun AlbumScreen(id: String) {
             if (waiting.isNotEmpty()) get.getTracks(waiting, "Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server. They'll download with the album.")
         },
         headerActions = {
-            IconButton(onClick = { albumMenu = true }) { Icon(Icons.Default.MoreVert, "Album options") }
+            IconButton(onClick = { albumMenu = true }) { Icon(HearthTheme.icons.more, "Album options") }
         },
         tracks = tracks?.takeIf { missing.isNotEmpty() },
         topContent = {
@@ -152,7 +142,7 @@ fun AlbumScreen(id: String) {
             item { AlbumDetails(a, id, songs.size, songs.sumOf { it.durationSec.toLong() }) }
             a?.artistId?.let { artistId ->
                 item {
-                    TextButton(onClick = { actions.openArtist(artistId) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    TextButton(onClick = { actions.openArtist(artistId) }, modifier = Modifier.padding(horizontal = HearthTheme.spacing.s)) {
                         Text("More by ${a.artist}")
                     }
                 }
@@ -167,15 +157,15 @@ private fun MissingNote(missing: List<TidalTrack>, modifier: Modifier = Modifier
     val requests = LocalRequests.current
     val waiting = missing.filterNot { isComing(requests[trackKey(it.id)]) }
     Row(
-        modifier.fillMaxWidth().padding(start = Dimens.Gutter, end = 8.dp, top = 8.dp, bottom = 4.dp),
+        modifier.fillMaxWidth().padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.s, top = HearthTheme.spacing.s, bottom = HearthTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.Cloud, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
+        Icon(HearthTheme.icons.notOnServer, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(HearthTheme.spacing.s))
         Text(
             if (waiting.isEmpty()) "${plural(missing.size, "song")} coming to your server…"
             else "${plural(waiting.size, "song")} not on your server yet",
-            color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
         )
     }
 }
@@ -191,7 +181,7 @@ private fun RemoteAlbumScreen(id: String) {
     }
     when (state) {
         Load.Loading -> LoadingPage()
-        Load.Failed -> UnavailablePage(Icons.Default.CloudOff, "Couldn't load this album. Check your connection and try again.")
+        Load.Failed -> UnavailablePage(HearthTheme.icons.offline, "Couldn't load this album. Check your connection and try again.")
         is Load.Ready -> {
             val local = state.value.localAlbumId
             // The server has it after all (or it just arrived): that's the page to show.
@@ -222,7 +212,7 @@ private fun RemoteAlbumContent(view: RemoteAlbum) {
         saved = willLike(request),
         onSavedChange = { get.heartAlbum(album, request) },
         headerActions = {
-            IconButton(onClick = { get.albumMenuFor = album }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+            IconButton(onClick = { get.albumMenuFor = album }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
         },
         tracks = tracks,
         remote = RemoteHeader(
@@ -240,7 +230,7 @@ private fun RemoteAlbumContent(view: RemoteAlbum) {
         extraContent = {
             album.artistId?.let { artistId ->
                 item {
-                    TextButton(onClick = { actions.openArtist(remoteArtistId(artistId)) }, modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp)) {
+                    TextButton(onClick = { actions.openArtist(remoteArtistId(artistId)) }, modifier = Modifier.padding(horizontal = HearthTheme.spacing.s, vertical = HearthTheme.spacing.m)) {
                         Text("More by ${album.artist}")
                     }
                 }

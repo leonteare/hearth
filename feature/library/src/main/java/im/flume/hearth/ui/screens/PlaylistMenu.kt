@@ -5,18 +5,8 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.HideImage
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +28,7 @@ import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.Destructive
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.couldNot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -89,33 +79,33 @@ internal fun PlaylistMenu(item: PlaylistItem, screenScope: CoroutineScope, songI
         }
     }
 
-    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
+    IconButton(onClick = { open = true }) { Icon(HearthTheme.icons.more, "Playlist options") }
     ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = item.playlist.coverArt, fallback = name) {
         if (songIds.isNotEmpty()) {
-            MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { open = false; actions.playNext(songIds) }
-            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { open = false; actions.addToQueue(songIds) }
-            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(songIds) }
+            MenuItem("Play next", HearthTheme.icons.playNext) { open = false; actions.playNext(songIds) }
+            MenuItem("Add to queue", HearthTheme.icons.queue) { open = false; actions.addToQueue(songIds) }
+            MenuItem("Add to playlist", HearthTheme.icons.addToPlaylist) { open = false; actions.addToPlaylist(songIds) }
         }
         if (access.canEdit) {
 
-            MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
-            MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
-            MenuItem("Change photo", Icons.Default.AddPhotoAlternate) {
+            MenuItem("Rename", HearthTheme.icons.edit) { open = false; renaming = true }
+            MenuItem("Edit order", HearthTheme.icons.reorder) { open = false; actions.open("playlist-edit/$id") }
+            MenuItem("Change photo", HearthTheme.icons.changePhoto) {
                 open = false
                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
             // Navidrome doesn't say whether the photo is custom; removing an automatic one is harmless.
-            MenuItem("Remove photo", Icons.Default.HideImage) {
+            MenuItem("Remove photo", HearthTheme.icons.removePhoto) {
                 open = false
                 withPassword { photoChange("Removing photo…", "Photo removed") { c.library.removePlaylistPhoto(id) } }
             }
         }
         if (access.isOwner) {
-            MenuItem("Share", Icons.Default.GroupAdd) { open = false; sharing = true }
-            MenuItem("Delete playlist", Icons.Default.Delete, tint = Destructive, tintText = true) { open = false; deleting = true }
+            MenuItem("Share", HearthTheme.icons.share) { open = false; sharing = true }
+            MenuItem("Delete playlist", HearthTheme.icons.delete, tint = HearthTheme.colors.destructive, tintText = true) { open = false; deleting = true }
         }
         if (access.isMember) {
-            MenuItem("Leave playlist", Icons.AutoMirrored.Filled.ExitToApp, tint = Destructive, tintText = true) { open = false; leaving = true }
+            MenuItem("Leave playlist", HearthTheme.icons.leave, tint = HearthTheme.colors.destructive, tintText = true) { open = false; leaving = true }
         }
     }
     if (sharing) ShareSheet(item) { sharing = false }
@@ -151,7 +141,7 @@ internal fun PlaylistMenu(item: PlaylistItem, screenScope: CoroutineScope, songI
                         c.appScope.async { c.library.answerInvite(id, accept = false) }.await()
                         back?.onBackPressed()
                     }
-                }) { Text("Leave", color = Destructive) }
+                }) { Text("Leave", color = HearthTheme.colors.destructive) }
             },
             dismissButton = { TextButton(onClick = { leaving = false }) { Text("Cancel") } },
         )
@@ -176,7 +166,7 @@ internal fun PlaylistMenu(item: PlaylistItem, screenScope: CoroutineScope, songI
                         }.await()
                         if (ok) back?.onBackPressed() else actions.showMessage(couldNot("Couldn't delete the playlist", null, !c.network.isOnline.value))
                     }
-                }) { Text("Delete", color = Destructive) }
+                }) { Text("Delete", color = HearthTheme.colors.destructive) }
             },
             dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
         )

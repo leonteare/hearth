@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Destructive
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Asked when the download toggle is tapped while the collection is still downloading. */
 @Composable
@@ -39,7 +39,7 @@ internal fun RemoveDownloadsDialog(plan: DownloadRepository.RemovalPlan?, onDism
             )
         },
         confirmButton = {
-            TextButton(enabled = plan != null, onClick = onRemove) { Text("Remove", color = Destructive) }
+            TextButton(enabled = plan != null, onClick = onRemove) { Text("Remove", color = HearthTheme.colors.destructive) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

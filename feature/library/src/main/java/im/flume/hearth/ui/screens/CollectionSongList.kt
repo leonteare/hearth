@@ -10,13 +10,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.data.SongItem
 import im.flume.hearth.ui.components.MissingSongRow
 import im.flume.hearth.ui.components.formatDuration
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * The songs, one of three ways: just the matches while searching ([filtered] holds their indexes),
@@ -35,7 +33,7 @@ internal fun LazyListScope.collectionSongs(
     if (filtered != null) {
         // Searching: just the matching songs (tapping one still plays the whole list from it).
         if (filtered.isEmpty()) item(key = "no-match") {
-            Text("No songs match \"$query\"", color = TextSecondary, modifier = Modifier.padding(Dimens.Gutter))
+            Text("No songs match \"$query\"", color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(HearthTheme.spacing.gutter))
         }
         items(filtered, key = { keys[it] }) { index -> Column(Modifier.animateItem()) { songRow(index, songs[index]) } }
     } else if (tracks == null) {
@@ -79,7 +77,7 @@ private fun DiscHeader(disc: Int, first: Boolean) {
     Text(
         "Disc $disc",
         style = MaterialTheme.typography.titleMedium,
-        color = TextSecondary,
-        modifier = Modifier.padding(start = 16.dp, top = if (first) 4.dp else 16.dp, bottom = 4.dp),
+        color = HearthTheme.colors.textSecondary,
+        modifier = Modifier.padding(start = HearthTheme.spacing.gutter, top = if (first) HearthTheme.spacing.xs else HearthTheme.spacing.l, bottom = HearthTheme.spacing.xs),
     )
 }

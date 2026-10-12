@@ -14,12 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -47,16 +41,14 @@ import androidx.compose.ui.unit.dp
 import im.flume.hearth.ui.components.AvailabilityIcon
 import im.flume.hearth.ui.components.BackButton
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.CoverGradientHeader
 import im.flume.hearth.ui.components.DownloadToggle
 import im.flume.hearth.ui.components.DownloadsIndicator
 import im.flume.hearth.ui.components.PlayShuffleButtons
 import im.flume.hearth.ui.components.RemoteCover
-import im.flume.hearth.ui.theme.Background
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.TextSecondary
 
 /**
  * The big header at the top of the list, over a wash of the cover's colour. Landscape puts the art
@@ -82,13 +74,8 @@ internal fun CollectionHeader(
     headerActions: @Composable () -> Unit,
     buttons: @Composable () -> Unit,
 ) {
-    val titleColor = if (remote != null) Color.White.copy(alpha = NotOnServerAlpha) else Color.Unspecified
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .onSizeChanged { onHeightChanged(it.height) }
-            .background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))
-    ) {
+    val titleColor = if (remote != null) HearthTheme.colors.onCover.copy(alpha = NotOnServerAlpha) else Color.Unspecified
+    CoverGradientHeader(headerColor, Modifier.fillMaxWidth().onSizeChanged { onHeightChanged(it.height) }) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BackButton()
@@ -97,7 +84,7 @@ internal fun CollectionHeader(
                     DownloadsIndicator()
                     // Same search bar the pull-down opens, for anyone who doesn't know the gesture.
                     if (searchable && !searchOpen) {
-                        IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "Find in ${if (title.isBlank()) "this list" else title}") }
+                        IconButton(onClick = onOpenSearch) { Icon(HearthTheme.icons.search, "Find in ${if (title.isBlank()) "this list" else title}") }
                     }
                     headerActions()
                 }
@@ -109,24 +96,24 @@ internal fun CollectionHeader(
                 OutlinedTextField(
                     value = query, onValueChange = onQueryChange,
                     placeholder = { Text("Find in ${if (title.isBlank()) "this list" else title}") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    leadingIcon = { Icon(HearthTheme.icons.search, null) },
                     trailingIcon = {
-                        IconButton(onClick = onCloseSearch) { Icon(Icons.Default.Close, "Close search") }
+                        IconButton(onClick = onCloseSearch) { Icon(HearthTheme.icons.close, "Close search") }
                     },
                     singleLine = true,
-                    shape = HearthShapes.Card,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp).focusRequester(searchFocus),
+                    shape = HearthTheme.shapes.card,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s).focusRequester(searchFocus),
                 )
             }
             if (wide) {
                 // Landscape: art on the left, title and buttons beside it, so the list stays in view.
-                Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(start = HearthTheme.spacing.gutter), verticalAlignment = Alignment.CenterVertically) {
                     CollectionArt(160.dp, title, cover, headerIcon, remote)
-                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, modifier = Modifier.padding(horizontal = Dimens.Gutter))
+                    Column(Modifier.weight(1f).padding(start = HearthTheme.spacing.s)) {
+                        Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter))
                         Text(
-                            subtitleLine, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 4.dp),
+                            subtitleLine, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
                         )
                         RemoteStatusLine(remote, TextAlign.Start)
                         buttons()
@@ -134,14 +121,14 @@ internal fun CollectionHeader(
                 }
             } else {
                 CollectionArt(220.dp, title, cover, headerIcon, remote)
-                Spacer(Modifier.height(16.dp))
-                Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(HearthTheme.spacing.l))
+                Text(title, style = MaterialTheme.typography.headlineMedium, color = titleColor, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter))
                 Text(
                     subtitleLine,
-                    color = TextSecondary,
+                    color = HearthTheme.colors.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
                 )
                 RemoteStatusLine(remote, TextAlign.Center)
             }
@@ -153,7 +140,7 @@ internal fun CollectionHeader(
 @Composable
 private fun CollectionArt(size: Dp, title: String, cover: String?, headerIcon: (@Composable (Dp) -> Unit)?, remote: RemoteHeader?) {
     when {
-        remote != null -> Box(Modifier.size(size).clip(HearthShapes.Cover)) { RemoteCover(remote.coverUuid, title, 640) }
+        remote != null -> Box(Modifier.size(size).clip(HearthTheme.shapes.cover)) { RemoteCover(remote.coverUuid, title, 640) }
         headerIcon != null -> headerIcon(size)
         else -> CoverArt(cover, size, requestSize = CoverSize.LARGE, fallback = title)
     }
@@ -164,13 +151,13 @@ private fun CollectionArt(size: Dp, title: String, cover: String?, headerIcon: (
 private fun RemoteStatusLine(remote: RemoteHeader?, align: TextAlign) {
     remote?.let { r ->
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (align == TextAlign.Center) Arrangement.Center else Arrangement.Start,
         ) {
             AvailabilityIcon(r.request)
-            Spacer(Modifier.width(4.dp))
-            Text(r.status, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.width(HearthTheme.spacing.xs))
+            Text(r.status, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -201,14 +188,14 @@ internal fun CollectionButtons(
             if (saved != null) {
                 IconButton(onClick = { onSavedChange(!saved) }) {
                     Icon(
-                        if (saved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        if (saved) HearthTheme.icons.likeOn else HearthTheme.icons.like,
                         when {
                             remote != null && saved -> "Don't save it when it arrives"
                             remote != null -> "Save this album"
                             saved -> "Remove from Your Library"
                             else -> "Save to Your Library"
                         },
-                        tint = if (saved) accent else TextSecondary,
+                        tint = if (saved) accent else HearthTheme.colors.textSecondary,
                         modifier = Modifier.size(28.dp),
                     )
                 }
@@ -225,9 +212,9 @@ internal fun CollectionTopBar(title: String, headerColor: Color, alpha: () -> Fl
         Modifier
             .fillMaxWidth()
             .graphicsLayer { this.alpha = alpha() }
-            .background(lerp(headerColor, Background, 0.35f))
+            .background(lerp(headerColor, HearthTheme.colors.background, 0.35f))
             .statusBarsPadding()
-            .padding(end = 8.dp),
+            .padding(end = HearthTheme.spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BackButton()
@@ -239,6 +226,6 @@ internal fun CollectionTopBar(title: String, headerColor: Color, alpha: () -> Fl
             modifier = Modifier.minimumInteractiveComponentSize().size(40.dp),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
-        ) { Icon(Icons.Default.PlayArrow, "Play") }
+        ) { Icon(HearthTheme.icons.play, "Play") }
     }
 }

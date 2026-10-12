@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,9 +30,7 @@ import im.flume.hearth.data.SongEntity
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.TopBar
-import im.flume.hearth.ui.theme.Background
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.couldNot
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -84,11 +80,11 @@ fun PlaylistEditScreen(id: String) {
                 ReorderableItem(reorder, key = key) { dragging ->
                     MediaRow(
                         song?.title ?: "Song not synced yet", song?.artist.orEmpty(), onClick = null,
-                        modifier = Modifier.background(if (dragging) SurfaceHigh else Background),
+                        modifier = Modifier.background(if (dragging) HearthTheme.colors.surfaceHigh else HearthTheme.colors.background),
                         coverArt = song?.coverArt, fallback = song?.album.orEmpty(),
                     ) {
                         Box(Modifier.draggableHandle().size(48.dp), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.DragHandle, "Reorder", tint = TextSecondary)
+                            Icon(HearthTheme.icons.dragHandle, "Reorder", tint = HearthTheme.colors.textSecondary)
                         }
                     }
                 }

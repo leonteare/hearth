@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,8 +19,7 @@ import im.flume.hearth.spoken.LocalBookRow
 import im.flume.hearth.spoken.SpokenFormat
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * Your Library → Audiobooks: the books from folders on this phone, above the server's, in the tab's
@@ -61,10 +58,10 @@ private fun PhoneBookRow(row: LocalBookRow) {
             onClick = { actions.open(bookRoute(b.id)) },
             coverUrl = c.spokenCover(b.id, 150),
             fallback = b.author ?: b.title,
-            subtitleIcon = { Icon(Icons.Outlined.PhoneAndroid, null, tint = TextSecondary, modifier = Modifier.size(14.dp)) },
+            subtitleIcon = { Icon(HearthTheme.icons.phone, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(14.dp)) },
         )
         SpokenFormat.fraction(row.positionSec, b.durationSec, row.finished)?.let { f ->
-            ListenedBar(f, Modifier.padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, bottom = 6.dp).width(96.dp))
+            ListenedBar(f, Modifier.padding(start = HearthTheme.spacing.gutter + HearthTheme.spacing.rowCover + HearthTheme.spacing.coverGap, bottom = 6.dp).width(96.dp))
         }
     }
 }
