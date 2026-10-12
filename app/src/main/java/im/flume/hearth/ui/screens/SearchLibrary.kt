@@ -56,6 +56,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.CircularProgressIndicator
@@ -396,9 +398,16 @@ private fun SearchFilterChips(selected: SearchFilter, onSelect: (SearchFilter) -
     EqualWidthChips(SearchFilter.entries, selected, { it.label }, MaterialTheme.typography.labelSmall, minHeight = 32.dp, onSelect)
 }
 
+/** Android's recommended smallest touch target. */
+private val MIN_TOUCH_TARGET = 48.dp
+
+/** Above this text size (set in the phone's settings) equal-width chips would cut their labels off. */
+private const val LARGE_FONT_SCALE = 1.15f
+
 /**
  * Choices side by side at equal width across the page, so none of them ever scrolls off or hides
  * under another control. Used for Search's filters and Your Library's Music · Podcasts · Audiobooks.
+ * With large text they scroll sideways instead, at their natural width.
  */
 @Composable
 private fun <T> EqualWidthChips(
@@ -410,29 +419,44 @@ private fun <T> EqualWidthChips(
     onSelect: (T) -> Unit,
 ) {
     val accent = MaterialTheme.colorScheme.primary
+    // With large text the labels can't fit side by side, so the row scrolls instead of cutting words off.
+    val scrolls = androidx.compose.ui.platform.LocalDensity.current.fontScale > LARGE_FONT_SCALE
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp).selectableGroup(),
+        Modifier
+            .fillMaxWidth()
+            .then(if (scrolls) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+            .padding(horizontal = Dimens.Gutter, vertical = 4.dp)
+            .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { f ->
             val on = f == selected
+            // The tappable area is at least 48dp tall even when the chip drawn inside it is smaller.
             Box(
                 Modifier
-                    .weight(1f)
-                    .heightIn(min = minHeight)
-                    .clip(HearthShapes.Chip)
-                    .background(if (on) accent else SurfaceHigh)
+                    .then(if (scrolls) Modifier else Modifier.weight(1f))
+                    .heightIn(min = MIN_TOUCH_TARGET)
                     .selectable(selected = on, role = Role.Tab, onClick = { onSelect(f) }),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    label(f),
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    color = if (on) MaterialTheme.colorScheme.onPrimary else Color.White,
-                    style = textStyle,
-                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minHeight)
+                        .clip(HearthShapes.Chip)
+                        .background(if (on) accent else SurfaceHigh)
+                        .padding(horizontal = if (scrolls) 12.dp else 0.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label(f),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = if (scrolls) TextOverflow.Visible else TextOverflow.Clip,
+                        color = if (on) MaterialTheme.colorScheme.onPrimary else Color.White,
+                        style = textStyle,
+                    )
+                }
             }
         }
     }
@@ -743,7 +767,7 @@ fun LibraryScreen() {
                                 LibraryEmpty(
                                     "No audiobooks yet",
                                     if (spokenSyncing) "Getting the list from the server…" else "Audiobooks on your server show up here. You can also add a folder of audiobooks on this phone in Settings → Storage.",
-                                    "Search",
+                                    "Find an audiobook",
                                 ) { actions.openSearchTab(SearchFilter.BOOKS) }
                             }
                         }

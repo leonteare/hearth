@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -128,6 +129,15 @@ fun playEpisode(c: AppContainer, actions: Actions, libraryItemId: String, episod
         return
     }
     c.player.playEpisode(libraryItemId, episodeId, startSec)
+}
+
+/**
+ * Removes one downloaded episode straight away with Undo, the same as a single song: one episode is
+ * cheap to get back, so asking first would only slow people down.
+ */
+fun removeEpisodeDownload(c: AppContainer, actions: Actions, libraryItemId: String, episodeId: String) {
+    c.spoken.downloads.remove(libraryItemId, episodeId)
+    actions.showUndo("Download removed") { c.spoken.downloads.downloadEpisode(libraryItemId, episodeId) }
 }
 
 fun playBook(c: AppContainer, actions: Actions, libraryItemId: String, downloaded: Boolean, startSec: Double? = null) {
@@ -256,12 +266,12 @@ fun EpisodeMenu(row: EpisodeRow, open: Boolean, onDismiss: () -> Unit, showGoToS
             }
             when (row.downloadState) {
                 SpokenDownloadState.DONE -> MenuItem("Remove download", Icons.Default.CheckCircle) {
-                    onDismiss(); c.spoken.downloads.remove(e.libraryItemId, e.id); actions.showMessage("Download removed")
+                    onDismiss(); removeEpisodeDownload(c, actions, e.libraryItemId, e.id)
                 }
                 SpokenDownloadState.QUEUED, SpokenDownloadState.DOWNLOADING -> MenuItem("Cancel download", Icons.Default.Close) {
                     onDismiss(); c.spoken.downloads.remove(e.libraryItemId, e.id)
                 }
-                SpokenDownloadState.FAILED -> MenuItem("Try downloading again", Icons.Default.Refresh) {
+                SpokenDownloadState.FAILED -> MenuItem("Try again", Icons.Default.Refresh) {
                     onDismiss(); c.spoken.downloads.retryFailed()
                 }
                 else -> MenuItem("Download", Icons.Outlined.ArrowCircleDown) {
@@ -512,7 +522,7 @@ fun BookScreen(id: String) {
     }
     val row = book
     if (row == null) {
-        if (loaded) UnavailablePage(Icons.Default.Podcasts, "This book isn't on the server any more")
+        if (loaded) UnavailablePage(Icons.AutoMirrored.Filled.MenuBook, "This book isn't on the server any more")
         else Box(Modifier.fillMaxSize())
         return
     }

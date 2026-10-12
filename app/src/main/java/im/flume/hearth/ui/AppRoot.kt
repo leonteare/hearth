@@ -126,10 +126,10 @@ private class AppActions(
         c.player.play(source, startSongId, shuffle)
     }
 
-    override fun showUndo(message: String, undo: suspend () -> Unit) {
+    override fun showUndo(message: String, long: Boolean, undo: suspend () -> Unit) {
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
-            val result = snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Short)
+            val result = snackbar.showSnackbar(message, actionLabel = "Undo", duration = if (long) SnackbarDuration.Long else SnackbarDuration.Short)
             if (result == SnackbarResult.ActionPerformed) c.appScope.launch { runCatching { undo() } }
         }
     }
@@ -145,14 +145,14 @@ private class AppActions(
         haptic(HapticFeedbackType.Confirm)
         c.player.playNext(songIds)
         if (c.player.state.value.spoken != null) return showMessage(SPOKEN_QUEUE_MESSAGE)
-        showUndo(if (songIds.size == 1) "Playing next" else "${songIds.size} songs will play next") { c.player.removeQueued(songIds) }
+        showUndo(if (songIds.size == 1) "Playing next" else "${songIds.size} songs will play next", long = false) { c.player.removeQueued(songIds) }
     }
 
     override fun addToQueue(songIds: List<String>) {
         haptic(HapticFeedbackType.Confirm)
         c.player.addToQueue(songIds)
         if (c.player.state.value.spoken != null) return showMessage(SPOKEN_QUEUE_MESSAGE)
-        showUndo(if (songIds.size == 1) "Added to the queue" else "Added ${songIds.size} songs to the queue") { c.player.removeQueued(songIds) }
+        showUndo(if (songIds.size == 1) "Added to the queue" else "Added ${songIds.size} songs to the queue", long = false) { c.player.removeQueued(songIds) }
     }
 
     override fun setStarred(songId: String, starred: Boolean) {
@@ -160,7 +160,7 @@ private class AppActions(
         scope.launch {
             runCatching { c.library.setStarred(songId, starred) }
                 .onSuccess { if (!starred) showUndo("Removed from Liked Songs") { c.library.setStarred(songId, true) } }
-                .onFailure { snackbar.showSnackbar("Couldn't update Liked Songs (offline?)") }
+                .onFailure { showMessage(failed("Couldn't update Liked Songs", it)) }
         }
     }
 
@@ -172,7 +172,7 @@ private class AppActions(
                     if (saved) showMessage("Saved to Your Library")
                     else showUndo("Removed from Your Library") { c.library.setAlbumSaved(albumId, true) }
                 }
-                .onFailure { showMessage("Couldn't update Your Library (offline?)") }
+                .onFailure { showMessage(failed("Couldn't update Your Library", it)) }
         }
     }
 
@@ -181,9 +181,12 @@ private class AppActions(
         c.appScope.launch {
             runCatching { c.library.setArtistFollowed(artistId, followed) }
                 .onSuccess { if (!followed) showUndo("Unfollowed") { c.library.setArtistFollowed(artistId, true) } }
-                .onFailure { showMessage("Couldn't update who you follow (offline?)") }
+                .onFailure { showMessage(failed("Couldn't update who you follow", it)) }
         }
     }
+
+    /** Why [what] failed, in plain words: the connection when the phone is offline, otherwise what [e] says. */
+    private fun failed(what: String, e: Throwable?) = im.flume.hearth.util.couldNot(what, e, offline = !c.network.isOnline.value)
 
     var haptics: HapticFeedback? = null
     private fun haptic(type: HapticFeedbackType) { haptics?.performHapticFeedback(type) }
@@ -243,8 +246,9 @@ private class AppActions(
     fun createEmptyPlaylist(name: String) {
         creatingPlaylist.value = false
         scope.launch {
-            val id = runCatching { c.library.createPlaylist(name, emptyList()) }.getOrNull()
-            if (id != null) openPlaylist(id) else snackbar.showSnackbar("Couldn't create the playlist (offline?)")
+            val result = runCatching { c.library.createPlaylist(name, emptyList()) }
+            val id = result.getOrNull()
+            if (id != null) openPlaylist(id) else showMessage(failed("Couldn't create the playlist", result.exceptionOrNull()))
         }
     }
 
@@ -285,7 +289,7 @@ private class AppActions(
                     else -> {
                         val owner = playlistId?.let { c.library.dao.playlistOnce(it) }
                             ?.let { PlaylistRules.access(it, c.session.credentials.value?.username).owner }
-                        c.library.editError(error, owner, "Couldn't update the playlist (offline?)")
+                        c.library.editError(error, owner, failed("Couldn't update the playlist", error))
                     }
                 }
             )

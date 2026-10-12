@@ -64,7 +64,7 @@ fun MediaRow(
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val click = if (onClick != null || onLongClick != null) {
-        Modifier.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick)
+        Modifier.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClickLabel = if (onLongClick != null) "More options" else null, onLongClick = onLongClick)
     } else Modifier
     Row(
         modifier
@@ -140,7 +140,7 @@ fun MediaCard(
 ) {
     val align = if (round) TextAlign.Center else TextAlign.Start
     val textAlpha = if (dimmed) im.flume.hearth.ui.theme.NotOnServerAlpha else 1f
-    Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
+    Column(modifier.width(width).clip(HearthShapes.Card).combinedClickable(onClick = onClick, onLongClickLabel = if (onLongClick != null) "More options" else null, onLongClick = onLongClick)) {
         if (cover != null) cover()
         else CoverArt(coverArt, width, corner = if (round) width / 2 else Dimens.CoverCorner, fallback = title, url = coverUrl)
         Spacer(Modifier.height(8.dp))

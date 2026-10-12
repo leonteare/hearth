@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -286,7 +287,7 @@ fun LocalBookScreen(id: String) {
                 actions.showUndo("Marked as finished") { c.spoken.markFinished(id, null, false) }
             }
         }
-        MenuItem("Remove from library", Icons.Outlined.VisibilityOff) {
+        MenuItem("Remove from library", Icons.Outlined.RemoveCircleOutline) {
             menu = false
             c.appScope.launch { local.setHidden(id, true) }
             actions.showUndo("Removed \"${b.title}\". The files are still on your phone.") { local.setHidden(id, false) }

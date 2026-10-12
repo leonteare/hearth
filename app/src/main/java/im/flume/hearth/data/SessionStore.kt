@@ -74,6 +74,11 @@ class SessionStore(context: Context) {
         get() = prefs.getBoolean("savedDownloadedAlbums", false)
         set(v) = prefs.edit { putBoolean("savedDownloadedAlbums", v) }
 
+    /** Set once the "Selecting songs" hint has been shown, so long-press selecting is explained just once. */
+    var selectHintShown: Boolean
+        get() = prefs.getBoolean("selectHintShown", false)
+        set(v) = prefs.edit { putBoolean("selectHintShown", v) }
+
     var lastScan: String?
         get() = prefs.getString("lastScan", null)
         set(v) = prefs.edit { putString("lastScan", v) }

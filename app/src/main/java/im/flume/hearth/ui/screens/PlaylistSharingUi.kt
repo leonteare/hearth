@@ -73,14 +73,24 @@ fun InviteBanner(item: PlaylistItem) {
             Spacer(Modifier.weight(1f))
             TextButton(onClick = {
                 c.appScope.launch {
-                    c.library.answerInvite(item.playlist.id, accept = false)
-                    actions.showMessage("Invite declined")
+                    runCatching { c.library.answerInvite(item.playlist.id, accept = false) }
+                        .onSuccess {
+                            // Declining hides the playlist, so a mis-tap needs a way back: ask to be invited again.
+                            actions.showUndo("Invite declined") {
+                                val me = c.session.credentials.value?.username ?: return@showUndo
+                                c.session.setPlaylistDecision(item.playlist.id, null)
+                                runCatching { c.library.updateSharing(item.playlist.id) { it.withRole(me, invite) } }
+                                    .onFailure { e -> actions.showMessage(im.flume.hearth.util.couldNot("Couldn't bring the invite back", e, !c.network.isOnline.value)) }
+                            }
+                        }
+                        .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't decline the invite", it, !c.network.isOnline.value)) }
                 }
             }) { Text("Decline", color = TextSecondary) }
             TextButton(onClick = {
                 c.appScope.launch {
-                    c.library.answerInvite(item.playlist.id, accept = true)
-                    actions.showMessage("Added to Your Library")
+                    runCatching { c.library.answerInvite(item.playlist.id, accept = true) }
+                        .onSuccess { actions.showMessage("Added to Your Library") }
+                        .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't accept the invite", it, !c.network.isOnline.value)) }
                 }
             }) { Text("Accept") }
         },
@@ -131,7 +141,7 @@ fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
                         }
                     )
                 }
-                .onFailure { actions.showMessage("Couldn't update sharing (offline?)") }
+                .onFailure { actions.showMessage(im.flume.hearth.util.couldNot("Couldn't update sharing", it, !c.network.isOnline.value)) }
         }
     }
 
@@ -174,7 +184,7 @@ fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
         ChoiceSheet(
             open = true,
             title = PlaylistRules.displayName(u),
-            options = listOf<Pair<ShareRole?, String>>(ShareRole.ADD to "Can add songs", ShareRole.VIEW to "Can listen only", null to "Not shared"),
+            options = listOf<Pair<ShareRole?, String>>(ShareRole.ADD to "Can add songs", ShareRole.VIEW to "Can listen", null to "Not shared"),
             selected = sharing.members[u] ?: sharing.invites[u],
             onDismiss = { choosing = null },
             onPick = { role -> if (role != (sharing.members[u] ?: sharing.invites[u])) apply(u, role) },
@@ -240,6 +250,6 @@ internal fun photoError(e: Throwable, clearPassword: () -> Unit): String = when 
         clearPassword()
         "Navidrome didn't accept your saved password. Try again to enter it."
     }
-    is java.io.IOException -> e.message?.takeIf { it.startsWith("That photo") } ?: "Couldn't change the photo (offline?)"
+    is java.io.IOException -> e.message?.takeIf { it.startsWith("That photo") } ?: im.flume.hearth.util.couldNot("Couldn't change the photo", e)
     else -> "Couldn't use that photo"
 }
