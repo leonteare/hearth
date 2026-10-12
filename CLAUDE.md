@@ -57,8 +57,8 @@ phones hold those names (launcher, manifest). Sources sit in `src/main/java/<pac
 | `:feature:home` | `HomeScreen`, `SpokenHome`, `StatsScreen`; `HomeRoutes.kt` |
 | `:feature:library` | Library tabs/lists/controls, Browse, Album/Artist, Collection* (playlist/mix/genre/liked pages), Playlist{Screen,Edit,Menu,SharingUi}, `InfoSections`, `LocalBookRows`; `LibraryRoutes.kt` |
 | `:feature:search` | `SearchScreen`, `SearchField`, `SearchResults`; `SearchRoutes.kt` |
-| `:feature:player` | `MiniPlayer`, `NowPlaying*`, `PlayerControls`, `LyricsView`, `Queue*`, `Spoken*` player pieces, `visualiser/`. No routes: `:app`'s `NavBar`/`PlayerOverlays` draw it |
-| `:feature:spoken` | `ShowPage`, `BookScreen`, `LocalBookScreen`, `FindDetailsSheet`; `SpokenRoutes.kt` |
+| `:feature:player` | `MiniPlayer`, `NowPlaying*`, `PlayerControls`, `LyricsView`, `Queue*`, `Spoken*` player pieces, `visualiser/` (`VisualiserScreen` + `VisualiserControls`, renderers). No routes: `:app`'s `NavBar`/`PlayerOverlays` draw it |
+| `:feature:spoken` | `ShowPage` (+ `ShowEpisodeRows`), `BookScreen`, `LocalBookScreen`, `FindDetailsSheet`; `SpokenRoutes.kt` |
 | `:feature:settings` | `Settings*` and its pages (General, Appearance, Storage, GetMusic, PodcastsAndAudiobooks, LocalBook), `Downloads*`, `SpokenDownloadRows`, `LoginScreen`; `SettingsRoutes.kt` |
 | `:app` | `HearthApp.kt` (`HearthContainer`, the one real container), `ui/`: `MainActivity`, `AppRoot`, `Routes` (calls each `<feature>Routes()`), `AppActions`, `NavBar`, `PlayerOverlays`; manifest, signing, versioning |
 
