@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import im.flume.hearth.core.playback.AudioFrame
 import org.junit.Assert.assertEquals
