@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.getActiveNetwork: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="    private val hasNetwork = MutableStateFlow(cm.activeNetwork != null)"
+        errorLine2="                                              ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="40"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.registerNetworkCallback: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="        cm.registerNetworkCallback("
+        errorLine2="        ^">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="69"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.registerDefaultNetworkCallback: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="        cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="77"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.getActiveNetwork: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="                hasNetwork.value = cm.activeNetwork != null"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="85"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.getAllNetworks: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="    private fun onWifi(except: Network?): Boolean = cm.allNetworks.any { n ->"
+        errorLine2="                                                    ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="136"
+            column="53"/>
+    </issue>
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.getNetworkCapabilities: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="        n != except &amp;&amp; isWifi(cm.getNetworkCapabilities(n))"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt"
+            line="137"
+            column="31"/>
+    </issue>
+
+</issues>

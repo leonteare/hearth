@@ -1,0 +1,8 @@
+# Kotlin files allowed over the 400-line limit in scripts/check-structure.sh.
+# One path per line, relative to the repo root. A path that no longer exists is fine (files move), so a
+# split or a rename only ever shortens this list. Add a line only when splitting a file would make it worse.
+
+# A single renderer: the grid, its runners and their trails are one piece of drawing logic.
+# Listed at both paths while the visualiser moves out of :feature:player into its own module.
+feature/player/src/main/java/im/flume/hearth/feature/player/visualiser/GridRunnerRenderer.kt
+feature/visualiser/src/main/java/im/flume/hearth/feature/visualiser/GridRunnerRenderer.kt

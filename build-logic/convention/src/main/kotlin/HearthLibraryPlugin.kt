@@ -30,6 +30,15 @@ class HearthLibraryPlugin : Plugin<Project> {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
+            // Android Lint, with everything it already reports written down in the module's lint-baseline.xml:
+            // a new warning fails the build, the old ones wait their turn. Delete a line from a baseline (or the
+            // whole file, and re-record with `./gradlew lintDebug`) as the warnings get fixed. Each module is
+            // checked on its own, so a problem is reported once, in the module that owns the code.
+            lint {
+                baseline = file("lint-baseline.xml")
+                abortOnError = true
+                checkDependencies = false
+            }
         }
 
         pluginManager.withPlugin("org.jetbrains.kotlin.plugin.compose") {

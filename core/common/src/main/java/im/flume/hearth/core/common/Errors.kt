@@ -52,7 +52,7 @@ fun userMessage(e: Throwable, fallback: String = GENERIC_ERROR_MESSAGE): String 
             when {
                 message == null -> fallback
                 // Hearth's own exceptions already say what happened in plain words.
-                e.javaClass.name.startsWith("im.flume.hearth.") && code == null -> message
+                e.javaClass.name.startsWith("im.flume.hearth.") && code == null -> message // fqn-ok
                 else -> "$fallback (${message.take(DETAIL_MAX).trimEnd()}${if (message.length > DETAIL_MAX) "…" else ""})"
             }
         }

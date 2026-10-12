@@ -2,4 +2,4 @@
 package im.flume.hearth.core.common
 
 /** Intent extra naming a page to open (see `DomainContainer.pendingRoute`), e.g. from a notification. */
-const val EXTRA_ROUTE = "im.flume.hearth.ROUTE"
+const val EXTRA_ROUTE = "im.flume.hearth.ROUTE" // fqn-ok

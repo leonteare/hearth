@@ -58,6 +58,13 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // As in the library modules (see HearthLibraryPlugin): today's warnings are in lint-baseline.xml, a new one fails.
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkDependencies = false
+    }
 }
 
 // A release APK/bundle must carry the real signing key: without keystore.properties, fail rather than

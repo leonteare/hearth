@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        PlaybackService.SLEEP_END_OF_SONG -> if (LocalSpokenNow.current != null) &quot;Stops at the end&quot; else &quot;Stops after this song&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="82"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        PlaybackService.SLEEP_END_OF_SONG -> if (LocalSpokenNow.current != null) &quot;Stops at the end&quot; else &quot;Stops after this song&quot;"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="82"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        PlaybackService.SLEEP_END_OF_CHAPTER -> &quot;Stops at the end of this chapter&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="83"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        PlaybackService.SLEEP_END_OF_CHAPTER -> &quot;Stops at the end of this chapter&quot;"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="83"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    val options = listOf(15, 30, 45, 60).map { &quot;$it minutes&quot; to it * 60_000L } + (&quot;End of this song&quot; to PlaybackService.SLEEP_END_OF_SONG)"
+        errorLine2="                                                                                                        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="96"
+            column="105"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    val options = listOf(15, 30, 45, 60).map { &quot;$it minutes&quot; to it * 60_000L } + (&quot;End of this song&quot; to PlaybackService.SLEEP_END_OF_SONG)"
+        errorLine2="                                                                                                                        ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/NowPlayingMenu.kt"
+            line="96"
+            column="121"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (hasChapters) MenuItem(&quot;End of this chapter&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }"
+        errorLine2="                                                                                           ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="111"
+            column="92"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (hasChapters) MenuItem(&quot;End of this chapter&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }"
+        errorLine2="                                                                                                           ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="111"
+            column="108"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (hasChapters) MenuItem(&quot;End of this chapter&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }"
+        errorLine2="                                                                                                                                        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="111"
+            column="137"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (hasChapters) MenuItem(&quot;End of this chapter&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_CHAPTER) { pick(PlaybackService.SLEEP_END_OF_CHAPTER) }"
+        errorLine2="                                                                                                                                                        ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="111"
+            column="153"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (!isBook) MenuItem(&quot;End of this episode&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }"
+        errorLine2="                                                                                       ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="114"
+            column="88"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (!isBook) MenuItem(&quot;End of this episode&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }"
+        errorLine2="                                                                                                       ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="114"
+            column="104"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (!isBook) MenuItem(&quot;End of this episode&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }"
+        errorLine2="                                                                                                                                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="114"
+            column="130"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        if (!isBook) MenuItem(&quot;End of this episode&quot;, icons.timer, checked = sleepAt == PlaybackService.SLEEP_END_OF_SONG) { pick(PlaybackService.SLEEP_END_OF_SONG) }"
+        errorLine2="                                                                                                                                                 ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="114"
+            column="146"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="    modifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/QueueRows.kt"
+            line="176"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableFloatStateOf` instead of `mutableStateOf`"
+        errorLine1="    var value by remember { mutableStateOf(SpokenSpeed.snap(speed)) }"
+        errorLine2="                            ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/SpokenSheets.kt"
+            line="55"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/visualiser/RetroRenderer.kt"
+            line="102"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val bb = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/visualiser/RetroRenderer.kt"
+            line="110"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val tile = Bitmap.createBitmap(1, scale, Bitmap.Config.ARGB_8888)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/visualiser/RetroRenderer.kt"
+            line="146"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.set` instead?"
+        errorLine1="        tile.setPixel(0, scale - 1, 0xFF000000.toInt())"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/visualiser/RetroRenderer.kt"
+            line="147"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.set` instead?"
+        errorLine1="        if (scale >= 4) tile.setPixel(0, scale - 2, 0x66000000)"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/player/visualiser/RetroRenderer.kt"
+            line="148"
+            column="25"/>
+    </issue>
+
+</issues>

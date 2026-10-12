@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="RememberInComposition"
+        message="Calling a @RememberInComposition annotated declaration inside composition without using `remember`"
+        errorLine1="            SearchField(&quot;&quot;, onQueryChange = {}, hint = &quot;What do you want to listen to?&quot;, focus = FocusRequester(), onSearch = {})"
+        errorLine2="                                                                                                 ~~~~~~~~~~~~~~">
+        <location
+            file="src/test/java/im/flume/hearth/feature/search/SearchScreenshots.kt"
+            line="23"
+            column="98"/>
+    </issue>
+
+    <issue
+        id="RememberInComposition"
+        message="Calling a @RememberInComposition annotated declaration inside composition without using `remember`"
+        errorLine1="            SearchField(&quot;northern&quot;, onQueryChange = {}, hint = &quot;What do you want to listen to?&quot;, focus = FocusRequester(), onSearch = {})"
+        errorLine2="                                                                                                         ~~~~~~~~~~~~~~">
+        <location
+            file="src/test/java/im/flume/hearth/feature/search/SearchScreenshots.kt"
+            line="31"
+            column="106"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        recentPrefs.edit().putString(&quot;recent&quot;, recent.joinToString(&quot;\n&quot;)).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/search/SearchScreen.kt"
+            line="79"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                        recentPrefs.edit().remove(&quot;recent&quot;).apply()"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/feature/search/SearchScreen.kt"
+            line="198"
+            column="25"/>
+    </issue>
+
+</issues>

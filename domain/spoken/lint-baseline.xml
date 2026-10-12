@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+
+    <issue
+        id="MissingPermission"
+        message="Missing permissions required by ConnectivityManager.registerNetworkCallback: android.permission.ACCESS_NETWORK_STATE"
+        errorLine1="            context.getSystemService(ConnectivityManager::class.java).registerNetworkCallback("
+        errorLine2="            ^">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/SpokenDownloads.kt"
+            line="99"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="SpecifyForegroundServiceType"
+        message="Missing dataSync foregroundServiceType in the AndroidManifest.xml"
+        errorLine1="        return if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)"
+        errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookUploadWorker.kt"
+            line="35"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="SpecifyForegroundServiceType"
+        message="Missing dataSync foregroundServiceType in the AndroidManifest.xml"
+        errorLine1="        return if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)"
+        errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/SpokenDownloads.kt"
+            line="375"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        MetadataRetriever.Builder(context, MediaItem.fromUri(uri)).build().use { r ->"
+        errorLine2="                          ~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="126"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        MetadataRetriever.Builder(context, MediaItem.fromUri(uri)).build().use { r ->"
+        errorLine2="                                                                   ~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="126"
+            column="68"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        MetadataRetriever.Builder(context, MediaItem.fromUri(uri)).build().use { r ->"
+        errorLine2="                                                                                 ~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="126"
+            column="82"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            r.retrieveDurationUs().get(60, TimeUnit.SECONDS)"
+        errorLine2="              ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="127"
+            column="15"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val pfd = context.contentResolver.openFileDescriptor(Uri.parse(f.uri), &quot;r&quot;) ?: return emptyList()"
+        errorLine2="                                                                 ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookChapters.kt"
+            line="32"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val tree = Uri.parse(treeUri)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="30"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                val read = if (same == null) readFile(Uri.parse(f.uri)) else null"
+        errorLine2="                                                      ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="49"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                LocalBookNaming.describe(g, tags ?: readFile(Uri.parse(rows.first().uri))?.tags)"
+        errorLine2="                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="59"
+            column="62"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val cover = saveCover(id, g.cover, Uri.parse(rows.first().uri), refresh = firstChanged || (g.cover != null &amp;&amp; g.cover.lastModified > (old?.scannedAt ?: 0)))"
+        errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="61"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        Uri.parse(uri).let { LocalFolders.key(it.authority, DocumentsContract.getDocumentId(it)) }"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="80"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            coverFile?.let { context.contentResolver.openInputStream(Uri.parse(it.uri))?.use { s -> s.readBytes() } }"
+        errorLine2="                                                                     ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookScanner.kt"
+            line="164"
+            column="70"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                            context.contentResolver.openInputStream(Uri.parse(f.uri)) ?: throw IOException(&quot;Couldn&apos;t open ${f.relPath}&quot;)"
+        errorLine2="                                                                    ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBookUpload.kt"
+            line="82"
+            column="69"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putStringSet(KEY_FOLDERS, uris).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBooks.kt"
+            line="97"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        DocumentsContract.getTreeDocumentId(Uri.parse(uri)).substringAfterLast(&apos;:&apos;).substringAfterLast(&apos;/&apos;).ifEmpty { &quot;Phone storage&quot; }"
+        errorLine2="                                            ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBooks.kt"
+            line="102"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        Uri.parse(uri).let { LocalFolders.key(it.authority, DocumentsContract.getTreeDocumentId(it)) }"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBooks.kt"
+            line="106"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION) }"
+        errorLine2="                                                                              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/LocalBooks.kt"
+            line="129"
+            column="79"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="    private fun setRemoveLater(keys: Set&lt;String>) = prefs.edit().putStringSet(&quot;removeLater&quot;, keys).apply()"
+        errorLine2="                                                    ~~~~~~~~~~~~">
+        <location
+            file="src/main/java/im/flume/hearth/domain/spoken/SpokenDownloads.kt"
+            line="220"
+            column="53"/>
+    </issue>
+
+</issues>
