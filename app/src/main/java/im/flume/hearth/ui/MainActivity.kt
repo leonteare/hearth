@@ -4,16 +4,18 @@ import im.flume.hearth.EXTRA_ROUTE
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
-import im.flume.hearth.ui.theme.Background
+import im.flume.hearth.ui.theme.HearthColors
 import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
@@ -23,13 +25,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Before the first frame, so content is laid out edge to edge from the start.
+        applySystemBars(HearthColors().isDark)
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         if (savedInstanceState == null) takeRoute(intent)
 
         setContent {
             HearthTheme {
-                Surface(color = Background, contentColor = Color.White) {
+                val dark = HearthTheme.colors.isDark
+                LaunchedEffect(dark) { applySystemBars(dark) }
+                Surface(color = HearthTheme.colors.background, contentColor = HearthTheme.colors.text) {
                     val creds by container.session.credentials.collectAsStateWithLifecycle()
                     if (creds == null) {
                         LoginScreen()
@@ -39,6 +44,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Status and navigation bar icons follow the skin: light icons on a dark skin. The bars stay see-through,
+     * and "auto" keeps Android's own contrast scrim behind 3-button navigation, as before.
+     */
+    private fun applySystemBars(dark: Boolean) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { dark },
+            navigationBarStyle = SystemBarStyle.auto(LIGHT_SCRIM, DARK_SCRIM) { dark },
+        )
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -74,3 +90,7 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 }
+
+/** The scrims enableEdgeToEdge() uses by default (androidx.activity keeps them internal). */
+private val LIGHT_SCRIM = AndroidColor.argb(0xe6, 0xFF, 0xFF, 0xFF)
+private val DARK_SCRIM = AndroidColor.argb(0x80, 0x1b, 0x1b, 0x1b)

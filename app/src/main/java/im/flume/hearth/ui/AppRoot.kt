@@ -54,7 +54,7 @@ import im.flume.hearth.ui.screens.LocalSearchFocus
 import im.flume.hearth.ui.screens.LocalSpokenNow
 import im.flume.hearth.ui.screens.SearchFocusRequest
 import im.flume.hearth.ui.screens.allDownloadCounts
-import im.flume.hearth.ui.theme.Background
+import im.flume.hearth.ui.theme.HearthTheme
 
 @Composable
 fun AppRoot() {
@@ -163,7 +163,7 @@ fun AppRoot() {
                 if (landscape) SideRail(currentTab, badged, onTabClick)
                 Scaffold(
                     modifier = if (landscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End)) else Modifier,
-                    containerColor = Background,
+                    containerColor = HearthTheme.colors.background,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
                         AppBottomBar(
