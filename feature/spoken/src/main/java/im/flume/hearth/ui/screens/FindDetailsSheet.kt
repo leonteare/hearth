@@ -11,10 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
 import im.flume.hearth.container
 import im.flume.hearth.spoken.BookCandidate
 import im.flume.hearth.spoken.BookMatch
@@ -44,10 +39,7 @@ import im.flume.hearth.ui.components.ActionSheet
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.Accent
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -97,11 +89,11 @@ internal fun FindDetailsSheet(open: Boolean, book: LocalBookEntity, signedIn: Bo
             if (!signedIn) {
                 Text(
                     "Sign in to podcasts & audiobooks in Settings to look up a book's details.",
-                    color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+                    color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
                 )
             } else {
-                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = query, onValueChange = { query = it }, singleLine = true, label = { Text("Title") },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -112,15 +104,15 @@ internal fun FindDetailsSheet(open: Boolean, book: LocalBookEntity, signedIn: Bo
                 }
                 val problem = error
                 when {
-                    searching -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 12.dp))
-                    problem != null -> Text(problem, color = Destructive, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp))
+                    searching -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m))
+                    problem != null -> Text(problem, color = HearthTheme.colors.destructive, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s))
                     candidates?.isEmpty() == true -> Text(
                         "Nothing found. Try fewer words, or the title as it's printed on the cover.",
-                        color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+                        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
                     )
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(HearthTheme.spacing.xs))
                 candidates.orEmpty().forEach { cand ->
                     val current = book.matchSource != null && cand.source == book.matchSource
                     MediaRow(
@@ -134,13 +126,13 @@ internal fun FindDetailsSheet(open: Boolean, book: LocalBookEntity, signedIn: Bo
                         },
                         coverUrl = cand.cover,
                         fallback = cand.title,
-                        trailing = if (current) { { Icon(Icons.Default.Check, "In use", tint = Accent, modifier = Modifier.padding(end = 12.dp)) } } else null,
+                        trailing = if (current) { { Icon(HearthTheme.icons.check, "In use", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = HearthTheme.spacing.m)) } } else null,
                     )
                 }
             }
             val matched = book.matchState == LocalMatchState.AUTO.name || book.matchState == LocalMatchState.CONFIRMED.name
             if (matched) {
-                MenuItem("Use the file's own name", Icons.Default.History) {
+                MenuItem("Use the file's own name", HearthTheme.icons.history) {
                     onDismiss()
                     c.appScope.launch { details.useFileNames(book.id) }
                     actions.showMessage("Back to \"${book.fileTitle ?: book.title}\"")

@@ -16,16 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material.icons.outlined.RemoveCircleOutline
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,9 +54,7 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.UnavailablePage
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -90,7 +78,7 @@ fun LocalBookScreen(id: String) {
 
     val r = row
     if (r == null) {
-        if (loaded) UnavailablePage(Icons.Outlined.PhoneAndroid, "This book isn't on the phone any more")
+        if (loaded) UnavailablePage(HearthTheme.icons.phone, "This book isn't on the phone any more")
         else Box(Modifier.fillMaxSize())
         return
     }
@@ -99,11 +87,11 @@ fun LocalBookScreen(id: String) {
         // Added to the server: that copy is the one to use now.
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth()) { BackButton() }
-            EmptyState(Icons.Outlined.CloudUpload, "\"${b.title}\" is on the server now.", action = "Open it") { actions.open(bookRoute(serverId)) }
+            EmptyState(HearthTheme.icons.addToServer, "\"${b.title}\" is on the server now.", action = "Open it") { actions.open(bookRoute(serverId)) }
         }
         return
     }
-    if (b.hidden) return UnavailablePage(Icons.Outlined.VisibilityOff, "Removed from your library. The files are still on your phone.")
+    if (b.hidden) return UnavailablePage(HearthTheme.icons.hidden, "Removed from your library. The files are still on your phone.")
     val isThis = now?.libraryItemId == id
     var livePosSec by remember { mutableStateOf<Double?>(null) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -145,31 +133,31 @@ fun LocalBookScreen(id: String) {
     }
     FindDetailsSheet(findDetails, b, signedIn = account != null && account?.needsSignIn != true) { findDetails = false }
     ActionSheet(menu, { menu = false }, title = b.title, subtitle = b.author, showCover = false) {
-        if (!busy) MenuItem("Add to server", Icons.Outlined.CloudUpload) { menu = false; confirmUpload = true }
+        if (!busy) MenuItem("Add to server", HearthTheme.icons.addToServer) { menu = false; confirmUpload = true }
         // Where the title, writer and cover came from, and the way to look them up or change them.
         val matched = b.matchState == LocalMatchState.AUTO.name || b.matchState == LocalMatchState.CONFIRMED.name
         MenuItem(
             if (matched) "Change details (from ${BookMatch.providerName(b.matchSource)})" else "Find details",
-            Icons.Default.Search,
+            HearthTheme.icons.search,
         ) { menu = false; findDetails = true }
         if (r.finished || started) {
-            MenuItem("Mark as not started", Icons.Outlined.RadioButtonUnchecked) { menu = false; c.appScope.launch { c.spoken.markFinished(id, null, false) } }
+            MenuItem("Mark as not started", HearthTheme.icons.markUnplayed) { menu = false; c.appScope.launch { c.spoken.markFinished(id, null, false) } }
         }
         if (!r.finished) {
-            MenuItem("Mark as finished", Icons.Outlined.CheckCircle) {
+            MenuItem("Mark as finished", HearthTheme.icons.markPlayed) {
                 menu = false
                 c.appScope.launch { c.spoken.markFinished(id, null, true) }
                 actions.showUndo("Marked as finished") { c.spoken.markFinished(id, null, false) }
             }
         }
-        MenuItem("Remove from library", Icons.Outlined.RemoveCircleOutline) {
+        MenuItem("Remove from library", HearthTheme.icons.removeFromLibrary) {
             menu = false
             c.appScope.launch { local.setHidden(id, true) }
             actions.showUndo("Removed \"${b.title}\". The files are still on your phone.") { local.setHidden(id, false) }
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
         item(key = "header") {
             SpokenHeader(
                 c.spokenCover(id, CoverSize.LARGE), b.title,
@@ -181,27 +169,27 @@ fun LocalBookScreen(id: String) {
             )
         }
         item(key = "progress") {
-            Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), horizontalAlignment = Alignment.CenterHorizontally) {
                 when {
                     r.finished -> Text("Finished", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     posSec > 0 && b.durationSec > 0 -> {
                         ListenedBar((posSec / b.durationSec).toFloat().coerceIn(0f, 1f), Modifier.widthIn(max = 280.dp).fillMaxWidth())
                         Spacer(Modifier.height(6.dp))
-                        Text(SpokenFormat.remaining(b.durationSec - posSec), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                        Text(SpokenFormat.remaining(b.durationSec - posSec), color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
         }
         item(key = "buttons") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 val playing = isThis && playerState.isPlaying
                 Button(
                     onClick = { if (isThis) c.player.playPause() else playBook(c, actions, id, downloaded = true) },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = HearthTheme.spacing.m),
                 ) {
-                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+                    Icon(if (playing) HearthTheme.icons.pause else HearthTheme.icons.play, null)
                     Spacer(Modifier.width(6.dp))
                     Text(
                         when {
@@ -236,21 +224,21 @@ fun LocalBookScreen(id: String) {
 @Composable
 private fun UploadStatus(state: LocalUploadState?, error: String?, progress: Float?, onRetry: () -> Unit) {
     if (state == null) return
-    Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (state) {
             LocalUploadState.UPLOADING -> {
                 Text(
                     if (progress == null) "Getting ready to add to the server…" else "Adding to the server… ${(progress * 100).toInt()}%",
-                    color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                    color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
                 )
                 if (progress == null) LinearProgressIndicator(Modifier.fillMaxWidth()) else LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             }
             LocalUploadState.WAITING_FOR_SERVER -> {
-                Text("Sent. Waiting for the server to add it to your library…", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text("Sent. Waiting for the server to add it to your library…", color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             LocalUploadState.FAILED -> {
-                Text("Couldn't add it to the server: ${error ?: "something went wrong"}", color = Destructive, style = MaterialTheme.typography.bodyMedium)
+                Text("Couldn't add it to the server: ${error ?: "something went wrong"}", color = HearthTheme.colors.destructive, style = MaterialTheme.typography.bodyMedium)
                 TextButton(onClick = onRetry) { Text("Try again") }
             }
         }

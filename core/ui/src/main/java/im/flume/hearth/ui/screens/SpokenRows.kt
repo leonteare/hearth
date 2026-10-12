@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,8 +46,7 @@ import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.launch
 
@@ -91,12 +86,12 @@ fun EpisodeListRow(
                 onClick = play,
                 onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
             )
-            .padding(start = Dimens.Gutter, end = 4.dp, top = Dimens.RowPaddingV, bottom = Dimens.RowPaddingV),
+            .padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.xs, top = HearthTheme.spacing.rowPaddingV, bottom = HearthTheme.spacing.rowPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showCover) {
-            CoverArt(null, Dimens.RowCover, requestSize = 150, fallback = row.podcastTitle, url = c.spokenCover(e.libraryItemId, 150))
-            Spacer(Modifier.width(Dimens.CoverGap))
+            CoverArt(null, HearthTheme.spacing.rowCover, requestSize = 150, fallback = row.podcastTitle, url = c.spokenCover(e.libraryItemId, 150))
+            Spacer(Modifier.width(HearthTheme.spacing.coverGap))
         }
         Column(Modifier.weight(1f)) {
             Text(
@@ -106,31 +101,31 @@ fun EpisodeListRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = when {
                     isCurrent -> accent
-                    row.finished || !playable -> TextSecondary
-                    else -> Color.White
+                    row.finished || !playable -> HearthTheme.colors.textSecondary
+                    else -> HearthTheme.colors.text
                 },
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (row.downloadState != null && row.downloadState != SpokenDownloadState.REMOVED) {
                     SpokenDownloadIcon(row.downloadState)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(HearthTheme.spacing.xs))
                 }
                 Text(
                     listOfNotNull(label, SpokenFormat.episodeLine(row, withShow = withShow)).joinToString(" • "),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
                 )
             }
             SpokenFormat.fraction(row.progressSec, e.durationSec, row.finished)?.let { f ->
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(HearthTheme.spacing.xs))
                 ListenedBar(f, Modifier.width(96.dp))
             }
         }
         if (playButton) {
             IconButton(onClick = play, enabled = playable) {
-                Icon(Icons.Default.PlayArrow, "Play ${e.title}", tint = Color.White)
+                Icon(HearthTheme.icons.play, "Play ${e.title}", tint = HearthTheme.colors.text)
             }
         } else {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+            IconButton(onClick = { menu = true }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
         }
     }
     EpisodeMenu(row, menu, onDismiss = { menu = false }, showGoToShow = showGoToShow)
@@ -146,9 +141,9 @@ fun PodcastListRow(p: PodcastEntity, newCount: Int = 0, modifier: Modifier = Mod
         onClick = { actions.open(podcastRoute(p.id)) },
         modifier = modifier,
         coverUrl = c.spokenCover(p.id, 150),
-        subtitleColor = TextSecondary,
+        subtitleColor = HearthTheme.colors.textSecondary,
         trailing = if (newCount > 0) {
-            { Box(Modifier.padding(end = 16.dp).size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)) }
+            { Box(Modifier.padding(end = HearthTheme.spacing.l).size(8.dp).clip(HearthTheme.shapes.round).background(MaterialTheme.colorScheme.primary)) }
         } else null,
     )
 }
@@ -174,7 +169,7 @@ fun BookListRow(b: BookRow, modifier: Modifier = Modifier) {
             } else null,
         )
         SpokenFormat.fraction(b.progressSec, book.durationSec, b.finished)?.let { f ->
-            ListenedBar(f, Modifier.padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, bottom = 6.dp).width(96.dp))
+            ListenedBar(f, Modifier.padding(start = HearthTheme.spacing.gutter + HearthTheme.spacing.rowCover + HearthTheme.spacing.coverGap, bottom = 6.dp).width(96.dp))
         }
     }
 }
@@ -187,25 +182,25 @@ fun ChapterRow(index: Int, title: String, startSec: Double, lengthSec: Double, c
         Modifier.fillMaxWidth()
             .background(if (current) accent.copy(alpha = 0.12f) else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+            .padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("${index + 1}", Modifier.width(32.dp), color = if (current) accent else TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Text("${index + 1}", Modifier.width(32.dp), color = if (current) accent else HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
         Column(Modifier.weight(1f)) {
             Text(
                 title.ifBlank { "Chapter ${index + 1}" }, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 color = when {
                     current -> accent
-                    done -> TextSecondary
-                    else -> Color.White
+                    done -> HearthTheme.colors.textSecondary
+                    else -> HearthTheme.colors.text
                 },
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(HearthTheme.spacing.s))
         Column(horizontalAlignment = Alignment.End) {
-            Text(SpokenFormat.clock(startSec), color = TextSecondary, style = MaterialTheme.typography.labelMedium)
-            if (lengthSec > 0) Text(SpokenFormat.length(lengthSec), color = TextSecondary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
+            Text(SpokenFormat.clock(startSec), color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium)
+            if (lengthSec > 0) Text(SpokenFormat.length(lengthSec), color = HearthTheme.colors.textSecondary.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -229,9 +224,9 @@ fun DirectoryRow(r: AbsPodcastSearchResult, library: List<PodcastEntity>, userna
         coverUrl = r.cover,
         trailing = {
             if (busy) {
-                CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(Modifier.padding(horizontal = HearthTheme.spacing.l).size(20.dp), strokeWidth = 2.dp)
             } else {
-                Box(Modifier.padding(end = 8.dp)) {
+                Box(Modifier.padding(end = HearthTheme.spacing.s)) {
                     FollowButton(following = state == DirectoryState.FOLLOWING) {
                         if (state == DirectoryState.FOLLOWING) {
                             existing?.let { actions.open(podcastRoute(it.id)) }
