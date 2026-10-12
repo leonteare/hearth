@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.testing.ScreenshotTest
-import im.flume.hearth.core.ui.theme.Dimens
+import im.flume.hearth.core.ui.theme.HearthTheme
 import org.junit.Test
 
 class PlayerChromeScreenshots : ScreenshotTest() {
@@ -22,7 +22,7 @@ class PlayerChromeScreenshots : ScreenshotTest() {
 
     @Test
     fun `the big play button, playing and paused`() = snap("big_play_button") {
-        Row(Modifier.padding(Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.Gutter)) {
+        Row(Modifier.padding(HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.gutter)) {
             BigPlayButton(isPlaying = true, onClick = {})
             BigPlayButton(isPlaying = false, onClick = {})
         }
@@ -30,7 +30,7 @@ class PlayerChromeScreenshots : ScreenshotTest() {
 
     @Test
     fun `the seek bar, plain and with chapter gaps`() = snap("player_slider") {
-        Column(Modifier.padding(Dimens.Gutter)) {
+        Column(Modifier.padding(HearthTheme.spacing.gutter)) {
             PlayerSlider(0.35f, rememberSeekState(), onSeek = {}, modifier = Modifier.fillMaxWidth())
             PlayerSlider(0.6f, rememberSeekState(), onSeek = {}, modifier = Modifier.fillMaxWidth(), ticks = listOf(0.2f, 0.45f, 0.8f))
         }
@@ -39,7 +39,7 @@ class PlayerChromeScreenshots : ScreenshotTest() {
     @Test
     fun `a cover gradient header fades from the cover colour`() = snap("cover_gradient_header") {
         CoverGradientHeader(coverColor, Modifier.height(240.dp)) {
-            Text("Long Winter", Modifier.align(Alignment.BottomStart).padding(Dimens.Gutter), style = MaterialTheme.typography.headlineMedium)
+            Text("Long Winter", Modifier.align(Alignment.BottomStart).padding(HearthTheme.spacing.gutter), style = MaterialTheme.typography.headlineMedium)
         }
     }
 

@@ -15,7 +15,7 @@ class TokensTest {
         assertEquals(Color(0xFF282828), c.surfaceHigh)
         assertEquals(Color.White, c.text)
         assertEquals(Color(0xFFB3B3B3), c.textSecondary)
-        assertEquals(TextSecondary.copy(alpha = DimmedTextAlpha), c.textDim)
+        assertEquals(Color(0xFFB3B3B3).copy(alpha = DimmedTextAlpha), c.textDim)
         assertEquals(Color.White.copy(alpha = 0.08f), c.divider)
         assertEquals(Color(0xFF3E3E3E), c.outline)
         assertEquals(Color(0xF0101010), c.navBar)
@@ -29,10 +29,10 @@ class TokensTest {
     }
 
     @Test
-    fun `default spacing matches Dimens`() {
+    fun `default spacing is today's spacing`() {
         val s = HearthSpacing()
         assertEquals(listOf(2.dp, 4.dp, 8.dp, 12.dp, 16.dp, 24.dp, 32.dp), listOf(s.xxs, s.xs, s.s, s.m, s.l, s.xl, s.xxl))
-        assertEquals(Dimens.Gutter, s.gutter)
+        assertEquals(16.dp, s.gutter)
         assertEquals(48.dp, s.rowCover)
         assertEquals(8.dp, s.rowPaddingV)
         assertEquals(140.dp, s.cardWidth)

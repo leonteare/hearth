@@ -1,8 +1,5 @@
-@file:Suppress("DEPRECATION") // The defaults below are the older globals, on purpose: one source for each value.
-
 // Semantic design tokens: what each colour, gap, shape and icon is FOR, so a skin can swap them in one place.
-// The defaults are today's look exactly; the older globals in Theme.kt (TextSecondary, Dimens, HearthShapes...)
-// stay and mean the same thing. Read them in composables through HearthTheme.colors / spacing / shapes / icons.
+// The defaults are today's look exactly. Read them in composables through HearthTheme.colors / spacing / shapes / icons.
 package im.flume.hearth.core.ui.theme
 
 import androidx.compose.foundation.shape.CornerBasedShape
@@ -26,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -37,6 +35,7 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.HideImage
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -106,28 +105,35 @@ import androidx.compose.ui.unit.dp
  */
 @Immutable
 data class HearthColors(
-    val background: Color = Background,
-    val surface: Color = Surface,
-    val surfaceHigh: Color = SurfaceHigh,
+    val background: Color = Color(0xFF121212),
+    val surface: Color = Color(0xFF1C1C1C),
+    val surfaceHigh: Color = Color(0xFF282828),
     /** Main text and icons on the background. */
     val text: Color = Color.White,
-    val textSecondary: Color = TextSecondary,
-    /** Secondary text for something that can't be used right now (see [DimmedText]). */
-    val textDim: Color = DimmedText,
-    val divider: Color = DividerColor,
+    val textSecondary: Color = Color(0xFFB3B3B3),
+    /** Secondary text for something that can't be used right now, still readable on [background] (see [DimmedTextAlpha]). */
+    val textDim: Color = Color(0xFFB3B3B3).copy(alpha = DimmedTextAlpha),
+    /** Hairline between groups. Translucent so it reads the same on the page and on sheets. */
+    val divider: Color = Color.White.copy(alpha = 0.08f),
     /** Outlines of fields and outlined buttons. */
     val outline: Color = Color(0xFF3E3E3E),
-    val navBar: Color = NavBarColor,
-    val searchField: Color = SearchFieldColor,
-    val onSearchField: Color = OnSearchField,
-    val searchFieldHint: Color = SearchFieldHint,
-    val liked: Color = LikedColor,
-    val downloads: Color = DownloadsColor,
-    val podcasts: Color = PodcastsColor,
-    val audiobooks: Color = AudiobooksColor,
-    val destructive: Color = Destructive,
-    val destructiveFill: Color = DestructiveFill,
-    val noticeDot: Color = NoticeDot,
+    /** Bottom navigation bar and the landscape side rail. */
+    val navBar: Color = Color(0xF0101010),
+    /** The white, Spotify-style search field and what sits on it. */
+    val searchField: Color = Color.White,
+    val onSearchField: Color = Color.Black,
+    val searchFieldHint: Color = Color(0xFF444444),
+    /** Tile colours for Liked Songs, Downloads, Podcasts and Audiobooks (shortcuts, quick tiles, page headers). */
+    val liked: Color = Color(0xFF5038A0),
+    val downloads: Color = Color(0xFF1E6B52),
+    val podcasts: Color = Color(0xFF1E5A8C),
+    val audiobooks: Color = Color(0xFF8C4A1E),
+    /** Destructive text and icons on the dark background (readable pink-red). */
+    val destructive: Color = Color(0xFFF2B8B5),
+    /** Solid destructive fills such as the swipe-to-remove background, with white content on top. */
+    val destructiveFill: Color = Color(0xFFB3261E),
+    /** The small red dot for something waiting on you (a playlist invite). */
+    val noticeDot: Color = Color(0xFFE5484D),
     /** Text and icons over cover art and cover-tinted gradients. */
     val onCover: Color = Color.White,
     /**
@@ -172,7 +178,7 @@ fun readableOn(fill: Color): Color {
     return if (onBlack >= onWhite) Color.Black else Color.White
 }
 
-/** Gaps and sizes. The scale (xxs…xxl) covers the common paddings; the named ones are [Dimens]. */
+/** Gaps and sizes. The scale (xxs…xxl) covers the common paddings; the named ones are for rows, cards and pages. */
 @Immutable
 data class HearthSpacing(
     val xxs: Dp = 2.dp,
@@ -183,21 +189,21 @@ data class HearthSpacing(
     val xl: Dp = 24.dp,
     val xxl: Dp = 32.dp,
     /** Page side margin. */
-    val gutter: Dp = Dimens.Gutter,
+    val gutter: Dp = 16.dp,
     /** Cover size in list rows. */
-    val rowCover: Dp = Dimens.RowCover,
+    val rowCover: Dp = 48.dp,
     /** Vertical padding of a list row. */
-    val rowPaddingV: Dp = Dimens.RowPaddingV,
+    val rowPaddingV: Dp = 8.dp,
     /** Gap between a row's cover and its text. */
-    val coverGap: Dp = Dimens.CoverGap,
+    val coverGap: Dp = 12.dp,
     /** Gap between cards in a horizontal carousel. */
-    val carouselSpacing: Dp = Dimens.CarouselSpacing,
+    val carouselSpacing: Dp = 14.dp,
     /** Inner padding of banners and cards. */
-    val cardPadding: Dp = Dimens.CardPadding,
+    val cardPadding: Dp = 14.dp,
     /** Width of a card in a carousel. */
-    val cardWidth: Dp = Dimens.CardWidth,
+    val cardWidth: Dp = 140.dp,
     /** Top padding of a tab page's title (below the status bar). */
-    val pageTitleTop: Dp = Dimens.PageTitleTop,
+    val pageTitleTop: Dp = 12.dp,
 )
 
 /** Corner shapes by role; defaults are [HearthShapes]. */
@@ -312,6 +318,10 @@ data class HearthIcons(
 
     // Spoken-word speed sheet (pairs with slower)
     val faster: ImageVector = Icons.Filled.Add,
+
+    // Filled variants of info and download (banners, menu items that want the solid glyph)
+    val infoFilled: ImageVector = Icons.Filled.Info,
+    val downloadFilled: ImageVector = Icons.Filled.Download,
 )
 
 val LocalHearthColors = staticCompositionLocalOf { HearthColors() }

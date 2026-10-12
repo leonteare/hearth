@@ -3,11 +3,6 @@ package im.flume.hearth.core.ui.components
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -16,20 +11,21 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.testing.ScreenshotTest
+import im.flume.hearth.core.ui.theme.HearthTheme
 import org.junit.Test
 
 class PageChromeScreenshots : ScreenshotTest() {
     @Test
     fun `a tab page header with its title and buttons`() = snap("page_header") {
         PageHeader("Your Library") {
-            IconButton(onClick = {}) { Icon(Icons.Default.Search, "Search") }
-            IconButton(onClick = {}) { Icon(Icons.Default.Settings, "Settings") }
+            IconButton(onClick = {}) { Icon(HearthTheme.icons.search, "Search") }
+            IconButton(onClick = {}) { Icon(HearthTheme.icons.settings, "Settings") }
         }
     }
 
     @Test
     fun `a page top bar with back, title and a button`() = snap("top_bar") {
-        TopBar("Downloads", onBack = {}) { IconButton(onClick = {}) { Icon(Icons.Default.Settings, "Settings") } }
+        TopBar("Downloads", onBack = {}) { IconButton(onClick = {}) { Icon(HearthTheme.icons.settings, "Settings") } }
     }
 
     @Test
@@ -43,7 +39,7 @@ class PageChromeScreenshots : ScreenshotTest() {
     @Test
     fun `a banner card, plain and tinted with actions`() = snap("banner_cards") {
         Column {
-            BannerCard("Couldn't reach your server", "Showing what's on this phone. We'll keep trying.", icon = Icons.Default.Info)
+            BannerCard("Couldn't reach your server", "Showing what's on this phone. We'll keep trying.", icon = HearthTheme.icons.infoFilled)
             BannerCard(
                 "Update ready", "Version 3.0 is ready to install.", tinted = true,
                 actions = { TextButton(onClick = {}) { Text("Later") }; TextButton(onClick = {}) { Text("Install") } },
@@ -54,7 +50,7 @@ class PageChromeScreenshots : ScreenshotTest() {
     @Test
     fun `an empty state with a message and an action`() = snap("empty_state") {
         Column(Modifier.height(320.dp)) {
-            EmptyState(Icons.Default.LibraryMusic, "Nothing saved yet. Albums you save show up here.", action = "Browse music", onAction = {})
+            EmptyState(HearthTheme.icons.library, "Nothing saved yet. Albums you save show up here.", action = "Browse music", onAction = {})
         }
     }
 

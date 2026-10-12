@@ -4,7 +4,6 @@ package im.flume.hearth.core.testing
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.Color
 import im.flume.hearth.core.data.DownloadState
 import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.SongEntity
@@ -16,7 +15,6 @@ import im.flume.hearth.core.ui.components.LocalRowContext
 import im.flume.hearth.core.ui.components.LocalTabRequests
 import im.flume.hearth.core.ui.components.RowContext
 import im.flume.hearth.core.ui.components.TabRequests
-import im.flume.hearth.core.ui.theme.Background
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 /**
@@ -72,7 +70,7 @@ fun HearthTestTheme(
             LocalTabRequests provides TabRequests(),
         ) {
             // As MainActivity does: the page background, with white as the default text and icon colour.
-            Surface(color = Background, contentColor = Color.White) { content() }
+            Surface(color = HearthTheme.colors.background, contentColor = HearthTheme.colors.text) { content() }
         }
     }
 }

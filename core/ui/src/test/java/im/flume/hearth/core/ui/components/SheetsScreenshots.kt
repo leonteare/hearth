@@ -1,24 +1,18 @@
 package im.flume.hearth.core.ui.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FavoriteBorder
 import im.flume.hearth.core.testing.ScreenshotTest
-import im.flume.hearth.core.ui.theme.Destructive
+import im.flume.hearth.core.ui.theme.HearthTheme
 import org.junit.Test
 
 class SheetsScreenshots : ScreenshotTest() {
     @Test
     fun `an action sheet with a cover header and menu items`() = snapScreen("action_sheet") {
         ActionSheet(open = true, onDismiss = {}, title = "Northern Lights", subtitle = "The Quiet Hours", fallback = "Long Winter") {
-            MenuItem("Like", Icons.Default.FavoriteBorder) {}
-            MenuItem("Play next", Icons.AutoMirrored.Filled.QueueMusic) {}
-            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) {}
-            MenuItem("Download", Icons.Default.Download, checked = true) {}
-            MenuItem("Remove from this playlist", Icons.Default.Delete, tint = Destructive, tintText = true) {}
+            MenuItem("Like", HearthTheme.icons.like) {}
+            MenuItem("Play next", HearthTheme.icons.queue) {}
+            MenuItem("Add to playlist", HearthTheme.icons.addToPlaylist) {}
+            MenuItem("Download", HearthTheme.icons.downloadFilled, checked = true) {}
+            MenuItem("Remove from this playlist", HearthTheme.icons.delete, tint = HearthTheme.colors.destructive, tintText = true) {}
         }
     }
 
