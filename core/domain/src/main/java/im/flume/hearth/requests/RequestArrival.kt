@@ -1,6 +1,6 @@
 package im.flume.hearth.requests
 
-import im.flume.hearth.domainContainer
+import im.flume.hearth.requestsContainer
 import im.flume.hearth.EXTRA_ROUTE
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,7 +8,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
-import im.flume.hearth.core.domain.R
+import im.flume.hearth.core.common.R
 import im.flume.hearth.api.TidalType
 import im.flume.hearth.data.AlbumEntity
 import im.flume.hearth.data.ArtistEntity
@@ -147,7 +147,7 @@ internal fun RequestsRepository.notifyArrival(note: RequestIntent.Note) {
     runCatching {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "New music", NotificationManager.IMPORTANCE_DEFAULT))
-        val intent = Intent(context, context.domainContainer.mainActivity)
+        val intent = Intent(context, context.requestsContainer.mainActivity)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .putExtra(EXTRA_ROUTE, route ?: "downloads")
         val id = key.hashCode()

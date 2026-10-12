@@ -1,6 +1,6 @@
 package im.flume.hearth.update
 
-import im.flume.hearth.domainContainer
+import im.flume.hearth.updateContainer
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -242,6 +242,6 @@ class InstallResultReceiver : BroadcastReceiver() {
             val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
             confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let(context::startActivity)
         }
-        context.domainContainer.updater.onInstallResult(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
+        context.updateContainer.updater.onInstallResult(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
     }
 }

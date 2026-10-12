@@ -1,7 +1,7 @@
 // The background job that adds a phone audiobook to the server, so it finishes with the app closed.
 package im.flume.hearth.spoken
 
-import im.flume.hearth.domainContainer
+import im.flume.hearth.spokenContainer
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -11,13 +11,13 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
-import im.flume.hearth.core.domain.R
+import im.flume.hearth.core.common.R
 
 /** Adds one phone book to the server, showing a notification so it can finish with the app closed. */
 class LocalBookUploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val id = inputData.getString(ARG_ID) ?: return Result.success()
-        val local = applicationContext.domainContainer.spoken.local
+        val local = applicationContext.spokenContainer.spoken.local
         runCatching { setForeground(foregroundInfo()) }
         local.runUpload(id)
         return Result.success()

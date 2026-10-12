@@ -1,6 +1,6 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.domainContainer
+import im.flume.hearth.spokenContainer
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -21,7 +21,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import im.flume.hearth.core.domain.R
+import im.flume.hearth.core.common.R
 import im.flume.hearth.api.AbsClient
 import im.flume.hearth.data.AppDatabase
 import im.flume.hearth.data.NetworkMonitor
@@ -322,7 +322,7 @@ class SpokenDownloads(
 /** Downloads queued episodes and books one at a time. */
 class SpokenDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val c = applicationContext.domainContainer
+        val c = applicationContext.spokenContainer
         val repo = c.spoken.downloads
         val dao = c.db.spoken()
         if (c.spoken.store.account.value == null) return Result.success()
