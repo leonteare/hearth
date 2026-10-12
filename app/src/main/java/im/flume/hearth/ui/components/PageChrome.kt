@@ -36,7 +36,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.NoticeDot
 import im.flume.hearth.ui.theme.SurfaceHigh
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.ui.theme.TextSecondary
 
 /** Back arrow; goes back through the system back dispatcher unless [onBack] is given. */
@@ -68,6 +73,7 @@ fun TopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        DownloadsIndicator()
         actions()
     }
 }
@@ -84,7 +90,60 @@ fun PageHeader(title: String, actions: @Composable RowScope.() -> Unit = {}) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        DownloadsIndicator()
         actions()
+    }
+}
+
+/**
+ * What's on its way to this phone, for the small downloads icon in every page's header. [downloading]
+ * and [waiting] count songs, episodes and books (plus music on its way to the server); [failed] counts
+ * the ones that need a look.
+ */
+data class DownloadsBadge(val downloading: Int, val waiting: Int, val failed: Int) {
+    val inProgress: Int get() = downloading + waiting
+
+    /** What TalkBack reads for the icon. */
+    val description: String get() = buildString {
+        append("Downloads, $inProgress in progress")
+        if (failed > 0) append(", $failed couldn't download")
+    }
+
+    companion object {
+        /** Null hides the icon: nothing downloading, waiting or failed. */
+        fun of(counts: im.flume.hearth.data.DownloadCounts, coming: Int, comingFailed: Int): DownloadsBadge? {
+            val badge = DownloadsBadge(counts.downloading, counts.queued + coming, counts.failed + comingFailed)
+            return badge.takeIf { it.inProgress > 0 || it.failed > 0 }
+        }
+    }
+}
+
+/** Set by the app root; null while nothing is downloading, and on the Downloads page itself. */
+val LocalDownloadsBadge = compositionLocalOf<DownloadsBadge?> { null }
+
+/**
+ * The small downloads icon at the top right of every page, just left of the page's own buttons so
+ * those never move. Only there while something is downloading, waiting or failed: a spinning ring
+ * while a download is running, a still ring while they wait (e.g. for Wi-Fi), and a red dot when
+ * something couldn't download. Tapping it opens the Downloads page.
+ */
+@Composable
+fun DownloadsIndicator(modifier: Modifier = Modifier) {
+    val badge = LocalDownloadsBadge.current ?: return
+    val actions = LocalActions.current
+    val accent = MaterialTheme.colorScheme.primary
+    IconButton(onClick = { actions.open("downloads") }, modifier = modifier.semantics { contentDescription = badge.description }) {
+        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            if (badge.downloading > 0) {
+                CircularProgressIndicator(Modifier.fillMaxSize(), color = accent, strokeWidth = 2.dp, trackColor = accent.copy(alpha = 0.2f))
+            } else if (badge.waiting > 0) {
+                CircularProgressIndicator(progress = { 0f }, modifier = Modifier.fillMaxSize(), color = accent, strokeWidth = 2.dp, trackColor = accent.copy(alpha = 0.35f))
+            }
+            Icon(Icons.Default.ArrowDownward, null, tint = if (badge.inProgress > 0) accent else TextSecondary, modifier = Modifier.size(16.dp))
+            if (badge.failed > 0) {
+                Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(HearthShapes.Round).background(NoticeDot))
+            }
+        }
     }
 }
 

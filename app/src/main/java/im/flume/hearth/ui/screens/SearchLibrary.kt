@@ -69,7 +69,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -121,7 +121,6 @@ import im.flume.hearth.ui.components.PageHeader
 import im.flume.hearth.ui.components.TopBar
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.DownloadsColor
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.LikedColor
 import im.flume.hearth.ui.theme.OnSearchField
@@ -131,6 +130,16 @@ import im.flume.hearth.ui.theme.SurfaceHigh
 import im.flume.hearth.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * Set when the Search tab is tapped. Search only takes the keyboard then (with nothing typed), not
+ * when you come back to it from a result with your results still showing.
+ */
+class SearchFocusRequest {
+    var pending by mutableStateOf(false)
+}
+
+val LocalSearchFocus = androidx.compose.runtime.staticCompositionLocalOf { SearchFocusRequest() }
 
 @Composable
 fun SearchScreen() {
@@ -157,7 +166,12 @@ fun SearchScreen() {
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val gridColumns = gridColumns()
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    val focusRequest = LocalSearchFocus.current
+    LaunchedEffect(focusRequest.pending) {
+        if (!focusRequest.pending) return@LaunchedEffect
+        focusRequest.pending = false
+        if (query.isEmpty()) runCatching { focus.requestFocus() }
+    }
     // Opened from elsewhere (Your Library's "Find a podcast"): that filter, ready to type.
     val tabRequests = LocalTabRequests.current
     LaunchedEffect(tabRequests.searchFilter) {
@@ -672,15 +686,9 @@ fun LibraryScreen() {
                         item {
                             MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(Icons.Default.Favorite, LikedColor) })
                         }
-                        // Not a playlist: only shown while songs are downloading or failed (always reachable from Settings → Storage).
-                        item(key = "downloads") {
-                            val counts by remember { c.allDownloadCounts() }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
-                            val coming by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
-                            downloadsShortcutLabel(counts, coming)?.let { label ->
-                                MediaRow(label, null, onClick = { actions.open("downloads") }, cover = { IconTile(Icons.Default.DownloadDone, DownloadsColor) })
-                            }
-                        }
+                        // Downloads aren't here: the downloads icon at the top of every page opens them.
                         items(sortedPlaylists, key = { it.playlist.id }) { item -> PlaylistListRow(item) }
+                        item(key = "all-songs") { BrowseAllRow("All songs") { actions.open("browse/songs") } }
                     }
                     LibraryTab.ARTISTS -> {
                         if (sortedArtists.isEmpty()) item {
@@ -691,6 +699,7 @@ fun LibraryScreen() {
                             ) { actions.open("browse/artists") }
                         }
                         items(sortedArtists, key = { it.id }) { ArtistRow(it) }
+                        if (sortedArtists.isNotEmpty()) item(key = "browse-artists") { BrowseAllRow("Browse all artists") { actions.open("browse/artists") } }
                     }
                     LibraryTab.ALBUMS -> {
                         if (sortedAlbums.isEmpty()) item {
@@ -701,6 +710,8 @@ fun LibraryScreen() {
                             ) { actions.open("browse/albums") }
                         }
                         items(sortedAlbums, key = { it.id }) { AlbumListRow(it) }
+                        if (sortedAlbums.isNotEmpty()) item(key = "browse-albums") { BrowseAllRow("Browse all albums") { actions.open("browse/albums") } }
+
                     }
                     LibraryTab.PODCASTS -> {
                         if (spokenAccount == null) {
@@ -796,6 +807,21 @@ private fun LibraryEmpty(title: String, body: String, button: String? = null, on
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = onBrowse) { Text(button) }
         }
+    }
+}
+
+/**
+ * A quiet link at the end of a Your Library list to everything on the server, so the full lists
+ * aren't only reachable from an empty library.
+ */
+@Composable
+private fun BrowseAllRow(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Dimens.Gutter, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = TextSecondary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextSecondary)
     }
 }
 

@@ -69,6 +69,13 @@ import im.flume.hearth.data.SongItem
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.AvailabilityIcon
 import im.flume.hearth.ui.components.BackButton
+import im.flume.hearth.ui.components.DownloadsIndicator
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Person
+
 import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LoadingPage
 import im.flume.hearth.ui.components.LocalActions
@@ -184,10 +191,25 @@ fun AlbumScreen(id: String) {
     }
     var albumMenu by remember(id) { mutableStateOf(false) }
     if (albumMenu) {
-        ActionSheet(true, onDismiss = { albumMenu = false }, title = albumName, subtitle = "${plural(missing.size, "song")} not on your server yet", showCover = false) {
-            MenuItem("Add missing songs to server", Icons.Outlined.CloudUpload) {
-                albumMenu = false
-                getMissing("Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server")
+        val ids = songs.map { it.id }
+        ActionSheet(
+            true, onDismiss = { albumMenu = false }, title = albumName,
+            subtitle = if (missing.isNotEmpty()) "${plural(missing.size, "song")} not on your server yet" else a?.artist ?: "Album",
+            coverArt = a?.coverArt ?: songs.firstOrNull()?.coverArt, fallback = albumName,
+        ) {
+            if (ids.isNotEmpty()) {
+                MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { albumMenu = false; actions.playNext(ids) }
+                MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { albumMenu = false; actions.addToQueue(ids) }
+                MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { albumMenu = false; actions.addToPlaylist(ids) }
+            }
+            a?.artistId?.let { artistId ->
+                MenuItem("Go to artist", Icons.Default.Person) { albumMenu = false; actions.openArtist(artistId) }
+            }
+            if (missing.isNotEmpty()) {
+                MenuItem("Add missing songs to server", Icons.Outlined.CloudUpload) {
+                    albumMenu = false
+                    getMissing("Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server")
+                }
             }
         }
     }
@@ -211,7 +233,7 @@ fun AlbumScreen(id: String) {
             if (waiting.isNotEmpty()) get.getTracks(waiting, "Getting ${plural(waiting.size, "missing song")} of \"$albumName\" onto your server. They'll download with the album.")
         },
         headerActions = {
-            if (missing.isNotEmpty()) IconButton(onClick = { albumMenu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+            IconButton(onClick = { albumMenu = true }) { Icon(Icons.Default.MoreVert, "Album options") }
         },
         tracks = tracks?.takeIf { missing.isNotEmpty() },
         topContent = {
@@ -497,7 +519,11 @@ private fun ArtistLayout(
         item(key = "header") {
             Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.fillMaxWidth()) { BackButton() }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        BackButton()
+                        Spacer(Modifier.weight(1f))
+                        DownloadsIndicator(Modifier.statusBarsPadding())
+                    }
                     if (wide) {
                         Row(Modifier.fillMaxWidth().padding(start = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
                             art(160.dp)

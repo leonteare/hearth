@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Refresh
+
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material.icons.outlined.Cloud
@@ -122,6 +124,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
     var loaded by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var newestFirst by rememberSaveable { mutableStateOf(true) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(id) {
         // Never fetched (e.g. just added): get the episodes now.
@@ -169,24 +172,56 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
         else -> plural(merged.size, "episode") + if (p != null) " · $onServerCount on your server" else ""
     }
 
+    fun refresh() {
+        refreshing = true
+        scope.launch {
+            if (p != null) runCatching { c.spoken.fetchItem(p.id) }.onFailure { actions.showMessage("Couldn't refresh: ${userMessage(it)}") }
+            if (showFeedUrl != null) {
+                c.spoken.feeds.load(showFeedUrl, force = true)
+                c.spoken.feeds.state(showFeedUrl).value.error?.let { actions.showMessage("Couldn't load every episode: $it") }
+            }
+            refreshing = false
+        }
+    }
+    fun toggleFollow() {
+        if (followBusy) return
+        followBusy = true
+        c.appScope.launch {
+            val error = if (p != null) c.spoken.setFollowing(p.id, !following)
+            else c.spoken.addPodcast(showFeedUrl!!, follow = true).exceptionOrNull()?.let(::userMessage)
+            followBusy = false
+            when {
+                error != null -> actions.showMessage("Couldn't ${if (following) "unfollow" else "follow"}: $error")
+                following -> actions.showUndo("Unfollowed $title. Its episodes are leaving this phone and your server.") { c.spoken.follow(p!!.id) }
+                p == null -> actions.showMessage("Following $title. Its newest episodes are on their way.")
+                else -> actions.showMessage("Following $title. New episodes will show on Home.")
+            }
+        }
+    }
+
+    // The show's ⋮ menu, in the same spot as on album, playlist and book pages.
+    ActionSheet(menuOpen, onDismiss = { menuOpen = false }, title = title, subtitle = "Podcast", coverUrl = coverUrl, fallback = title) {
+        if (account != null) {
+            MenuItem(if (following) "Unfollow" else "Follow", Icons.Default.Podcasts) { menuOpen = false; toggleFollow() }
+        }
+        if (p != null && latest != null) {
+            MenuItem(if (latest.started) "Resume latest episode" else "Play latest episode", Icons.Default.PlayArrow) {
+                menuOpen = false
+                playEpisode(c, actions, p.id, latest.episode.id, latest.downloadState == SpokenDownloadState.DONE)
+            }
+        }
+        MenuItem(if (newestFirst) "Show oldest first" else "Show newest first", Icons.AutoMirrored.Filled.Sort) { menuOpen = false; newestFirst = !newestFirst }
+        MenuItem("Check for new episodes", Icons.Default.Refresh) { menuOpen = false; refresh() }
+    }
+
     PullToRefreshBox(
         isRefreshing = refreshing,
-        onRefresh = {
-            refreshing = true
-            scope.launch {
-                if (p != null) runCatching { c.spoken.fetchItem(p.id) }.onFailure { actions.showMessage("Couldn't refresh: ${userMessage(it)}") }
-                if (showFeedUrl != null) {
-                    c.spoken.feeds.load(showFeedUrl, force = true)
-                    c.spoken.feeds.state(showFeedUrl).value.error?.let { actions.showMessage("Couldn't load every episode: $it") }
-                }
-                refreshing = false
-            }
-        },
+        onRefresh = { refresh() },
         modifier = Modifier.fillMaxSize(),
     ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item(key = "header") {
-                SpokenHeader(coverUrl, title, listOfNotNull(author, countLine))
+                SpokenHeader(coverUrl, title, listOfNotNull(author, countLine), onMenu = { menuOpen = true })
             }
             if (p == null && id != null && loaded) {
                 item(key = "gone") {
@@ -200,21 +235,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
             item(key = "buttons") {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (account != null) {
-                        FollowButton(following) {
-                            if (followBusy) return@FollowButton
-                            followBusy = true
-                            c.appScope.launch {
-                                val error = if (p != null) c.spoken.setFollowing(p.id, !following)
-                                else c.spoken.addPodcast(showFeedUrl!!, follow = true).exceptionOrNull()?.let(::userMessage)
-                                followBusy = false
-                                when {
-                                    error != null -> actions.showMessage("Couldn't ${if (following) "unfollow" else "follow"}: $error")
-                                    following -> actions.showUndo("Unfollowed $title. Its episodes are leaving this phone and your server.") { c.spoken.follow(p!!.id) }
-                                    p == null -> actions.showMessage("Following $title. Its newest episodes are on their way.")
-                                    else -> actions.showMessage("Following $title. New episodes will show on Home.")
-                                }
-                            }
-                        }
+                        FollowButton(following) { toggleFollow() }
                     }
                     Spacer(Modifier.weight(1f))
                     if (p != null && latest != null) {

@@ -15,6 +15,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextAlign
+
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -49,6 +53,19 @@ fun LoginScreen() {
     var pass by remember { mutableStateOf("") }
     var busy by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    // Signed in to Navidrome, waiting on the optional podcasts & audiobooks step. The app opens once
+    // that's done or skipped (saving the login is what opens it).
+    var signedIn by remember { mutableStateOf<Credentials?>(null) }
+
+    fun finish(creds: Credentials) {
+        c.session.saveCredentials(creds)
+        // Kept encrypted (Keystore) so playlist photos don't ask for it again.
+        runCatching { c.session.vault.save(pass) }
+        c.network.reportServerSuccess()
+        c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
+    }
+
+    signedIn?.let { creds -> return SpokenStep(onDone = { finish(creds) }) }
 
     Column(
         Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -86,11 +103,8 @@ fun LoginScreen() {
                     val result = runCatching { c.api.ping(creds) }
                     busy = false
                     result.onSuccess {
-                        c.session.saveCredentials(creds)
-                        // Kept encrypted (Keystore) so playlist photos don't ask for it again.
-                        runCatching { c.session.vault.save(pass) }
-                        c.network.reportServerSuccess()
-                        c.appScope.launch { c.sync.fullSync(c.api.scanStatus()?.lastScan) }
+                        // Already signed in to podcasts & audiobooks (e.g. signed out of music only): no need to ask.
+                        if (c.spoken.account.value?.needsSignIn == false) finish(creds) else signedIn = creds
                     }.onFailure { e ->
                         error = if (generateSequence(e) { it.cause }.any { it is javax.net.ssl.SSLException || it is java.security.cert.CertificateException }) {
                             "Couldn't sign in: the server's HTTPS certificate isn't trusted by this phone. " +
@@ -108,5 +122,33 @@ fun LoginScreen() {
         ) {
             if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) else Text("Sign in")
         }
+    }
+}
+
+/**
+ * Straight after the first sign-in: podcasts and audiobooks use a separate login, which used to be
+ * buried in Settings. Optional; Skip opens the app, and Settings → General has it any time.
+ */
+@Composable
+private fun SpokenStep(onDone: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().systemBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(48.dp))
+        Icon(Icons.Default.Podcasts, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+        Text("Podcasts & audiobooks too?", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks here. " +
+                "Each of you has your own, so progress and followed shows are yours. You can do this later in Settings.",
+            color = TextSecondary,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        im.flume.hearth.ui.screens.SpokenSignInForm(
+            secondary = { TextButton(onClick = onDone) { Text("Skip") } },
+            onSignedIn = onDone,
+        )
     }
 }

@@ -33,6 +33,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import im.flume.hearth.ui.components.DownloadsBadge
+import im.flume.hearth.ui.components.LocalDownloadsBadge
+import im.flume.hearth.ui.screens.allDownloadCounts
+
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.data.PlaylistRules
@@ -354,12 +362,29 @@ fun AppRoot() {
 
     // The tab you're "in" is the last tab page on the back stack, even when deep inside an album.
     val backStack by nav.currentBackStack.collectAsStateWithLifecycle()
+    // The small downloads icon in every page's header: songs, episodes and books on their way (or
+    // stuck), plus music coming to the server. Not on the Downloads page itself.
+    val downloadCounts by remember { c.allDownloadCounts() }.collectAsStateWithLifecycle(im.flume.hearth.data.DownloadCounts())
+    val onDownloadsPage = backStack.lastOrNull()?.destination?.route == "downloads"
+    val downloadsBadge = remember(downloadCounts, requestList, onDownloadsPage) {
+        if (onDownloadsPage) null
+        else DownloadsBadge.of(
+            downloadCounts,
+            coming = requestList.count { it.status.active },
+            comingFailed = requestList.count { it.status == im.flume.hearth.data.RequestStatus.FAILED },
+        )
+    }
+    // How tall the mini player and tab bar are, so messages sit just above them.
+    var bottomBarPx by remember { mutableIntStateOf(0) }
     val currentTab = backStack.lastOrNull { it.destination.route in TAB_ROUTES }?.destination?.route ?: "home"
     // A red dot on Your Library while a playlist invite is waiting for an answer.
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     val badged = if (PlaylistRules.pendingInvites(playlistItems).isNotEmpty()) "library" else null
 
+    val searchFocus = remember { im.flume.hearth.ui.screens.SearchFocusRequest() }
     val onTabClick: (String) -> Unit = { dest ->
+        // Tapping Search means "I want to type"; coming back to it from a result doesn't.
+        if (dest == "search") searchFocus.pending = true
         if (dest == currentTab) {
             // Tapping the tab you're already in goes back to its main page.
             nav.popBackStack(dest, inclusive = false)
@@ -393,6 +418,9 @@ fun AppRoot() {
         im.flume.hearth.ui.components.LocalGetMusic provides getMusic,
         im.flume.hearth.ui.screens.LocalSpokenNow provides playerState.spoken,
         im.flume.hearth.ui.components.LocalTabRequests provides actions.tabRequests,
+        LocalDownloadsBadge provides downloadsBadge,
+        im.flume.hearth.ui.screens.LocalSearchFocus provides searchFocus,
+
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
@@ -401,9 +429,11 @@ fun AppRoot() {
                     modifier = if (landscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End)) else Modifier,
                     containerColor = Background,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    snackbarHost = { SnackbarHost(snackbar) },
                     bottomBar = {
-                        Column(if (landscape) Modifier.navigationBarsPadding().padding(bottom = 8.dp) else Modifier) {
+                        Column(
+                            (if (landscape) Modifier.navigationBarsPadding().padding(bottom = 8.dp) else Modifier)
+                                .onSizeChanged { bottomBarPx = it.height }
+                        ) {
                             im.flume.hearth.ui.components.PreviewBar()
                             if (playerState.current != null) MiniPlayer(playerState, onOpen = { nowPlayingOpen = true })
                             if (!landscape) BottomBar(currentTab, badged, onTabClick)
@@ -435,13 +465,15 @@ fun AppRoot() {
                         screen("downloads") { DownloadsScreen() }
                         screen("settings") { SettingsScreen() }
                         screen("settings/general") { GeneralSettings() }
+                        // Straight to the podcasts & audiobooks sign-in, from the prompts on those tabs.
+                        screen("settings/general/podcasts") { GeneralSettings(showSpokenAccount = true) }
                         screen("settings/storage") { StorageSettings() }
                         screen("settings/appearance") { AppearanceSettings() }
                         screen("album/{id}") { AlbumScreen(it.arguments!!.getString("id")!!) }
                         screen("artist/{id}") { ArtistScreen(it.arguments!!.getString("id")!!) }
                         screen("playlist/{id}") { PlaylistScreen(it.arguments!!.getString("id")!!) }
                         screen("genre/{name}") { GenreScreen(it.arguments!!.getString("name")!!) }
-                        screen("mix/{index}") { MixScreen(it.arguments!!.getString("index")!!.toInt()) }
+                        screen("mix/{key}") { MixScreen(it.arguments!!.getString("key")!!) }
                         screen("stats/{key}") { StatsScreen(it.arguments!!.getString("key")!!) }
                         screen("playlist-edit/{id}") { PlaylistEditScreen(it.arguments!!.getString("id")!!) }
                         screen("podcast/{id}") { im.flume.hearth.ui.screens.PodcastScreen(it.arguments!!.getString("id")!!) }
@@ -497,6 +529,21 @@ fun AppRoot() {
                 BackHandler(enabled = visualiserOpen) { visualiserOpen = false }
                 im.flume.hearth.ui.screens.visualiser.VisualiserScreen(playerState, onClose = { visualiserOpen = false })
             }
+
+            // Drawn last so messages (and their Undo) from the player, queue or visualiser show over them.
+            // Above the mini player and tabs normally; just above the system bar over a full-screen player.
+            val overlayOpen = nowPlayingOpen && playerState.current != null
+            val density = LocalDensity.current
+            SnackbarHost(
+                snackbar,
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .then(
+                        if (overlayOpen) Modifier.navigationBarsPadding().padding(bottom = 8.dp)
+                        else Modifier.padding(bottom = with(density) { bottomBarPx.toDp() })
+                    )
+                    .then(if (landscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)) else Modifier),
+            )
         }
     }
 }

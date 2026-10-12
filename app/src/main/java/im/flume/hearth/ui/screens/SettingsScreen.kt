@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -90,7 +91,7 @@ fun SettingsScreen() {
     val actions = LocalActions.current
     SettingsPage("Settings") {
         listOf(
-            Triple("General", "Account, library, playback, streaming, updates", Icons.Outlined.Settings) to "settings/general",
+            Triple("General", "Account, podcasts & audiobooks sign-in, library, playback, updates", Icons.Outlined.Settings) to "settings/general",
             Triple("Storage", "Downloads, cache, getting music you don't have", Icons.Outlined.Storage) to "settings/storage",
             Triple("Appearance", "Accent colour, lyrics", Icons.Outlined.Palette) to "settings/appearance",
         ).forEach { (row, route) ->
@@ -111,8 +112,12 @@ fun SettingsScreen() {
     }
 }
 
+/**
+ * [showSpokenAccount] scrolls straight to the podcasts & audiobooks sign-in, for the "Open Settings"
+ * prompts on those tabs, so nobody has to hunt for it.
+ */
 @Composable
-fun GeneralSettings() {
+fun GeneralSettings(showSpokenAccount: Boolean = false) {
     val c = LocalContext.current.container
     val context = LocalContext.current
     val settings by c.session.settings.collectAsStateWithLifecycle()
@@ -121,6 +126,15 @@ fun GeneralSettings() {
     val sync by c.sync.state.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
     val usageCounts by remember { c.usage.changes() }.collectAsStateWithLifecycle(c.usage.all())
+    var usageOpen by remember { mutableStateOf(false) }
+    val spokenAccountView = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    if (showSpokenAccount) {
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            // Wait for the page to be laid out, so there's somewhere to scroll to.
+            androidx.compose.runtime.withFrameNanos { }
+            spokenAccountView.bringIntoView()
+        }
+    }
 
     SettingsPage("General") {
         Section("App")
@@ -132,6 +146,8 @@ fun GeneralSettings() {
         Clickable("Sign out", "Your downloads stay on this phone", color = Destructive) {
             confirmLogout = true
         }
+
+        Column(Modifier.bringIntoViewRequester(spokenAccountView)) { PodcastsAndAudiobooksAccount() }
 
         Section("Library")
         Info("Songs in your library", songCount.toString())
@@ -163,15 +179,19 @@ fun GeneralSettings() {
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
 
-        Section("Feature use on this phone")
-        Text(
-            "How often each feature has been used. Never sent anywhere; it helps decide what to keep.",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        usageCounts.sortedByDescending { it.second }.forEach { (name, count) ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                Text(name, modifier = Modifier.weight(1f))
-                Text("$count", color = TextSecondary)
+        // Tucked away and closed: only of interest when deciding what to keep in the app.
+        Section("About this phone")
+        Clickable(
+            "Feature use on this phone",
+            if (usageOpen) "How often each feature has been used. Never sent anywhere; it helps decide what to keep."
+            else "Tap to show how often each feature has been used",
+        ) { usageOpen = !usageOpen }
+        if (usageOpen) {
+            usageCounts.sortedByDescending { it.second }.forEach { (name, count) ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text(name, modifier = Modifier.weight(1f))
+                    Text("$count", color = TextSecondary)
+                }
             }
         }
     }
@@ -252,7 +272,7 @@ fun StorageSettings() {
             color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
 
-        PodcastsAndAudiobooksSettings()
+        PodcastsAndAudiobooksStorage()
 
         GetMusicSettings()
     }
@@ -380,31 +400,48 @@ private fun Choice(title: String, value: Int, options: List<Pair<Int, String>>, 
 }
 
 /**
- * The Audiobookshelf login for podcasts and audiobooks: server, username and password (the password is
- * only sent to sign in, never stored), a connection test, sign out, and the auto-download switch.
+ * Podcasts and audiobooks on this phone (in Storage): what's downloaded, whether new episodes download
+ * by themselves, and folders of audiobooks on the phone. The sign-in lives in General → Account.
  */
 @Composable
-private fun PodcastsAndAudiobooksSettings() {
+private fun PodcastsAndAudiobooksStorage() {
+    val c = LocalContext.current.container
+    val scope = rememberCoroutineScope()
+    val account by c.spoken.account.collectAsStateWithLifecycle()
+    val spokenSettings by c.spoken.settings.collectAsStateWithLifecycle()
+    val spokenBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
+
+    Section("Podcasts & audiobooks")
+    if (spokenBytes > 0) Info("Downloaded to this phone", formatBytes(spokenBytes))
+    if (account != null) {
+        Toggle("Download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Played episodes are removed from this phone.") { v ->
+            c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
+            if (v) scope.launch { c.spoken.refresh(force = true) }
+        }
+    }
+    PhoneAudiobookFolders()
+}
+
+/**
+ * The Audiobookshelf login for podcasts and audiobooks (in General → Account): who's signed in, a
+ * refresh, a connection test and sign out; or the sign-in form.
+ */
+@Composable
+private fun PodcastsAndAudiobooksAccount() {
     val c = LocalContext.current.container
     val actions = LocalActions.current
     val scope = rememberCoroutineScope()
     val account by c.spoken.account.collectAsStateWithLifecycle()
-    val spokenSettings by c.spoken.settings.collectAsStateWithLifecycle()
     val syncError by c.spoken.lastError.collectAsStateWithLifecycle()
-    var url by remember { mutableStateOf(c.spoken.store.lastServerUrl) }
-    var username by remember { mutableStateOf(c.spoken.store.lastUsername) }
-    var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<String?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
 
     Section("Podcasts & audiobooks")
     val a = account
-    val spokenBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
     val syncing by c.spoken.syncing.collectAsStateWithLifecycle()
     if (a != null && !a.needsSignIn) {
         Info("Signed in as ${a.username}", a.serverUrl.removePrefix("https://").removePrefix("http://"))
-        if (spokenBytes > 0) Info("Downloaded to this phone", formatBytes(spokenBytes))
         Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(enabled = !syncing, onClick = { scope.launch { c.spoken.refresh(force = true) } }) {
                 Text(if (syncing) "Refreshing…" else "Refresh now")
@@ -429,37 +466,9 @@ private fun PodcastsAndAudiobooksSettings() {
             else "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks. Each of you has your own, so progress and followed shows are yours.",
             color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
-        androidx.compose.material3.OutlinedTextField(
-            value = url, onValueChange = { url = it; result = null },
-            label = { Text("Server address") }, singleLine = true,
-            placeholder = { Text(im.flume.hearth.spoken.AbsAccountStore.DEFAULT_SERVER_URL) },
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        androidx.compose.material3.OutlinedTextField(
-            value = username, onValueChange = { username = it; result = null },
-            label = { Text("Username") }, singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        androidx.compose.material3.OutlinedTextField(
-            value = password, onValueChange = { password = it; result = null },
-            label = { Text("Password") }, singleLine = true,
-            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        TextButton(
-            enabled = !busy && username.isNotBlank() && password.isNotEmpty(),
-            modifier = Modifier.padding(horizontal = 8.dp),
-            onClick = {
-                busy = true; result = null
-                scope.launch {
-                    val error = c.spoken.signIn(url, username, password)
-                    busy = false
-                    if (error == null) { password = ""; actions.showMessage("Signed in. Your podcasts and audiobooks are on their way") } else result = "Failed: $error"
-                }
-            },
-        ) { Text(if (busy) "Signing in…" else "Sign in") }
+        SpokenSignInForm(Modifier.padding(horizontal = 16.dp)) {
+            actions.showMessage("Signed in. Your podcasts and audiobooks are on their way")
+        }
     }
     (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed: last refresh: $it" })?.let {
         Text(
@@ -467,13 +476,7 @@ private fun PodcastsAndAudiobooksSettings() {
             style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
-    if (a != null) {
-        Toggle("Download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Played episodes are removed from this phone.") { v ->
-            c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
-            if (v) scope.launch { c.spoken.refresh(force = true) }
-        }
-    }
-    PhoneAudiobookFolders()
+
 
     if (confirmSignOut) {
         AlertDialog(
@@ -561,5 +564,62 @@ private fun GetMusicSettings() {
     }
     Toggle("Show music you don't have in Search and artist pages", settings.tidalInSearch, "Shown dimmed, after your own music") { v ->
         c.session.updateSettings { it.copy(tidalInSearch = v) }
+    }
+}
+
+/**
+ * Server, username and password for podcasts & audiobooks, and a filled Sign in button. Shared by
+ * Settings and the optional step after the first sign-in. The password is only sent to sign in, never
+ * stored. [secondary] sits beside the button (e.g. "Skip"); [onSignedIn] runs once it worked.
+ */
+@Composable
+internal fun SpokenSignInForm(
+    modifier: Modifier = Modifier,
+    secondary: (@Composable () -> Unit)? = null,
+    onSignedIn: () -> Unit,
+) {
+    val c = LocalContext.current.container
+    val scope = rememberCoroutineScope()
+    var url by remember { mutableStateOf(c.spoken.store.lastServerUrl) }
+    var username by remember { mutableStateOf(c.spoken.store.lastUsername) }
+    // Plain remember: a saveable password would sit unencrypted in the saved-state Bundle.
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.material3.OutlinedTextField(
+            value = url, onValueChange = { url = it; error = null },
+            label = { Text("Server address") }, singleLine = true,
+            placeholder = { Text(im.flume.hearth.spoken.AbsAccountStore.DEFAULT_SERVER_URL) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = username, onValueChange = { username = it; error = null },
+            label = { Text("Username") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        androidx.compose.material3.OutlinedTextField(
+            value = password, onValueChange = { password = it; error = null },
+            label = { Text("Password") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        error?.let { Text("Couldn't sign in: $it", color = Destructive, style = MaterialTheme.typography.bodyMedium) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.Button(
+                enabled = !busy && username.isNotBlank() && password.isNotEmpty(),
+                onClick = {
+                    busy = true; error = null
+                    scope.launch {
+                        val failure = c.spoken.signIn(url, username, password)
+                        busy = false
+                        if (failure == null) { password = ""; onSignedIn() } else error = failure
+                    }
+                },
+            ) { Text(if (busy) "Signing in…" else "Sign in") }
+            secondary?.invoke()
+        }
     }
 }

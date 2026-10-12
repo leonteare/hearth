@@ -453,6 +453,7 @@ internal fun SpokenHeader(
                 BackButton()
                 Spacer(Modifier.weight(1f))
                 // Same status-bar inset as the back button, so the two line up.
+                im.flume.hearth.ui.components.DownloadsIndicator(Modifier.statusBarsPadding())
                 if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.statusBarsPadding()) { Icon(Icons.Default.MoreVert, "More") }
             }
             CoverArt(null, artSize, requestSize = 600, fallback = title, url = coverUrl)
@@ -690,7 +691,9 @@ fun SpokenSignInPrompt(what: String) {
         Icons.Default.Podcasts,
         "Sign in to podcasts & audiobooks in Settings to see your $what here.",
         action = "Open Settings",
-        onAction = { actions.open("settings/storage") },
+        // Lands on the sign-in itself, not the top of Settings.
+        onAction = { actions.open("settings/general/podcasts") },
+
     )
 }
 
