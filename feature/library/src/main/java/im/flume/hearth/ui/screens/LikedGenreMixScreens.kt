@@ -34,6 +34,7 @@ import im.flume.hearth.data.SongOrder
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.EmptyState
 import im.flume.hearth.ui.components.LoadingPage
+import im.flume.hearth.ui.components.MixCover
 import im.flume.hearth.ui.components.UnavailablePage
 import im.flume.hearth.ui.theme.HearthShapes
 import im.flume.hearth.ui.theme.LikedColor

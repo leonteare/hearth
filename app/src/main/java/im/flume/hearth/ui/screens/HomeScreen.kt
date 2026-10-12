@@ -69,6 +69,7 @@ import im.flume.hearth.data.PlaySource
 import im.flume.hearth.sync.SyncState
 import im.flume.hearth.ui.components.AlbumRow
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.MixCover
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.MediaCard
@@ -197,16 +198,6 @@ fun HomeScreen() {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MixCover(mix: Mix, size: Dp) {
-    val covers = (mix.covers + List(4) { null }).take(4)
-    Column(Modifier.size(size).clip(HearthShapes.Cover)) {
-        for (row in 0..1) Row(Modifier.weight(1f)) {
-            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = CoverSize.MEDIUM)
         }
     }
 }
