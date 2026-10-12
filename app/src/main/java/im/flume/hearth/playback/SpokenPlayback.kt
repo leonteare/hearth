@@ -325,9 +325,11 @@ class ListeningTracker(private val progress: SpokenProgress) {
     }
 
     private companion object {
-        const val SAVE_EVERY_MS = 5_000L
+        /** Position written on the phone this often while playing (pause, seek and the end save at once). */
+        const val SAVE_EVERY_MS = 15_000L
         const val SESSION_EVERY_MS = 30_000L
         const val NEW_SESSION_AFTER_PAUSE_MS = 10 * 60_000L
-        const val FLUSH_EVERY_MS = 60_000L
+        /** Sent to the server this often while playing; pausing or stopping sends straight away. */
+        const val FLUSH_EVERY_MS = 5 * 60_000L
     }
 }
