@@ -211,7 +211,7 @@ fun MixCover(mix: Mix, size: Dp) {
     }
 }
 
-private data class QuickTile(
+internal data class QuickTile(
     val title: String,
     val icon: ImageVector,
     val color: Color,
@@ -220,7 +220,7 @@ private data class QuickTile(
 
 /** A fixed two-by-two grid, the same on every screen size. */
 @Composable
-private fun QuickGrid(tiles: List<QuickTile>) {
+internal fun QuickGrid(tiles: List<QuickTile>) {
     val columns = 2
     Column(Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(columns).forEach { row ->

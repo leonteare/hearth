@@ -1,0 +1,78 @@
+package im.flume.hearth.ui.screens
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import im.flume.hearth.testing.Samples
+import im.flume.hearth.testing.ScreenshotTest
+import im.flume.hearth.ui.theme.Dimens
+import org.junit.Test
+
+/** The mini player, the player controls and the queue. Moves to :feature:player with those screens. */
+class PlayerScreenshots : ScreenshotTest() {
+    private val songs = Samples.songs(5)
+    private val state = Samples.playerState(songs[1], songs)
+
+    @Test
+    fun `the mini player with a song playing`() = snap("mini_player_music") {
+        MiniPlayer(state, onOpen = {})
+    }
+
+    @Test
+    fun `the mini player with a song paused`() = snap("mini_player_paused") {
+        MiniPlayer(state.copy(isPlaying = false), onOpen = {})
+    }
+
+    @Test
+    fun `the mini player with a podcast episode, skip buttons instead of next and previous`() = snap("mini_player_spoken") {
+        MiniPlayer(Samples.spokenPlayerState(), onOpen = {})
+    }
+
+    @Test
+    fun `the music player controls below the cover`() = snap("player_controls") {
+        Column(Modifier.padding(horizontal = Dimens.Gutter)) {
+            PlayerControls(
+                state.copy(shuffle = true), songs[1].copy(starred = true), onClose = {}, showLyrics = false,
+                onToggleLyrics = {}, onOpenQueue = {}, onOpenVisualiser = {},
+            )
+        }
+    }
+
+    @Test
+    fun `the podcast player controls with speed and chapters`() {
+        val spokenState = Samples.spokenPlayerState(speed = 1.25f)
+        snap("spoken_controls") {
+            Column(Modifier.padding(horizontal = Dimens.Gutter)) {
+                SpokenControls(
+                    spokenState, spokenState.spoken!!,
+                    SpokenInfo("The town that forgot to sleep", "The Long Read", isBook = false, downloadState = null, finished = false),
+                    chapters = emptyList(), openPage = {}, onSpeed = {}, onChapters = {}, onOpenQueue = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the speed sheet at one and a quarter`() = snapScreen("speed_sheet") {
+        SpeedSheet(1.25f, onDismiss = {}, onSpeed = {})
+    }
+
+    @Test
+    fun `queue rows, the playing song highlighted, then up next and later`() = snap("queue_rows") {
+        Column {
+            QueueHeader("Now playing")
+            QueueRow(state.queue[1], isCurrent = true)
+            QueueHeader("Next from: Long Winter", trailing = "3 songs")
+            QueueRow(state.queue[2], handle = { Modifier })
+            QueueRow(state.queue[3], handle = { Modifier })
+            QueueHeader("Later", alpha = 0.6f)
+            LaterRow(songs[4], alpha = 0.6f)
+        }
+    }
+
+    @Test
+    fun `the now playing screen`() = snapScreen("now_playing") {
+        Box { NowPlayingScreen(state, onClose = {}, onOpenQueue = {}, onOpenVisualiser = {}) }
+    }
+}
