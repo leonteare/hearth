@@ -8,12 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,9 +30,7 @@ import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.MenuItem
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -81,14 +73,14 @@ private fun SpokenDownloadListRow(r: SpokenDownloadRow, modifier: Modifier = Mod
             onClick = { actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId)) },
             coverUrl = c.spokenCover(d.libraryItemId, 150),
             fallback = r.subtitle ?: title,
-            subtitleColor = if (d.state == SpokenDownloadState.FAILED) Destructive else TextSecondary,
-            trailing = { IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) } },
+            subtitleColor = if (d.state == SpokenDownloadState.FAILED) HearthTheme.colors.destructive else HearthTheme.colors.textSecondary,
+            trailing = { IconButton(onClick = { menu = true }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) } },
         )
         if (progress != null) {
             LinearProgressIndicator(
                 progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
-                trackColor = TextSecondary.copy(alpha = 0.25f),
+                modifier = Modifier.fillMaxWidth().padding(start = HearthTheme.spacing.gutter + HearthTheme.spacing.rowCover + HearthTheme.spacing.coverGap, end = HearthTheme.spacing.gutter).height(3.dp),
+                trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.25f),
                 gapSize = 0.dp,
                 drawStopIndicator = {},
             )
@@ -96,17 +88,17 @@ private fun SpokenDownloadListRow(r: SpokenDownloadRow, modifier: Modifier = Mod
     }
     ActionSheet(menu, { menu = false }, title = title, subtitle = r.subtitle, coverUrl = c.spokenCover(d.libraryItemId, 150), fallback = r.subtitle) {
         if (d.state == SpokenDownloadState.FAILED) {
-            MenuItem("Try again", Icons.Default.Refresh) { menu = false; c.spoken.downloads.retryFailed() }
+            MenuItem("Try again", HearthTheme.icons.refresh) { menu = false; c.spoken.downloads.retryFailed() }
         }
         MenuItem(
             if (d.state == SpokenDownloadState.DONE) "Remove download" else "Cancel download",
-            Icons.Default.Close,
+            HearthTheme.icons.close,
         ) {
             menu = false
             if (d.state == SpokenDownloadState.DONE && !d.isBook) removeEpisodeDownload(c, actions, d.libraryItemId, d.episodeId)
             else c.spoken.downloads.remove(d.libraryItemId, d.episodeId)
         }
-        MenuItem(if (d.isBook) "Go to book" else "Go to show", if (d.isBook) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.Podcasts) {
+        MenuItem(if (d.isBook) "Go to book" else "Go to show", if (d.isBook) HearthTheme.icons.audiobook else HearthTheme.icons.podcast) {
             menu = false; actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId))
         }
     }

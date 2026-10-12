@@ -21,13 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.Settings
 import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,23 +61,23 @@ internal fun GetMusicSettings() {
     Section("Get music you don't have")
     Text(
         "Search and artist pages can show music that isn't on your server yet. Tap a song to hear a preview; tap ♡ and Tidarr fetches it onto your server, then it's added to your library and downloaded to this phone.",
-        color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
     )
     OutlinedTextField(
         value = url, onValueChange = { url = it; result = null },
         label = { Text("Tidarr address") }, singleLine = true,
         placeholder = { Text(Settings.DEFAULT_TIDARR_URL) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
     )
     OutlinedTextField(
         value = key, onValueChange = { key = it; result = null },
         label = { Text("API key (optional)") }, singleLine = true, enabled = keyLoaded,
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
     )
-    Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(horizontal = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { save(); actions.showMessage("Tidarr settings saved") }, enabled = dirty) { Text("Save") }
         TextButton(
             enabled = !testing && url.isNotBlank(),
@@ -96,8 +94,8 @@ internal fun GetMusicSettings() {
     }
     result?.let {
         Text(
-            it, color = if (it.startsWith("Failed")) Destructive else MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            it, color = if (it.startsWith("Failed")) HearthTheme.colors.destructive else MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
         )
     }
     Toggle("Show music you don't have in Search and artist pages", settings.tidalInSearch, "Shown dimmed, after your own music") { v ->

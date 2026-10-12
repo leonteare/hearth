@@ -14,14 +14,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadCounts
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +58,7 @@ fun StorageSettings() {
             c.downloads.schedule()
         }
         if (downloadedBytes > 0) {
-            Clickable("Remove all downloaded music", color = Destructive) { confirmRemoveAll = true }
+            Clickable("Remove all downloaded music", color = HearthTheme.colors.destructive) { confirmRemoveAll = true }
         }
 
         Section("Streaming cache")
@@ -76,7 +74,7 @@ fun StorageSettings() {
         }
         Text(
             "Cache size changes apply after the app restarts.",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
         )
 
         PodcastsAndAudiobooksStorage()
@@ -91,7 +89,7 @@ fun StorageSettings() {
             text = { Text("All the music downloaded to this phone will be deleted. Downloaded podcasts and audiobooks stay. You can download the music again later.") },
             confirmButton = {
                 TextButton(onClick = { confirmRemoveAll = false; c.downloads.removeAll() }) {
-                    Text("Remove", color = Destructive)
+                    Text("Remove", color = HearthTheme.colors.destructive)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },

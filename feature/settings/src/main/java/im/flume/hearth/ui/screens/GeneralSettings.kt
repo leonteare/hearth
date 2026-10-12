@@ -25,8 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.playback.QueueStore
 import im.flume.hearth.sync.SyncState
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -60,7 +59,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
         Section("Account")
         Info("Signed in as", creds?.username.orEmpty())
         Info("Server", creds?.serverUrl.orEmpty())
-        Clickable("Sign out", "Your downloads stay on this phone", color = Destructive) {
+        Clickable("Sign out", "Your downloads stay on this phone", color = HearthTheme.colors.destructive) {
             confirmLogout = true
         }
 
@@ -79,7 +78,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
         }
         Text(
             "Uses the loudness info in your music files so songs play at a similar volume. Per album keeps the intended differences between songs on an album.",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
         )
         Toggle("Smart shuffle", settings.smartShuffle, "Avoid playing the same artist twice in a row") { v ->
             c.session.updateSettings { it.copy(smartShuffle = v) }
@@ -93,7 +92,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
         Choice("Quality on mobile data", settings.mobileBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(mobileBitrate = v) } }
         Text(
             "Lower qualities are converted on the server, so seeking within a song that isn't cached yet can be slower.",
-            color = TextSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
         )
 
         // Tucked away and closed: only of interest when deciding what to keep in the app.
@@ -105,9 +104,9 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
         ) { usageOpen = !usageOpen }
         if (usageOpen) {
             usageCounts.sortedByDescending { it.second }.forEach { (name, count) ->
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = 6.dp)) {
                     Text(name, modifier = Modifier.weight(1f))
-                    Text("$count", color = TextSecondary)
+                    Text("$count", color = HearthTheme.colors.textSecondary)
                 }
             }
         }
@@ -132,7 +131,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
                         c.session.logout()
                         c.downloads.reset()
                     }
-                }) { Text("Sign out", color = Destructive) }
+                }) { Text("Sign out", color = HearthTheme.colors.destructive) }
             },
             dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } },
         )
