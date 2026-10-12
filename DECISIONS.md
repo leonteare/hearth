@@ -34,12 +34,15 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **Modules by layer, then by feature** (2.20.0). `core:common ← network ← data ← domain ← playback ← ui ←
   feature:* ← app`; features never depend on each other and reach each other's pages by route. Why: parallel agents
   can each own one module without merge fights, builds recompile less, and the boundaries are enforced by Gradle
-  rather than by convention. Packages stayed as they were so the move renamed nothing.
+  rather than by convention.
 - **Domain split by area** (after 2.20.0). `:domain:music`, `:domain:spoken`, `:domain:requests` (→ music: arrivals
   are matched, liked and downloaded through the library) and `:domain:update`, each on `:core:data`; `:core:domain` is
   only the aggregator (`DomainContainer`, `SearchHits`). Each area declares its own container slice
   (`MusicContainer`, ...) so its workers never need the aggregator. Text matching both music and spoken use
   (`SearchIndex.kt`) sits in `:core:data`, so spoken doesn't depend on music.
+- **One root package per module** (after 2.20.1): `im.flume.hearth.<module path>`, so an import names its module.
+  `:app` keeps `HearthApp`/`ui.MainActivity` (launcher and manifest names on phones). Jobs WorkManager saved under
+  the old worker names still run through `LegacyWorkers` (`:core:domain`, set on `HearthApp`).
 - **Container interfaces.** `:app` builds the one `HearthContainer`; lower modules see it as `DomainContainer`
   (`:core:domain`) or `AppContainer` (`:core:playback`, adds the player). Tests swap in `TestContainer`.
 - **Design tokens, ready for skins.** Colours, spacing, shapes and icons are named by purpose in `Tokens.kt` and read

@@ -11,7 +11,7 @@ import java.util.Properties
 /**
  * The settings every Hearth library module shares, so each module's build file only lists what's
  * different about it. The namespace comes from the module path (`:core:ui` → `im.flume.hearth.core.ui`);
- * only that module's R and BuildConfig live there, the code keeps its own packages.
+ * it is also the root package of the module's code, so an import shows which module a class is in.
  * Applying the Compose compiler plugin in a module also turns Compose on and adds the Compose BOM.
  */
 class HearthLibraryPlugin : Plugin<Project> {

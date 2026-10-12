@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Hearth: an Android app (Kotlin, Compose, Media3, Room, WorkManager, OkHttp) that plays music from a Navidrome/Subsonic
-server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, split into layer and feature
-modules. README.md has features; DECISIONS.md has settled choices (read it before re-litigating one).
+server, plus podcasts and audiobooks from Audiobookshelf. Split into layer and feature modules, each with its
+own root package. README.md has features; DECISIONS.md has settled choices (read it before re-litigating one).
 
 ## Commands
 
@@ -11,7 +11,7 @@ Run from the repo root. There is no CI.
 | Purpose | Command |
 |---|---|
 | **Check a change** (compile + unit + screenshot tests, all modules) | `./verify.sh` (one PASS/FAIL line naming failing tests and changed screenshots) |
-| One module's tests | `./gradlew :feature:library:testDebugUnitTest --tests 'im.flume.hearth.ui.screens.LibraryTabsTest'` |
+| One module's tests | `./gradlew :feature:library:testDebugUnitTest --tests 'im.flume.hearth.feature.library.LibraryTabsTest'` |
 | Record screenshot references | `./gradlew :feature:library:testDebugUnitTest -Proborazzi.test.record=true` (per module; add `--tests`). Look at every changed PNG before committing |
 | Debug APK (`im.flume.hearth.debug`, installs beside release) | `./gradlew assembleDebug` |
 | Release APK | `./gradlew assembleRelease` (fails on purpose without `keystore.properties`) |
@@ -33,24 +33,26 @@ Dependency rule: `:core:common ← :core:network ← :core:data ← :core:domain
 Core modules `api` the one below; each feature depends only on `:core:ui`; **features never depend on each other**.
 The domain layer is split by area: `:core:data ← :domain:{music,spoken,update}`, `:domain:music ← :domain:requests`,
 and `:core:domain` (aggregator) `api`s all four. Domain modules never depend on `:core:domain` or on each other, except
-requests → music. Packages are unchanged (`im.flume.hearth.data` spans `:core:data`, `:domain:music`, `:domain:requests`
-and `:core:domain`; `ui.screens` spans
-`:core:ui` and every feature). Each module has `src/main/java/im/flume/hearth/...` and a mirrored `src/test/...`. Shared
-Gradle setup: `build-logic/` plugins `hearth.android.library` (namespace `im.flume.hearth.<module path>`, SDKs, Java 17)
-and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
+requests → music. **Each module's root package is its namespace**, `im.flume.hearth.<module path>` (`:core:data` →
+`im.flume.hearth.core.data`, `:feature:library` → `im.flume.hearth.feature.library`), with a few sub-packages:
+`core.data.spoken`, `domain.music.{download,playback,sync}`, `core.ui.{theme,components,screens}`,
+`feature.player.visualiser`. `:app` keeps `im.flume.hearth` (`HearthApp`) and `im.flume.hearth.ui` (`MainActivity`):
+phones hold those names (launcher, manifest). Sources sit in `src/main/java/<package path>/`, tests mirrored in
+`src/test/...`. Shared Gradle setup: `build-logic/` plugins `hearth.android.library` (namespace, SDKs, Java 17) and
+`hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 
 | Module | Holds |
 |---|---|
-| `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `util/Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `api/ApiExceptions`, `EXTRA_ROUTE`, `ic_notification` (`im.flume.hearth.core.common.R`) |
-| `:core:network` | `api/`: `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
-| `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`; `data/SearchIndex` (`SearchMatch`, `Scored`, `SongFilter`: text matching music and spoken share) |
+| `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `ApiExceptions`, `EXTRA_ROUTE`, `ic_notification` (`im.flume.hearth.core.common.R`) |
+| `:core:network` | `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
+| `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas/im.flume.hearth.core.data.AppDatabase/`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`; `SearchIndex` (`SearchMatch`, `Scored`, `SongFilter`: text matching music and spoken share) |
 | `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning (below); `MusicContainer` |
-| `:domain:spoken` | Podcasts and audiobooks (`spoken/`, below); `SpokenContainer` |
-| `:domain:requests` | Tidarr requests (`requests/`, `data/RequestIntent`, `data/RequestTracking`); `RequestsContainer` |
-| `:domain:update` | `update/Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
-| `:core:domain` | Aggregator: `DomainContainer` (extends the four area containers), `data/SearchHits` (Search's one list across areas) |
-| `:core:playback` | `playback/`: Media3 service and player; `AppContainer` (DomainContainer + player) and `Context.container` |
-| `:core:ui` | `ui/theme/` (`Tokens.kt`, legacy `Theme.kt`, `CoverSizes`, `Contrast`), `ui/components/`, screen pieces two+ features share |
+| `:domain:spoken` | Podcasts and audiobooks (below); `SpokenContainer` |
+| `:domain:requests` | Tidarr requests (below, `RequestIntent`, `RequestTracking`); `RequestsContainer` |
+| `:domain:update` | `Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
+| `:core:domain` | Aggregator: `DomainContainer` (extends the four area containers), `SearchHits` (Search's one list across areas), `LegacyWorkers` (old worker class names → current; WorkManager's factory) |
+| `:core:playback` | Media3 service and player; `AppContainer` (DomainContainer + player) and `Context.container` |
+| `:core:ui` | `theme/` (`Tokens.kt`, legacy `Theme.kt`, `CoverSizes`, `Contrast`), `components/`, `screens/` (pieces two+ features share) |
 | `:core:testing` | Test-only (via `testImplementation`): `Samples`, `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication`, `ScreenshotTest` |
 | `:feature:home` | `HomeScreen`, `SpokenHome`, `StatsScreen`; `HomeRoutes.kt` |
 | `:feature:library` | Library tabs/lists/controls, Browse, Album/Artist, Collection* (playlist/mix/genre/liked pages), Playlist{Screen,Edit,Menu,SharingUi}, `InfoSections`, `LocalBookRows`; `LibraryRoutes.kt` |
@@ -60,35 +62,35 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 | `:feature:settings` | `Settings*` and its pages (General, Appearance, Storage, GetMusic, PodcastsAndAudiobooks, LocalBook), `Downloads*`, `SpokenDownloadRows`, `LoginScreen`; `SettingsRoutes.kt` |
 | `:app` | `HearthApp.kt` (`HearthContainer`, the one real container), `ui/`: `MainActivity`, `AppRoot`, `Routes` (calls each `<feature>Routes()`), `AppActions`, `NavBar`, `PlayerOverlays`; manifest, signing, versioning |
 
-### Where things live (under each module's `src/main/java/im/flume/hearth/`)
+### Where things live (relative to each module's root package)
 
-- **domain:music `data/`**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
+- **domain:music**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
   (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`, `PlaylistEdits`,
   `PhotoPrep`, `Availability`, `RequestMatching` (is Tidal music on the server; `Availability` needs it).
-- **domain:music other**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
+- **domain:music sub-packages**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
   `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
-- **domain:requests `requests/`**: Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker.
-- **domain:spoken `spoken/`**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
+- **domain:requests**: Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker.
+- **domain:spoken**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
   `SpokenMapping`, `SpokenProgress`, `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`), `SpokenDownloads`,
   `SpokenPresentation`, `ShowFeed`/`ShowFeeds`; phone books: `LocalBooks`, `LocalBookScanner`, `LocalBookUpload`(+Worker),
   `LocalBookChapters`, `LocalBookLogic`, `LocalBookDetails`, `BookMatch`, `EmbeddedChapters`.
-- **playback `playback/`**: `PlaybackService` + its extension files (`PlayerSetup`, `PlayerListener`, `SessionCallback`,
+- **core:playback**: `PlaybackService` + its extension files (`PlayerSetup`, `PlayerListener`, `SessionCallback`,
   `SessionExtras`, `QueueEdits`, `QueuePersistence`, `PlaybackRecovery`, `StreamCaching`, `SpokenMode`, `SleepTimer`,
   `VolumeLevelling`, `SpokenAwarePlayer`); `PlayerConnection` (`PlayerUiState`), `QueueStore`, `SongDataSource`
   (download → cache → stream), `Scrobbler`, `PlaybackErrors`/`Policy`, `CoverArt`, `SpokenPlayback`, `PreviewPlayer`
   (30 s previews); visualiser audio `AudioAnalyzer`, `AudioAnalysis`, `BeatTracker`, `TimedRing`.
-- **ui `components/`**: `Actions` (+ `LocalActions`), `Routing` (`screen()`, `arg()`), `SongRows`, `MediaItems`,
+- **core:ui `components/`**: `Actions` (+ `LocalActions`), `Routing` (`screen()`, `arg()`), `SongRows`, `MediaItems`,
   `MissingRows`, `SongMenu`, `Sheets`, `PageChrome`, `PlayerChrome`, `CoverArt`/`CoverColor`/`CoverPrefetcher`/
   `CoverGradientHeader`/`MixCover`, `GetMusic`(+`Sheets`)/`NotOnServer`(+`Icons`), `PreviewBar`, `PlayShuffleButtons`,
   `PlaylistPicker`, `LiveRows`/`RowContext`, `Formatters`.
-- **ui `screens/` (shared)**: `LibraryRows`, `SpokenCommon`, `SpokenRows`, `SpokenMenus`, `FollowButton`, `LyricStyle`,
+- **core:ui `screens/` (shared)**: `LibraryRows`, `SpokenCommon`, `SpokenRows`, `SpokenMenus`, `FollowButton`, `LyricStyle`,
   `PlayerPosition`, `EqualWidthChips`, `OpmlImport`, `UpdateUi`, `CrashBanner`.
 
 **Update this map when you add, move or split a file.**
 
 ## Where new code goes
 
-- **New screen**: a file in its feature's `ui/screens/`, registered in that feature's `<Feature>Routes.kt` with
+- **New screen**: a file in its feature module, registered in that feature's `<Feature>Routes.kt` with
   `screen("name/{id}") { entry -> Page(entry.arg("id")) }` (from `:core:ui` `Routing.kt`). Other features reach it by
   route via `NavActions`, never by calling the composable. New feature module: add to `settings.gradle.kts`, `:app`'s
   dependencies, and `:app` `Routes.kt`.
@@ -99,6 +101,8 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
   `HearthApp.kt`) and in `TestContainer`. Workers reach it via the module's internal `Context.<area>Container`.
 - **New DB table / column**: entity + DAO in `:core:data`, migration (below), exported `core/data/schemas/.../N.json`,
   `MigrationTest` case. Sync-only columns: bump `SCHEMA` in `LibrarySync`'s companion (forces a resync).
+- **Moving or renaming a worker**: WorkManager saves jobs by the worker's class name, so add the old name to
+  `LegacyWorkers` (`:core:domain`) and point existing entries at the new one (`LegacyWorkersTest` checks targets exist).
 - **New user action**: a method on the right `Actions` sub-interface (`SongActions`, `PlaylistActions`,
   `LibraryActions`, `NavActions`, `MessageActions`, `CoverActions`), implemented in `:app` `AppActions` and
   `FakeActions`. Rows and cards call `LocalActions.current`, not callbacks threaded through layers.

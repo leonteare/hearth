@@ -26,10 +26,19 @@ class LegacyWorkersTest {
     }
 
     @Test
-    fun `every worker in the app has its old name mapped`() {
+    fun `every old name leads to a worker in the app's sources`() {
         val workers = currentWorkers()
         assertTrue("The scanner found no workers; it is broken", workers.size >= 6)
-        assertEquals(workers, LegacyWorkers.NAMES.values.toSet())
+        val stale = LegacyWorkers.NAMES.values.toSet() - workers
+        assertTrue("Old names lead to workers that moved or were renamed: $stale", stale.isEmpty())
+    }
+
+    @Test
+    fun `every worker a phone on 2_20_1 can have saved is mapped`() {
+        // All the workers 2.20.1 had, under their names then. A worker added after the package move needs no entry.
+        val released = setOf("download.DownloadWorker", "requests.RequestsWorker", "spoken.SpokenSyncWorker",
+            "spoken.SpokenDownloadWorker", "spoken.OutboxWorker", "spoken.LocalBookUploadWorker")
+        assertEquals(released.map { "im.flume.hearth.$it" }.toSet(), LegacyWorkers.NAMES.keys)
     }
 
     @Test
