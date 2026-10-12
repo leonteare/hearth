@@ -201,16 +201,6 @@ fun HomeScreen() {
     }
 }
 
-@Composable
-fun MixCover(mix: Mix, size: Dp) {
-    val covers = (mix.covers + List(4) { null }).take(4)
-    Column(Modifier.size(size).clip(HearthShapes.Cover)) {
-        for (row in 0..1) Row(Modifier.weight(1f)) {
-            for (col in 0..1) CoverArt(covers[row * 2 + col], null, Modifier.weight(1f).fillMaxSize(), corner = 0.dp, requestSize = CoverSize.MEDIUM)
-        }
-    }
-}
-
 internal data class QuickTile(
     val title: String,
     val icon: ImageVector,

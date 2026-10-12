@@ -1,5 +1,6 @@
 plugins {
     id("hearth.android.library")
+    id("hearth.screenshots")
     alias(libs.plugins.kotlin.compose)
 }
 
