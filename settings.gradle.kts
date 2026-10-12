@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 rootProject.name = "Hearth"
 include(":app")
 include(":core:common")
+include(":core:network")

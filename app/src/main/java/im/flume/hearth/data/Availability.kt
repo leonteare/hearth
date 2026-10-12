@@ -109,7 +109,7 @@ object Availability {
         if (remote.isEmpty()) return owned.map { SongItem.Owned(it) }
         val claimed = HashSet<String>()
         val missing = remote.filter { t ->
-            val match = owned.firstOrNull { s -> s.id !in claimed && t.isrc != null && t.isrc.uppercase() in RequestMatching.isrcs(s.isrc) }
+            val match = owned.firstOrNull { s -> s.id !in claimed && t.isrc.let { isrc -> isrc != null && isrc.uppercase() in RequestMatching.isrcs(s.isrc) } }
                 ?: owned.firstOrNull { s -> s.id !in claimed && (norm(s.title) == norm(t.displayTitle) || norm(s.title) == norm(t.title)) }
                 ?: owned.firstOrNull { s -> s.id !in claimed && baseTitle(s.title).let { it.isNotEmpty() && it == baseTitle(t.title) } }
             if (match != null) claimed += match.id

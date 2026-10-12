@@ -48,8 +48,9 @@ fun Lyrics.rows(): List<LyricRow> {
     lines.forEachIndexed { i, line ->
         val nextStart = lines.drop(i + 1).firstOrNull { it.start != null }?.start
         if (line.value.isBlank()) {
-            if (out.lastOrNull()?.isBreak != true && line.start != null) {
-                out += LyricRow(line.start, nextStart ?: (line.start + 5_000), "", isBreak = true)
+            val start = line.start
+            if (out.lastOrNull()?.isBreak != true && start != null) {
+                out += LyricRow(start, nextStart ?: (start + 5_000), "", isBreak = true)
             }
         } else {
             out += LyricRow(line.start, nextStart, line.value, isBreak = false)
