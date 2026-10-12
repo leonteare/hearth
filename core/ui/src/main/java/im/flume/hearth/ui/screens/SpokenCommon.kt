@@ -4,9 +4,7 @@ package im.flume.hearth.ui.screens
 
 import android.net.Uri
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,16 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Downloading
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,14 +43,13 @@ import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.ui.components.Actions
 import im.flume.hearth.ui.components.BackButton
 import im.flume.hearth.ui.components.CoverArt
+import im.flume.hearth.ui.components.CoverGradientHeader
 import im.flume.hearth.ui.components.DownloadsIndicator
 import im.flume.hearth.ui.components.EmptyState
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** The episode or book in the player (null while music plays), so rows can show what's playing. */
 val LocalSpokenNow = compositionLocalOf<SpokenNowPlaying?> { null }
@@ -106,9 +92,9 @@ fun playBook(c: AppContainer, actions: Actions, libraryItemId: String, downloade
 @Composable
 fun SpokenDownloadIcon(state: SpokenDownloadState?, modifier: Modifier = Modifier) {
     when (state) {
-        SpokenDownloadState.DONE -> Icon(Icons.Default.CheckCircle, "Downloaded", modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
-        SpokenDownloadState.QUEUED, SpokenDownloadState.DOWNLOADING -> Icon(Icons.Default.Downloading, "Downloading", modifier.size(14.dp), tint = TextSecondary)
-        SpokenDownloadState.FAILED -> Icon(Icons.Default.ErrorOutline, "Couldn't download", modifier.size(14.dp), tint = Destructive)
+        SpokenDownloadState.DONE -> Icon(HearthTheme.icons.downloaded, "Downloaded", modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+        SpokenDownloadState.QUEUED, SpokenDownloadState.DOWNLOADING -> Icon(HearthTheme.icons.downloading, "Downloading", modifier.size(14.dp), tint = HearthTheme.colors.textSecondary)
+        SpokenDownloadState.FAILED -> Icon(HearthTheme.icons.failed, "Couldn't download", modifier.size(14.dp), tint = HearthTheme.colors.destructive)
         else -> {}
     }
 }
@@ -118,9 +104,9 @@ fun SpokenDownloadIcon(state: SpokenDownloadState?, modifier: Modifier = Modifie
 fun ListenedBar(fraction: Float, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
     LinearProgressIndicator(
         progress = { fraction },
-        modifier = modifier.height(3.dp).clip(CircleShape),
+        modifier = modifier.height(3.dp).clip(HearthTheme.shapes.round),
         color = color,
-        trackColor = TextSecondary.copy(alpha = 0.25f),
+        trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.25f),
         gapSize = 0.dp,
         drawStopIndicator = {},
     )
@@ -141,13 +127,13 @@ fun Description(text: String?) {
     var expanded by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().clickable { expanded = !expanded }.animateContentSize()
-            .padding(horizontal = Dimens.Gutter, vertical = 8.dp)
+            .padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s)
     ) {
         Text(
-            clean, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
+            clean, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
             maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
         )
-        Text(if (expanded) "Less" else "More", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+        Text(if (expanded) "Less" else "More", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = HearthTheme.spacing.xxs))
     }
 }
 
@@ -159,22 +145,22 @@ fun SpokenHeader(
     onMenu: (() -> Unit)? = null,
 ) {
     val headerColor = rememberCoverColor(null, imageUrl = coverUrl)
-    Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor, Color.Transparent)))) {
+    CoverGradientHeader(headerColor) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BackButton()
                 Spacer(Modifier.weight(1f))
                 // Same status-bar inset as the back button, so the two line up.
                 DownloadsIndicator(Modifier.statusBarsPadding())
-                if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.statusBarsPadding()) { Icon(Icons.Default.MoreVert, "More") }
+                if (onMenu != null) IconButton(onClick = onMenu, modifier = Modifier.statusBarsPadding()) { Icon(HearthTheme.icons.more, "More") }
             }
             CoverArt(null, artSize, requestSize = CoverSize.LARGE, fallback = title, url = coverUrl)
-            Spacer(Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(HearthTheme.spacing.l))
+            Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = HearthTheme.spacing.l))
             lines.filter { it.isNotBlank() }.forEach { line ->
                 Text(
-                    line, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    line, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.xxs),
                 )
             }
         }
@@ -188,10 +174,10 @@ fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit
     FilledIconButton(
         onClick = onClick,
         modifier = Modifier.size(56.dp),
-        shape = CircleShape,
+        shape = HearthTheme.shapes.round,
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = MaterialTheme.colorScheme.onPrimary),
     ) {
-        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, label, modifier = Modifier.size(32.dp))
+        Icon(if (playing) HearthTheme.icons.pause else HearthTheme.icons.play, label, modifier = Modifier.size(32.dp))
     }
 }
 
@@ -200,7 +186,7 @@ fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit
 fun SpokenSignInPrompt(what: String) {
     val actions = LocalActions.current
     EmptyState(
-        Icons.Default.Podcasts,
+        HearthTheme.icons.podcast,
         "Sign in to podcasts & audiobooks in Settings to see your $what here.",
         action = "Open Settings",
         // Lands on the sign-in itself, not the top of Settings.

@@ -15,13 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,9 +54,7 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.UnavailablePage
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -96,7 +87,7 @@ fun BookScreen(id: String) {
     }
     val row = book
     if (row == null) {
-        if (loaded) UnavailablePage(Icons.AutoMirrored.Filled.MenuBook, "This book isn't on the server any more")
+        if (loaded) UnavailablePage(HearthTheme.icons.audiobook, "This book isn't on the server any more")
         else Box(Modifier.fillMaxSize())
         return
     }
@@ -129,7 +120,7 @@ fun BookScreen(id: String) {
             text = { Text("\"${b.title}\" will be removed from this phone. You can still stream it, or download it again later.") },
             confirmButton = {
                 TextButton(onClick = { confirmRemove = false; c.spoken.downloads.remove(id) }) {
-                    Text(if (downloading) "Stop" else "Remove", color = Destructive)
+                    Text(if (downloading) "Stop" else "Remove", color = HearthTheme.colors.destructive)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Cancel") } },
@@ -137,12 +128,12 @@ fun BookScreen(id: String) {
     }
     ActionSheet(menu, { menu = false }, title = b.title, subtitle = b.author, showCover = false) {
         if (row.finished || started) {
-            MenuItem("Mark as not started", Icons.Outlined.RadioButtonUnchecked) {
+            MenuItem("Mark as not started", HearthTheme.icons.markUnplayed) {
                 menu = false; c.appScope.launch { c.spoken.markFinished(id, null, false) }
             }
         }
         if (!row.finished) {
-            MenuItem("Mark as finished", Icons.Outlined.CheckCircle) {
+            MenuItem("Mark as finished", HearthTheme.icons.markPlayed) {
                 menu = false
                 c.appScope.launch { c.spoken.markFinished(id, null, true) }
                 actions.showUndo("Marked as finished") { c.spoken.markFinished(id, null, false) }
@@ -161,7 +152,7 @@ fun BookScreen(id: String) {
         },
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
             item(key = "header") {
                 SpokenHeader(
                     coverUrl, b.title,
@@ -175,19 +166,19 @@ fun BookScreen(id: String) {
                 )
             }
             item(key = "progress") {
-                Column(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), horizontalAlignment = Alignment.CenterHorizontally) {
                     when {
                         row.finished -> Text("Finished", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                         posSec > 0 && b.durationSec > 0 -> {
                             ListenedBar((posSec / b.durationSec).toFloat().coerceIn(0f, 1f), Modifier.widthIn(max = 280.dp).fillMaxWidth())
                             Spacer(Modifier.height(6.dp))
-                            Text(SpokenFormat.remaining(b.durationSec - posSec), color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                            Text(SpokenFormat.remaining(b.durationSec - posSec), color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
             }
             item(key = "buttons") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter), verticalAlignment = Alignment.CenterVertically) {
                     DownloadToggle(downloaded = downloaded, progress = if (downloading) downloadProgress ?: 0f else null) {
                         when {
                             downloaded || downloading -> confirmRemove = true
@@ -202,9 +193,9 @@ fun BookScreen(id: String) {
                     Button(
                         onClick = { if (isThis) c.player.playPause() else playBook(c, actions, id, downloaded) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = HearthTheme.spacing.m),
                     ) {
-                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+                        Icon(if (playing) HearthTheme.icons.pause else HearthTheme.icons.play, null)
                         Spacer(Modifier.width(6.dp))
                         Text(
                             when {
@@ -232,7 +223,7 @@ fun BookScreen(id: String) {
                 }
             } else if (b.detailsFetchedAt == 0L && c.network.cannotStream) {
                 item(key = "no-chapters") {
-                    Text("Chapters show up once you're online.", color = TextSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+                    Text("Chapters show up once you're online.", color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(HearthTheme.spacing.l))
                 }
             }
         }

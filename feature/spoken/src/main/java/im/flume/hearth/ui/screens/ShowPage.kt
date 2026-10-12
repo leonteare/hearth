@@ -17,19 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.filled.Refresh
-
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.ArrowCircleDown
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material.icons.outlined.CloudDownload
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -83,12 +69,8 @@ import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.UnavailablePage
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthShapes
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.ui.theme.NotOnServerAlpha
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
 import im.flume.hearth.util.userMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -154,7 +136,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
 
     if (podcastLookup == null) { Box(Modifier.fillMaxSize()); return } // not read from the phone yet
     if (p == null && (showFeedUrl == null || account == null)) {
-        if (loaded) UnavailablePage(Icons.Default.Podcasts, "This show isn't on your server any more")
+        if (loaded) UnavailablePage(HearthTheme.icons.podcast, "This show isn't on your server any more")
         else Box(Modifier.fillMaxSize())
         return
     }
@@ -207,16 +189,16 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
     // The show's ⋮ menu, in the same spot as on album, playlist and book pages.
     ActionSheet(menuOpen, onDismiss = { menuOpen = false }, title = title, subtitle = "Podcast", coverUrl = coverUrl, fallback = title) {
         if (account != null) {
-            MenuItem(if (following) "Unfollow" else "Follow", Icons.Default.Podcasts) { menuOpen = false; toggleFollow() }
+            MenuItem(if (following) "Unfollow" else "Follow", HearthTheme.icons.podcast) { menuOpen = false; toggleFollow() }
         }
         if (p != null && latest != null) {
-            MenuItem(if (latest.started) "Resume latest episode" else "Play latest episode", Icons.Default.PlayArrow) {
+            MenuItem(if (latest.started) "Resume latest episode" else "Play latest episode", HearthTheme.icons.play) {
                 menuOpen = false
                 playEpisode(c, actions, p.id, latest.episode.id, latest.downloadState == SpokenDownloadState.DONE)
             }
         }
-        MenuItem(if (newestFirst) "Show oldest first" else "Show newest first", Icons.AutoMirrored.Filled.Sort) { menuOpen = false; newestFirst = !newestFirst }
-        MenuItem("Check for new episodes", Icons.Default.Refresh) { menuOpen = false; refresh() }
+        MenuItem(if (newestFirst) "Show oldest first" else "Show newest first", HearthTheme.icons.sort) { menuOpen = false; newestFirst = !newestFirst }
+        MenuItem("Check for new episodes", HearthTheme.icons.refresh) { menuOpen = false; refresh() }
     }
 
     PullToRefreshBox(
@@ -224,7 +206,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
         onRefresh = { refresh() },
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
             item(key = "header") {
                 SpokenHeader(coverUrl, title, listOfNotNull(author, countLine), onMenu = { menuOpen = true })
             }
@@ -232,13 +214,13 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
                 item(key = "gone") {
                     Text(
                         "This show isn't on your server any more. Follow it, or pick an episode, to bring it back.",
-                        color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
+                        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
                     )
                 }
             }
             item(key = "buttons") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
                     if (account != null) {
                         FollowButton(following) { toggleFollow() }
                     }
@@ -256,9 +238,9 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
             item(key = "eps-head") {
                 SectionHeader("Episodes") {
                     TextButton(onClick = { newestFirst = !newestFirst }) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                        Icon(HearthTheme.icons.sort, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(if (newestFirst) "Newest" else "Oldest", color = TextSecondary)
+                        Text(if (newestFirst) "Newest" else "Oldest", color = HearthTheme.colors.textSecondary)
                     }
                 }
             }
@@ -267,13 +249,13 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
             }
             when {
                 merged.isEmpty() && feedState.loading -> item(key = "loading") {
-                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.5.dp)
                     }
                 }
                 merged.isEmpty() && (episodes != null || p == null) -> item(key = "empty") {
                     EmptyState(
-                        Icons.Default.Podcasts,
+                        HearthTheme.icons.podcast,
                         when {
                             c.network.cannotStream -> "No episodes on this phone yet. Connect to the internet to see them."
                             feedState.error != null -> "Couldn't load the episodes: ${feedState.error}. Pull down to try again."
@@ -283,8 +265,8 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
                 }
                 entries.isEmpty() && query.isNotBlank() -> item(key = "no-match") {
                     Text(
-                        "No episodes match \"$query\"", color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 16.dp),
+                        "No episodes match \"$query\"", color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.l),
                     )
                 }
             }
@@ -313,28 +295,28 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
 @Composable
 private fun EpisodeFilterField(query: String, onChange: (String) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter).padding(bottom = 8.dp)
-            .heightIn(min = 44.dp).clip(HearthShapes.Card).background(SurfaceHigh).padding(start = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter).padding(bottom = HearthTheme.spacing.s)
+            .heightIn(min = 44.dp).clip(HearthTheme.shapes.card).background(HearthTheme.colors.surfaceHigh).padding(start = HearthTheme.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Search, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+        Icon(HearthTheme.icons.search, null, tint = HearthTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = query,
             onValueChange = onChange,
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            cursorBrush = SolidColor(Color.White),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = HearthTheme.colors.text),
+            cursorBrush = SolidColor(HearthTheme.colors.text),
             modifier = Modifier.weight(1f),
             decorationBox = { inner ->
-                if (query.isEmpty()) Text("Find an episode", color = TextSecondary, style = MaterialTheme.typography.bodyLarge)
+                if (query.isEmpty()) Text("Find an episode", color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyLarge)
                 inner()
             },
         )
         if (query.isNotEmpty()) {
-            IconButton(onClick = { onChange("") }) { Icon(Icons.Default.Close, "Clear", tint = TextSecondary) }
+            IconButton(onClick = { onChange("") }) { Icon(HearthTheme.icons.close, "Clear", tint = HearthTheme.colors.textSecondary) }
         } else {
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(HearthTheme.spacing.m))
         }
     }
 }
@@ -377,23 +359,23 @@ private fun FeedEpisodeRow(ep: FeedEpisode, podcastId: String?, feedUrl: String,
                 onClick = play,
                 onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
             )
-            .padding(start = Dimens.Gutter, end = 4.dp, top = Dimens.RowPaddingV, bottom = Dimens.RowPaddingV),
+            .padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.xs, top = HearthTheme.spacing.rowPaddingV, bottom = HearthTheme.spacing.rowPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 ep.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge,
-                color = if (getting) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = NotOnServerAlpha),
+                color = if (getting) MaterialTheme.colorScheme.primary else HearthTheme.colors.text.copy(alpha = NotOnServerAlpha),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
                     getting -> CircularProgressIndicator(
-                        Modifier.size(12.dp), strokeWidth = 1.5.dp, color = MaterialTheme.colorScheme.primary, trackColor = TextSecondary.copy(alpha = 0.3f),
+                        Modifier.size(12.dp), strokeWidth = 1.5.dp, color = MaterialTheme.colorScheme.primary, trackColor = HearthTheme.colors.textSecondary.copy(alpha = 0.3f),
                     )
-                    failed -> Icon(Icons.Outlined.ErrorOutline, "Couldn't get it", Modifier.size(14.dp), tint = Destructive)
-                    else -> Icon(Icons.Outlined.Cloud, "Not on your server yet", Modifier.size(14.dp), tint = TextSecondary.copy(alpha = NotOnServerAlpha))
+                    failed -> Icon(HearthTheme.icons.failedOutline, "Couldn't get it", Modifier.size(14.dp), tint = HearthTheme.colors.destructive)
+                    else -> Icon(HearthTheme.icons.notOnServer, "Not on your server yet", Modifier.size(14.dp), tint = HearthTheme.colors.textSecondary.copy(alpha = NotOnServerAlpha))
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(HearthTheme.spacing.xs))
                 val line = listOfNotNull(
                     SpokenFormat.date(ep.publishedAt).ifEmpty { null },
                     SpokenFormat.length(ep.durationSec).ifEmpty { null },
@@ -405,20 +387,20 @@ private fun FeedEpisodeRow(ep: FeedEpisode, podcastId: String?, feedUrl: String,
                         else -> line
                     },
                     maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium,
-                    color = (if (failed) Destructive else TextSecondary).copy(alpha = if (getting) 1f else NotOnServerAlpha),
+                    color = (if (failed) HearthTheme.colors.destructive else HearthTheme.colors.textSecondary).copy(alpha = if (getting) 1f else NotOnServerAlpha),
                 )
             }
         }
-        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
+        IconButton(onClick = { menu = true }) { Icon(HearthTheme.icons.more, "More", tint = HearthTheme.colors.textSecondary) }
     }
     ActionSheet(menu, { menu = false }, title = ep.title, subtitle = showTitle, fallback = showTitle, coverUrl = podcastId?.let { c.spokenCover(it, 150) }) {
-        MenuItem(if (getting) "Play when it's ready" else "Play", Icons.Default.PlayArrow) { menu = false; play() }
-        MenuItem("Download to phone", Icons.Outlined.ArrowCircleDown) {
+        MenuItem(if (getting) "Play when it's ready" else "Play", HearthTheme.icons.play) { menu = false; play() }
+        MenuItem("Download to phone", HearthTheme.icons.download) {
             menu = false
             getEpisode(c, actions, podcastId, feedUrl, ep, FetchThen.DOWNLOAD)
         }
         if (!getting) {
-            MenuItem("Add to server", Icons.Outlined.CloudDownload) {
+            MenuItem("Add to server", HearthTheme.icons.fetchToServer) {
                 menu = false
                 getEpisode(c, actions, podcastId, feedUrl, ep, FetchThen.NOTHING)
             }
