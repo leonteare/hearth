@@ -118,13 +118,13 @@ class QueueEditMathTest {
     @Test
     fun `turning shuffle on keeps the hand-queued songs right after the current one`() {
         val manual = setOf(4, 5)
-        assertEquals(6, QueueEditMath.firstReplacedOnShuffle(current = 3, size = 10) { it in manual })
+        assertEquals(listOf(9, 8, 7, 6), QueueEditMath.replacedOnShuffle(current = 3, size = 10) { it in manual })
     }
 
     @Test
     fun `turning shuffle on with nothing queued by hand replaces everything after the current song`() {
-        assertEquals(4, QueueEditMath.firstReplacedOnShuffle(current = 3, size = 10) { false })
-        assertEquals(10, QueueEditMath.firstReplacedOnShuffle(current = 9, size = 10) { false })
+        assertEquals((9 downTo 4).toList(), QueueEditMath.replacedOnShuffle(current = 3, size = 10) { false })
+        assertEquals(emptyList<Int>(), QueueEditMath.replacedOnShuffle(current = 9, size = 10) { false })
     }
 
     @Test
@@ -164,5 +164,11 @@ class QueueEditMathTest {
         val (taken, rest) = QueueEditMath.take(listOf("a", "b"), max = 5) { false }
         assertTrue(taken.isEmpty())
         assertEquals(listOf("a", "b"), rest.toList())
+    }
+
+    @Test
+    fun `shuffling keeps a hand-queued song even when it sits after source songs`() {
+        // 0 current, 1 source, 2 hand-queued (e.g. after a drag), 3 source.
+        assertEquals(listOf(3, 1), QueueEditMath.replacedOnShuffle(current = 0, size = 4) { it == 2 })
     }
 }

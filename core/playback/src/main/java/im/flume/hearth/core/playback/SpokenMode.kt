@@ -136,12 +136,11 @@ internal suspend fun PlaybackService.exitSpoken() {
 internal suspend fun PlaybackService.backToMusic() = queueOps.withLock {
     val saved = store.loadMusic() ?: return@withLock
     exitSpoken()
-    val byId = c.library.songsByIds(saved.window).associateBy { it.id }
-    val items = saved.window.mapIndexedNotNull { i, id -> byId[id]?.toMediaItem(manual = saved.manual.getOrElse(i) { false }) }
+    val loaded = loadWindow(saved)
     store.clearMusic()
-    if (items.isEmpty()) { publishExtras(); return@withLock }
+    if (loaded == null) { publishExtras(); return@withLock }
     applySavedState(saved)
-    player.setMediaItems(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs)
+    player.setMediaItems(loaded.items, loaded.startIndex, loaded.startMs)
     player.prepare()
     player.play()
     publishExtras()

@@ -182,10 +182,9 @@ internal class SessionCallback(private val service: PlaybackService) : MediaSess
                     future.setException(UnsupportedOperationException("Nothing to resume"))
                     return@launch
                 }
-                val (saved, items) = loaded
-                applySavedState(saved)
+                applySavedState(loaded.saved)
                 publishExtras()
-                future.set(MediaSession.MediaItemsWithStartPosition(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs))
+                future.set(MediaSession.MediaItemsWithStartPosition(loaded.items, loaded.startIndex, loaded.startMs))
             }
             return future
         }

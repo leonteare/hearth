@@ -55,14 +55,20 @@ internal fun PlaybackService.saveQueueBlocking() {
     runBlocking { store.save(snap) }
 }
 
-internal suspend fun PlaybackService.loadSavedItems(): Pair<SavedQueue, List<MediaItem>>? {
-    val saved = store.load() ?: return null
+/** A saved music queue as player items, and where to start in them (index, position in ms). */
+internal class LoadedQueue(val saved: SavedQueue, val items: List<MediaItem>, val startIndex: Int, val startMs: Long)
+
+internal suspend fun PlaybackService.loadSavedItems(): LoadedQueue? = loadWindow(store.load() ?: return null)
+
+/** Songs gone from the library are dropped; the start moves with them (see [QueueRestore.start]). */
+internal suspend fun PlaybackService.loadWindow(saved: SavedQueue): LoadedQueue? {
     val byId = c.library.songsByIds(saved.window).associateBy { it.id }
     val items = saved.window.mapIndexedNotNull { i, id ->
         byId[id]?.toMediaItem(manual = saved.manual.getOrElse(i) { false })
     }
     if (items.isEmpty()) return null
-    return saved to items
+    val (index, ms) = QueueRestore.start(saved.window.map { it in byId }, saved.index, saved.positionMs)
+    return LoadedQueue(saved, items, index, ms)
 }
 
 internal suspend fun PlaybackService.restoreQueue(playWhenReady: Boolean) {
@@ -74,10 +80,10 @@ internal suspend fun PlaybackService.restoreQueue(playWhenReady: Boolean) {
         spokenNeedsServerCheck = true
         return
     }
-    val (saved, items) = loadSavedItems() ?: return
+    val loaded = loadSavedItems() ?: return
     if (player.mediaItemCount > 0) return
-    applySavedState(saved)
-    player.setMediaItems(items, QueueRestore.startIndex(saved.index, items.size), saved.positionMs)
+    applySavedState(loaded.saved)
+    player.setMediaItems(loaded.items, loaded.startIndex, loaded.startMs)
     player.prepare()
     player.playWhenReady = playWhenReady
     publishExtras()
@@ -94,10 +100,17 @@ internal fun PlaybackService.applySavedState(saved: SavedQueue) {
 /** Where a saved queue picks up again. */
 internal object QueueRestore {
     /**
-     * The song to start on among the [itemCount] (at least one) songs that could be loaded. Songs gone from
-     * the library are dropped, so the saved index is only kept within range.
+     * Where to start once songs gone from the library are dropped ([kept] says, per saved song, whether it
+     * could be loaded; at least one was): the same song as before, moved up by the songs dropped ahead of
+     * it, at the saved position. If that song itself is gone, the next one that's left, from its start (or
+     * the last one, if none follow).
      */
-    fun startIndex(savedIndex: Int, itemCount: Int): Int = savedIndex.coerceIn(0, itemCount - 1)
+    fun start(kept: List<Boolean>, savedIndex: Int, savedPositionMs: Long): Pair<Int, Long> {
+        val keptCount = kept.count { it }
+        val index = savedIndex.coerceIn(0, kept.lastIndex)
+        val before = (0 until index).count { kept[it] }
+        return if (kept[index]) before to savedPositionMs else before.coerceAtMost(keptCount - 1) to 0L
+    }
 
     /**
      * Seconds into the episode or book to start at, and whether it was finished. The phone's own record

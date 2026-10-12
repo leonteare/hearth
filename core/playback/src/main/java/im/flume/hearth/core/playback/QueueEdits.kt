@@ -141,9 +141,9 @@ internal fun PlaybackService.toggleShuffle() {
     shuffled = !shuffled
     val current = player.currentMediaItem?.mediaId
     val cur = player.currentMediaItemIndex
-    // Keep songs the user queued by hand; replace the rest of what follows.
-    val firstAuto = QueueEditMath.firstReplacedOnShuffle(cur, player.mediaItemCount) { player.getMediaItemAt(it).isManual }
-    if (firstAuto < player.mediaItemCount) player.removeMediaItems(firstAuto, player.mediaItemCount)
+    // Keep songs the user queued by hand (wherever they sit after the current one); replace the rest.
+    QueueEditMath.replacedOnShuffle(cur, player.mediaItemCount) { player.getMediaItemAt(it).isManual }
+        .forEach { player.removeMediaItem(it) }
     val upcoming = QueuePlanner.upcomingAfterToggle(context, current, shuffled)
     pending = ArrayDeque(upcoming)
     scope.launch {
@@ -241,11 +241,12 @@ internal object QueueEditMath {
     }
 
     /**
-     * Shuffle on or off: the first index replaced by the new order. The hand-queued songs after the current
-     * one are kept, counted as if they sat straight after it (where Play next and Add to queue put them).
+     * Shuffle on or off: the songs after the current one that the new order replaces, highest index first
+     * (so removing them in order is safe). Hand-queued songs are kept wherever they sit: after an undo or a
+     * drag they need not be straight after the current song.
      */
-    fun firstReplacedOnShuffle(current: Int, size: Int, isManual: (Int) -> Boolean): Int =
-        current + 1 + (current + 1 until size).count(isManual)
+    fun replacedOnShuffle(current: Int, size: Int, isManual: (Int) -> Boolean): List<Int> =
+        (current + 1 until size).filterNot(isManual).reversed()
 
     /** Repeat all with nothing left waiting: the source starts over (in a fresh order when shuffled). */
     fun startOverOnRepeat(pendingEmpty: Boolean, repeatMode: Int, hasSource: Boolean): Boolean =

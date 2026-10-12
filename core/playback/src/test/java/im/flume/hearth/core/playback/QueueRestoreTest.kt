@@ -10,19 +10,36 @@ class QueueRestoreTest {
         isFinished = finished, lastUpdate = 0, finishedAt = null, dirty = false, markedUnplayed = false,
     )
 
+    private val all = List(10) { true }
+
     @Test
-    fun `a saved queue picks up on the song it was on`() {
-        assertEquals(3, QueueRestore.startIndex(savedIndex = 3, itemCount = 10))
+    fun `a saved queue picks up on the song it was on at the saved position`() {
+        assertEquals(3 to 42_000L, QueueRestore.start(all, savedIndex = 3, savedPositionMs = 42_000))
     }
 
     @Test
-    fun `a saved index past the songs still in the library starts on the last one`() {
-        assertEquals(4, QueueRestore.startIndex(savedIndex = 9, itemCount = 5))
+    fun `songs gone from the library ahead of the current one move the start up with them`() {
+        // Songs 0 and 2 are gone: the song that was at 4 is now at 2, still at the saved position.
+        val kept = listOf(false, true, false, true, true, true)
+        assertEquals(2 to 42_000L, QueueRestore.start(kept, savedIndex = 4, savedPositionMs = 42_000))
     }
 
     @Test
-    fun `a broken negative index starts at the beginning`() {
-        assertEquals(0, QueueRestore.startIndex(savedIndex = -1, itemCount = 5))
+    fun `if the current song itself is gone the next one starts from the beginning`() {
+        val kept = listOf(true, true, false, true)
+        assertEquals(2 to 0L, QueueRestore.start(kept, savedIndex = 2, savedPositionMs = 42_000))
+    }
+
+    @Test
+    fun `if the current song and everything after it are gone the last one left starts`() {
+        val kept = listOf(true, true, false, false)
+        assertEquals(1 to 0L, QueueRestore.start(kept, savedIndex = 2, savedPositionMs = 42_000))
+    }
+
+    @Test
+    fun `a broken index is kept within the saved queue`() {
+        assertEquals(0 to 5L, QueueRestore.start(all, savedIndex = -1, savedPositionMs = 5))
+        assertEquals(9 to 5L, QueueRestore.start(all, savedIndex = 99, savedPositionMs = 5))
     }
 
     @Test
