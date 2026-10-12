@@ -183,8 +183,6 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
 ## Open questions
 - Nothing runs lint automatically. Work the 174 baselined issues down (95 are Media3 `UnsafeOptInUsageError` in
   `:core:playback`), or narrow the check?
-- Screenshots were recorded on Windows and CI compares them on Linux, exactly. If CI shows only sub-pixel noise, add a
-  small `changeThreshold` to `ScreenshotTest`'s `OPTIONS`.
 
 ## Mistake ledger
 - A regex that passed JVM tests crashed the app on Android (ICU rejects an unescaped `}`); `RegexLiteralsTest` now guards it.
@@ -193,3 +191,5 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
 - Changing a systemd timer's `OnCalendar` with `Persistent=true` started a missed run immediately; check `list-timers` and stop it if unwanted.
 - A screenshot test of a database-backed page can fire before its rows load; wait for the data (see `SpokenPagesScreenshots`' `Settled`), do not re-record.
 - The rules in this file rotted until `check-structure.sh` existed: if a rule matters, check it.
+- Linux draws text a shade differently from Windows, so CI saw a handful of changed pixels in screenshots that are
+  identical to the eye; `ScreenshotTest`'s `OPTIONS` now allows a hundredth of a percent of pixels to differ.

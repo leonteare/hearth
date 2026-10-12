@@ -65,7 +65,8 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
   `lintDebug` after a one-line change costs about 2 m 20 s against verify's 4 m 42 s.
 - **CI runs `verify.sh` on Linux** (`.github/workflows/verify.yml`, every push to main and every pull request), with
   `org.gradle.java.home` overridden in the runner's `~/.gradle/gradle.properties` so the checked-in Windows path is
-  ignored. This answers the old "can it build anywhere else" question. Screenshots are still compared exactly.
+  ignored. This answers the old "can it build anywhere else" question: yes. Linux draws text a shade differently, so
+  screenshot comparison allows a hundredth of a percent of the pixels to differ (CI saw 4-12 of about 700,000).
 - **Each module documents itself** in its own `README.md` (2.21.0). CLAUDE.md keeps the map, the rules and the ledger;
   the file-by-file detail lives next to the code, so an agent reads one README instead of the whole map.
 - **The visualiser is its own module** `:feature:visualiser` (2.21.0), not a package inside `:feature:player`. The two
