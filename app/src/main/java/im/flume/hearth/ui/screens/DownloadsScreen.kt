@@ -1,10 +1,9 @@
+// The Downloads page: the status card and what's downloading, waiting, failed and recently finished.
 package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -12,11 +11,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,34 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.container
 import im.flume.hearth.data.DownloadState
-import im.flume.hearth.spoken.SpokenDownloadRow
-import im.flume.hearth.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenKey
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Podcasts
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Refresh
-import im.flume.hearth.data.RequestEntity
-import im.flume.hearth.data.RequestIntent
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.filled.Favorite
-import im.flume.hearth.data.RequestStatus
-import im.flume.hearth.api.TidalType
-import im.flume.hearth.ui.components.AvailabilityIcon
-import im.flume.hearth.ui.components.LocalGetMusic
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.RemoteCover
-import im.flume.hearth.ui.components.comingLabel
-import im.flume.hearth.ui.components.remoteAlbumId
-import im.flume.hearth.ui.components.remoteArtistId
-import im.flume.hearth.ui.theme.NotOnServerAlpha
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.graphics.Color
 import im.flume.hearth.data.PlaySource
+import im.flume.hearth.data.RequestStatus
 import im.flume.hearth.data.SongEntity
+import im.flume.hearth.spoken.SpokenDownloadState
 import im.flume.hearth.ui.components.BannerCard
 import im.flume.hearth.ui.components.EmptyState
 import im.flume.hearth.ui.components.LocalActions
@@ -65,14 +39,12 @@ import im.flume.hearth.ui.components.TopBar
 import im.flume.hearth.ui.components.formatBytes
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.theme.Destructive
-import im.flume.hearth.ui.theme.Dimens
 import im.flume.hearth.ui.theme.TextSecondary
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /** How far back "Finished" reaches. */
 private const val FINISHED_WINDOW_MS = 24 * 60 * 60 * 1000L
-private const val SECTION_LIMIT = 50
+internal const val SECTION_LIMIT = 50
 
 /**
  * What's downloading, waiting, failed and recently finished. Not a playlist: finished downloads live
@@ -245,151 +217,4 @@ private fun LazyListScope.finishedSection(finished: List<SongEntity>, onPlay: (S
     if (finished.isEmpty()) return
     item(key = "done-head") { SectionHeader("Finished") }
     items(finished, key = { "done:${it.id}" }) { song -> Column(Modifier.animateItem()) { SongRow(song, onClick = { onPlay(song) }) } }
-}
-
-/** Something on its way to the server: where it is, and ⋯ to try again or cancel. */
-@Composable
-private fun ComingRow(r: RequestEntity, modifier: Modifier = Modifier) {
-    val actions = LocalActions.current
-    val get = LocalGetMusic.current
-    val failed = r.status == RequestStatus.FAILED
-    val what = when (r.type) {
-        TidalType.ALBUM.api -> "Album · ${r.artist}"
-        TidalType.ARTIST.api -> "All their music"
-        else -> r.artist
-    }
-    MediaRow(
-        title = r.title,
-        subtitle = listOfNotNull(if (r.type == TidalType.ARTIST.api) comingLabel(r) else RequestIntent.stageLabel(r), what).joinToString(" · "),
-        onClick = {
-            when (r.type) {
-                TidalType.ALBUM.api -> actions.openAlbum(remoteAlbumId(r.tidalId))
-                TidalType.ARTIST.api -> actions.openArtist(remoteArtistId(r.tidalId))
-                else -> get.requestMenu = r
-            }
-        },
-        onLongClick = { get.requestMenu = r },
-        modifier = modifier,
-        round = r.type == TidalType.ARTIST.api,
-        cover = { RemoteCover(r.coverUuid, r.title) },
-        titleColor = Color.White.copy(alpha = NotOnServerAlpha),
-        subtitleColor = if (failed) Destructive else TextSecondary,
-        subtitleIcon = { AvailabilityIcon(r) },
-        trailing = {
-            if (failed) TextButton(onClick = { get.retry(r) }) { Text("Try again") }
-            // What it'll do when it arrives: ♡ liked (or saved), ⬇ downloaded to this phone.
-            if (!failed && r.type != TidalType.ARTIST.api) {
-                val album = r.type == TidalType.ALBUM.api
-                if (r.like) Icon(
-                    Icons.Default.Favorite, if (album) "Will be saved" else "Will be liked",
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(16.dp),
-                )
-                if (r.toPhone) Icon(
-                    Icons.Outlined.ArrowCircleDown, "Will download to your phone",
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 2.dp).size(18.dp),
-                )
-            }
-            IconButton(onClick = { get.requestMenu = r }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) }
-        },
-    )
-}
-
-@Composable
-private fun MoreLine(text: String) {
-    Text(
-        text, color = TextSecondary, style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 8.dp),
-    )
-}
-
-/** A song waiting to download, with a progress bar while it's on its way. Collects only its own progress. */
-@Composable
-private fun PendingSongRow(song: SongEntity, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val c = LocalContext.current.container
-    // null when not downloading; 0 when the size isn't known yet.
-    val progress by remember(song.id) {
-        c.downloads.progress.map { if (song.id in it) it[song.id] ?: 0f else null }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(null)
-    Column(modifier) {
-        SongRow(song, onClick = onClick)
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
-                trackColor = TextSecondary.copy(alpha = 0.25f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-        }
-    }
-}
-
-/** Podcast / audiobook downloads in a section of their own (when no songs share that section). */
-private fun LazyListScope.spokenSection(
-    key: String,
-    title: String,
-    rows: List<SpokenDownloadRow>,
-    trailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
-) {
-    if (rows.isEmpty()) return
-    item(key = "$key-head") { SectionHeader(title, trailing = trailing) }
-    spokenRows(key, rows)
-}
-
-private fun LazyListScope.spokenRows(key: String, rows: List<SpokenDownloadRow>) {
-    items(rows.take(SECTION_LIMIT), key = { "$key:${it.download.libraryItemId}/${it.download.episodeId}" }) { r -> SpokenDownloadListRow(r, Modifier.animateItem()) }
-}
-
-/** An episode or book download: cover, what it is, and progress while it's on its way. Tap opens its page. */
-@Composable
-private fun SpokenDownloadListRow(r: SpokenDownloadRow, modifier: Modifier = Modifier) {
-    val c = LocalContext.current.container
-    val actions = LocalActions.current
-    val d = r.download
-    val key = SpokenKey(d.libraryItemId, d.episodeId)
-    val progress by remember(key) {
-        c.spoken.downloads.progress.map { if (key in it) it[key] ?: 0f else null }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(null)
-    var menu by remember { mutableStateOf(false) }
-    val title = r.title ?: if (d.isBook) "Audiobook" else "Episode"
-    Column(modifier) {
-        MediaRow(
-            title,
-            when (d.state) {
-                SpokenDownloadState.FAILED -> d.error ?: "Couldn't download"
-                SpokenDownloadState.DONE -> listOfNotNull(r.subtitle, formatBytes(d.bytes).takeIf { d.bytes > 0 }).joinToString(" · ")
-                else -> listOfNotNull(if (d.isBook) "Audiobook" else "Podcast", r.subtitle).joinToString(" · ")
-            },
-            onClick = { actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId)) },
-            coverUrl = c.spokenCover(d.libraryItemId, 150),
-            fallback = r.subtitle ?: title,
-            subtitleColor = if (d.state == SpokenDownloadState.FAILED) Destructive else TextSecondary,
-            trailing = { IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More", tint = TextSecondary) } },
-        )
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress ?: 0f },
-                modifier = Modifier.fillMaxWidth().padding(start = Dimens.Gutter + Dimens.RowCover + Dimens.CoverGap, end = Dimens.Gutter).height(3.dp),
-                trackColor = TextSecondary.copy(alpha = 0.25f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-        }
-    }
-    im.flume.hearth.ui.components.ActionSheet(menu, { menu = false }, title = title, subtitle = r.subtitle, coverUrl = c.spokenCover(d.libraryItemId, 150), fallback = r.subtitle) {
-        if (d.state == SpokenDownloadState.FAILED) {
-            im.flume.hearth.ui.components.MenuItem("Try again", Icons.Default.Refresh) { menu = false; c.spoken.downloads.retryFailed() }
-        }
-        im.flume.hearth.ui.components.MenuItem(
-            if (d.state == SpokenDownloadState.DONE) "Remove download" else "Cancel download",
-            Icons.Default.Close,
-        ) {
-            menu = false
-            if (d.state == SpokenDownloadState.DONE && !d.isBook) removeEpisodeDownload(c, actions, d.libraryItemId, d.episodeId)
-            else c.spoken.downloads.remove(d.libraryItemId, d.episodeId)
-        }
-        im.flume.hearth.ui.components.MenuItem(if (d.isBook) "Go to book" else "Go to show", if (d.isBook) Icons.AutoMirrored.Filled.MenuBook else Icons.Default.Podcasts) {
-            menu = false; actions.open(if (d.isBook) bookRoute(d.libraryItemId) else podcastRoute(d.libraryItemId))
-        }
-    }
 }
