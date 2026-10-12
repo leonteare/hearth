@@ -25,7 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.components.PreviewBar
-import im.flume.hearth.ui.screens.MiniPlayer
+import im.flume.hearth.feature.player.MiniPlayer
 import im.flume.hearth.core.ui.theme.HearthIcons
 import im.flume.hearth.core.ui.theme.HearthTheme
 

@@ -1,0 +1,152 @@
+package im.flume.hearth.feature.library
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.core.text.HtmlCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import im.flume.hearth.core.network.AlbumDto
+import im.flume.hearth.core.network.ArtistInfo
+import im.flume.hearth.core.network.ItemDate
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaCard
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.formatLongDuration
+import im.flume.hearth.core.ui.theme.HearthTheme
+import java.time.LocalDate
+import java.time.Month
+import java.time.format.TextStyle
+import java.util.Locale
+import im.flume.hearth.core.ui.screens.coverArt
+
+private fun cleanHtml(html: String?): String? {
+    if (html.isNullOrBlank()) return null
+    val text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+        .replace(Regex("\\s*Read more on Last\\.fm\\.?\\s*$", RegexOption.IGNORE_CASE), "")
+        .trim()
+    return text.takeIf { it.isNotBlank() }
+}
+
+private fun formatDate(d: ItemDate?): String? {
+    val year = d?.year?.takeIf { it > 0 } ?: return null
+    val month = d.month?.takeIf { it in 1..12 } ?: return year.toString()
+    val monthName = Month.of(month).getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val day = d.day?.takeIf { it in 1..31 } ?: return "$monthName $year"
+    return runCatching { LocalDate.of(year, month, day) }.map { "$day $monthName $year" }.getOrDefault("$monthName $year")
+}
+
+/** Collapsible block of prose: 4 lines until tapped. */
+@Composable
+fun AboutText(title: String, text: String, link: String?) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    SectionHeader(title)
+    Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter).animateContentSize()) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = HearthTheme.colors.textSecondary,
+            maxLines = if (expanded) Int.MAX_VALUE else 4,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable { expanded = !expanded },
+        )
+        if (link != null) {
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .clickable(role = Role.Button) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    "Read more on Last.fm",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+/** Small print under an album's track list, Spotify-style, plus album notes if the server has any. */
+@Composable
+fun AlbumDetails(album: AlbumEntity?, albumId: String, songCount: Int, totalSec: Long) {
+    val c = LocalContext.current.container
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
+    var full by remember(albumId) { mutableStateOf<AlbumDto?>(null) }
+    var notes by remember(albumId) { mutableStateOf<String?>(null) }
+    var notesLink by remember(albumId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(albumId, online) {
+        if (!online) return@LaunchedEffect
+        full = runCatching { c.api.album(albumId) }.getOrNull()
+        runCatching { c.api.albumInfo(albumId) }.getOrNull()?.let { info ->
+            notes = cleanHtml(info.notes)
+            notesLink = info.lastFmUrl?.takeIf { notes != null }
+        }
+    }
+    val released = formatDate(full?.releaseDate) ?: album?.year?.toString()
+    val original = formatDate(full?.originalReleaseDate)?.takeIf { it != released }
+    val lines = listOfNotNull(
+        released?.let { "Released $it" },
+        original?.let { "Originally released $it" },
+        "$songCount songs, ${formatLongDuration(totalSec)}",
+        full?.recordLabels?.map { it.name }?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { "© $it" },
+        (full?.genre ?: album?.genre)?.takeIf { it.isNotBlank() },
+    )
+    Column(Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = 20.dp), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)) {
+        lines.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary) }
+    }
+    notes?.let { AboutText("About this album", it, notesLink) }
+}
+
+/** Biography and similar artists (only ones in your library), shown at the bottom of an artist page. */
+@Composable
+fun ArtistAbout(artistId: String) {
+    val c = LocalContext.current.container
+    val online by c.network.isOnline.collectAsStateWithLifecycle()
+    var info by remember(artistId) { mutableStateOf<ArtistInfo?>(null) }
+    LaunchedEffect(artistId, online) {
+        if (!online) return@LaunchedEffect
+        info = runCatching { c.api.artistInfo(artistId) }.getOrNull()
+    }
+    val bio = cleanHtml(info?.biography)
+    if (bio != null) AboutText("About", bio, info?.lastFmUrl)
+
+    val fans = info?.similarArtist.orEmpty().filter { it.id.isNotBlank() && it.albumCount > 0 }
+    if (fans.isNotEmpty()) {
+        SectionHeader("Fans also like")
+        val actions = LocalActions.current
+        LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
+            items(fans, key = { it.id }) { a ->
+                MediaCard(a.name, null, onClick = { actions.openArtist(a.id) }, coverArt = a.coverArt, width = 110.dp, round = true)
+            }
+        }
+    }
+}

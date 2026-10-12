@@ -31,9 +31,9 @@ import androidx.compose.ui.platform.LocalDensity
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
-import im.flume.hearth.ui.screens.NowPlayingScreen
-import im.flume.hearth.ui.screens.QueueScreen
-import im.flume.hearth.ui.screens.visualiser.VisualiserScreen
+import im.flume.hearth.feature.player.NowPlayingScreen
+import im.flume.hearth.feature.player.QueueScreen
+import im.flume.hearth.feature.player.visualiser.VisualiserScreen
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 /**

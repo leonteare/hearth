@@ -18,6 +18,7 @@ import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.ui.theme.HearthColors
 import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
+import im.flume.hearth.feature.settings.LoginScreen
 
 class MainActivity : ComponentActivity() {
 

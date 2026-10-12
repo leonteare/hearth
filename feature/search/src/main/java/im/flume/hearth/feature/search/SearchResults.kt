@@ -1,0 +1,183 @@
+// The list under the search box: recent searches and genres before you type, then the ranked results.
+package im.flume.hearth.feature.search
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import im.flume.hearth.domain.music.AlbumItem
+import im.flume.hearth.domain.music.ArtistItem
+import im.flume.hearth.core.data.GenreCount
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.domain.SearchHit
+import im.flume.hearth.core.data.SearchIndex
+import im.flume.hearth.domain.music.SongItem
+import im.flume.hearth.core.data.spoken.PodcastEntity
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MissingAlbumRow
+import im.flume.hearth.core.ui.components.MissingArtistRow
+import im.flume.hearth.core.ui.components.MissingSongRow
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.SongRow
+import im.flume.hearth.core.ui.components.remoteAlbumId
+import im.flume.hearth.core.ui.components.remoteArtistId
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.AlbumListRow
+import im.flume.hearth.core.ui.screens.ArtistRow
+import im.flume.hearth.core.ui.screens.BookListRow
+import im.flume.hearth.core.ui.screens.DirectoryRow
+import im.flume.hearth.core.ui.screens.EpisodeListRow
+import im.flume.hearth.core.ui.screens.PodcastListRow
+import im.flume.hearth.core.ui.screens.gridColumns
+
+/** Before anything is typed: recent searches (with Clear), then a grid of genres to browse. */
+internal fun LazyListScope.searchLanding(
+    recent: List<String>,
+    onClearRecent: () -> Unit,
+    onPickRecent: (String) -> Unit,
+    genres: List<GenreCount>,
+    gridColumns: Int,
+    onOpenGenre: (String) -> Unit,
+) {
+    if (recent.isNotEmpty()) {
+        item {
+            SectionHeader("Recent searches") {
+                TextButton(onClick = onClearRecent) { Text("Clear", color = HearthTheme.colors.textSecondary) }
+            }
+        }
+        items(recent.take(RECENT_SEARCHES), key = { "r:$it" }) { r ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onPickRecent(r) }.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(HearthTheme.icons.history, null, tint = HearthTheme.colors.textSecondary)
+                Spacer(Modifier.width(HearthTheme.spacing.l))
+                Text(r, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+    if (genres.isNotEmpty()) item { SectionHeader("Browse genres") }
+    items(genres.chunked(gridColumns)) { pair ->
+        Row(Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.s)) {
+            pair.forEach { g ->
+                Box(
+                    Modifier.weight(1f).heightIn(min = 72.dp).clip(HearthTheme.shapes.card)
+                        .background(genreColor(g.genre, HearthTheme.colors.genrePalette)).clickable { onOpenGenre(g.genre) }.padding(HearthTheme.spacing.m)
+                ) {
+                    Text(g.genre, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            repeat(gridColumns - pair.size) { Spacer(Modifier.weight(1f)) }
+        }
+    }
+}
+
+/** With something typed: progress notes, every hit best first, and a line when nothing matched. */
+internal fun LazyListScope.searchResults(
+    query: String,
+    filter: SearchFilter,
+    indexing: Boolean,
+    library: SearchIndex.Results,
+    hits: List<SearchHit>,
+    shown: List<SearchHit>,
+    directoryLoading: Boolean,
+    podcasts: List<PodcastEntity>,
+    username: String?,
+    playSong: (String) -> Unit,
+) {
+    if (indexing) {
+        item(key = "indexing") { SearchProgressNote("Getting your library ready to search…") }
+    }
+    if (library.fuzzy && !library.isEmpty) {
+        item(key = "close") {
+            Text(
+                "No exact matches. Showing close matches.",
+                color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.s),
+            )
+        }
+    }
+    items(shown, key = { it.key }) { hit ->
+        Column(Modifier.animateItem()) {
+            SearchHitRow(hit, podcasts, username, playSong)
+        }
+    }
+    val lookingForPodcasts = directoryLoading && (filter == SearchFilter.ALL || filter == SearchFilter.PODCASTS)
+    if (lookingForPodcasts) {
+        item(key = "directory-loading") { SearchProgressNote("Looking for more podcasts…") }
+    }
+    if (!indexing && !directoryLoading && shown.isEmpty()) {
+        item(key = "none") {
+            Text(
+                if (hits.isEmpty()) "No results for \"$query\"" else "No ${filter.label.lowercase()} for \"$query\"",
+                color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(HearthTheme.spacing.l),
+            )
+        }
+    }
+}
+
+/** A small spinner with a line saying what's still being looked up. */
+@Composable
+private fun SearchProgressNote(text: String) {
+    Row(Modifier.padding(horizontal = HearthTheme.spacing.l, vertical = HearthTheme.spacing.m), verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        Spacer(Modifier.width(HearthTheme.spacing.m))
+        Text(text, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** One row of Search's list, in the same row the rest of the app uses for that kind of thing. */
+@Composable
+private fun SearchHitRow(
+    hit: SearchHit,
+    podcasts: List<PodcastEntity>,
+    username: String?,
+    playSong: (String) -> Unit,
+) {
+    val actions = LocalActions.current
+    when (hit) {
+        is SearchHit.Artist -> when (val a = hit.item) {
+            is ArtistItem.Owned -> ArtistRow(a.artist)
+            is ArtistItem.Missing -> MissingArtistRow(a.artist) { actions.openArtist(remoteArtistId(a.artist.id)) }
+        }
+        is SearchHit.Album -> when (val a = hit.item) {
+            is AlbumItem.Owned -> AlbumListRow(a.album)
+            is AlbumItem.Missing -> MissingAlbumRow(a.album) { actions.openAlbum(remoteAlbumId(a.album.id)) }
+        }
+        is SearchHit.Song -> when (val s = hit.item) {
+            is SongItem.Owned -> SongRow(s.song, onClick = { playSong(s.song.id) }, subtitle = "Song • ${s.song.artist}")
+            is SongItem.Missing -> MissingSongRow(s.track, subtitle = "Song • ${s.track.artist}")
+        }
+        is SearchHit.Podcast -> PodcastListRow(hit.podcast)
+        is SearchHit.DirectoryPodcast -> DirectoryRow(hit.result, podcasts, username)
+        is SearchHit.Episode -> EpisodeListRow(hit.row, showCover = true, withShow = true, label = "Episode")
+        is SearchHit.Book -> BookListRow(hit.row)
+    }
+}
+
+/** The same genre always gets the same tile colour, so the grid looks the same every visit. */
+internal fun genreColor(name: String, palette: List<Color>): Color =
+    palette[(name.hashCode() and 0x7fffffff) % palette.size]

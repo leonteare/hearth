@@ -14,6 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import im.flume.hearth.feature.home.homeRoutes
+import im.flume.hearth.feature.library.libraryRoutes
+import im.flume.hearth.feature.search.searchRoutes
+import im.flume.hearth.feature.settings.settingsRoutes
+import im.flume.hearth.feature.spoken.spokenRoutes
 
 /** How long a page (or the full-screen player) takes to slide in or out. */
 internal const val SLIDE_MS = 280

@@ -50,10 +50,10 @@ import im.flume.hearth.core.ui.components.LocalTabRequests
 import im.flume.hearth.core.ui.components.PrefetchPlayerCovers
 import im.flume.hearth.core.ui.components.RowContext
 import im.flume.hearth.core.ui.components.rememberGetMusic
-import im.flume.hearth.ui.screens.LocalSearchFocus
+import im.flume.hearth.feature.search.LocalSearchFocus
 import im.flume.hearth.core.ui.screens.LocalSpokenNow
-import im.flume.hearth.ui.screens.SearchFocusRequest
-import im.flume.hearth.ui.screens.allDownloadCounts
+import im.flume.hearth.feature.search.SearchFocusRequest
+import im.flume.hearth.feature.home.allDownloadCounts
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 @Composable

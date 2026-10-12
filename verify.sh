@@ -3,7 +3,7 @@
 # Exit code is non-zero on any failure. release.sh runs this before it builds.
 #
 #   ./verify.sh                 # compileDebugKotlin + testDebugUnitTest (screenshot tests compare with their references)
-#   ./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'   # extra args go to Gradle
+#   ./verify.sh --tests 'im.flume.hearth.domain.music.playback.QueuePlannerTest'   # extra args go to Gradle
 set -uo pipefail
 cd "$(dirname "$0")"
 

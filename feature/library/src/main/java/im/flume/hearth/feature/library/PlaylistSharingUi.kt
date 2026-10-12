@@ -1,0 +1,254 @@
+package im.flume.hearth.feature.library
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import im.flume.hearth.core.common.PasswordNeededException
+import im.flume.hearth.core.common.WrongPasswordException
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.domain.music.PlaylistItem
+import im.flume.hearth.domain.music.PlaylistRules
+import im.flume.hearth.domain.music.ShareRole
+import im.flume.hearth.domain.music.Sharing
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.BannerCard
+import im.flume.hearth.core.ui.components.ChoiceSheet
+import im.flume.hearth.core.ui.components.IconTile
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.couldNot
+import java.io.IOException
+import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.coverArt
+
+private fun roleLabel(role: ShareRole) = when (role) {
+    ShareRole.ADD -> "Can add songs"
+    ShareRole.VIEW -> "Can listen"
+}
+
+/** Shown on a playlist someone invited you to: accept to keep it, decline to make it go away. */
+@Composable
+fun InviteBanner(item: PlaylistItem) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val invite = item.access.invite ?: return
+    val owner = PlaylistRules.displayName(item.access.owner)
+    val what = if (invite == ShareRole.ADD) "add songs to this playlist" else "listen to this playlist"
+    BannerCard(
+        title = null,
+        body = "$owner invited you to $what",
+        icon = HearthTheme.icons.share,
+        tinted = true,
+        actions = {
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = {
+                c.appScope.launch {
+                    runCatching { c.library.answerInvite(item.playlist.id, accept = false) }
+                        .onSuccess {
+                            // Declining hides the playlist, so a mis-tap needs a way back: ask to be invited again.
+                            actions.showUndo("Invite declined") {
+                                val me = c.session.credentials.value?.username ?: return@showUndo
+                                c.session.setPlaylistDecision(item.playlist.id, null)
+                                runCatching { c.library.updateSharing(item.playlist.id) { it.withRole(me, invite) } }
+                                    .onFailure { e -> actions.showMessage(couldNot("Couldn't bring the invite back", e, !c.network.isOnline.value)) }
+                            }
+                        }
+                        .onFailure { actions.showMessage(couldNot("Couldn't decline the invite", it, !c.network.isOnline.value)) }
+                }
+            }) { Text("Decline", color = HearthTheme.colors.textSecondary) }
+            TextButton(onClick = {
+                c.appScope.launch {
+                    runCatching { c.library.answerInvite(item.playlist.id, accept = true) }
+                        .onSuccess { actions.showMessage("Added to Your Library") }
+                        .onFailure { actions.showMessage(couldNot("Couldn't accept the invite", it, !c.network.isOnline.value)) }
+                }
+            }) { Text("Accept") }
+        },
+    )
+}
+
+/**
+ * The owner's share sheet: everyone on the server (or a typed username, when the account can't list
+ * users), each shared as "can add", "can listen" or not at all. New people get an invite to accept.
+ */
+@Composable
+fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
+    val c = LocalContext.current.container
+    val actions = LocalActions.current
+    val me = c.session.credentials.collectAsStateWithLifecycle().value?.username?.lowercase()
+    val sharing = item.access.sharing ?: Sharing()
+    var users by remember { mutableStateOf<List<String>?>(null) }
+    var listFailed by remember { mutableStateOf(false) }
+    var typed by remember { mutableStateOf("") }
+    var choosing by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        // Navidrome's own API lists every account (admins); its Subsonic one only ever lists you.
+        // Anyone who owns a playlist this phone can see has an account too.
+        val listed = runCatching { c.nativeApi.userNames() }.recoverCatching { c.api.users().map { it.username } }
+        val owners = runCatching { c.library.dao.playlistsOnce().mapNotNull { it.owner } }.getOrDefault(emptyList())
+        users = (listed.getOrDefault(emptyList()) + owners).map { it.lowercase() }.distinct()
+        listFailed = listed.isFailure && users.isNullOrEmpty() // Only admins can list accounts.
+    }
+    val names = (users.orEmpty() + sharing.members.keys + sharing.invites.keys)
+        .filter { it.isNotBlank() && it != me && it != item.access.owner }
+        .distinct().sorted()
+
+    fun status(u: String): String = sharing.members[u]?.let(::roleLabel)
+        ?: sharing.invites[u]?.let { "Invited • ${roleLabel(it).lowercase()}" }
+        ?: "Not shared"
+
+    fun apply(u: String, role: ShareRole?) {
+        val name = PlaylistRules.displayName(u)
+        val wasShared = u in sharing.members || u in sharing.invites
+        c.appScope.launch {
+            runCatching { c.library.updateSharing(item.playlist.id) { it.withRole(u, role) } }
+                .onSuccess {
+                    actions.showMessage(
+                        when {
+                            role == null -> "Stopped sharing with $name"
+                            wasShared -> "Updated $name"
+                            else -> "Invited $name"
+                        }
+                    )
+                }
+                .onFailure { actions.showMessage(couldNot("Couldn't update sharing", it, !c.network.isOnline.value)) }
+        }
+    }
+
+    ActionSheet(
+        open = true, onDismiss = onDismiss, title = "Share \"${item.playlist.name}\"",
+        subtitle = "They'll see it in Hearth once they accept", coverArt = item.playlist.coverArt, fallback = item.playlist.name,
+    ) {
+        Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+            if (users == null) {
+                Row(Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl), horizontalArrangement = Arrangement.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp))
+                }
+            }
+            names.forEach { u ->
+                MediaRow(
+                    PlaylistRules.displayName(u), status(u), onClick = { choosing = u }, round = true,
+                    cover = { IconTile(HearthTheme.icons.artist, HearthTheme.colors.outline) },
+                )
+            }
+            if (users != null && names.isEmpty() && !listFailed) {
+                Text(
+                    "No one else has an account on this server yet.",
+                    color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m),
+                )
+            }
+            if (listFailed) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        typed, { typed = it }, singleLine = true, modifier = Modifier.weight(1f),
+                        placeholder = { Text("Their Navidrome username") },
+                    )
+                    Spacer(Modifier.width(HearthTheme.spacing.s))
+                    TextButton(enabled = typed.isNotBlank(), onClick = { choosing = typed.trim().lowercase(); typed = "" }) { Text("Share") }
+                }
+            }
+        }
+    }
+
+    choosing?.let { u ->
+        ChoiceSheet(
+            open = true,
+            title = PlaylistRules.displayName(u),
+            options = listOf<Pair<ShareRole?, String>>(ShareRole.ADD to "Can add songs", ShareRole.VIEW to "Can listen", null to "Not shared"),
+            selected = sharing.members[u] ?: sharing.invites[u],
+            onDismiss = { choosing = null },
+            onPick = { role -> if (role != (sharing.members[u] ?: sharing.invites[u])) apply(u, role) },
+        )
+    }
+}
+
+/**
+ * Asks for the Navidrome password once, checks it with the server, then keeps it encrypted on the
+ * phone. Navidrome only accepts playlist photos through its own API, which needs a real login.
+ */
+@Composable
+fun PasswordDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
+    val c = LocalContext.current.container
+    val scope = rememberCoroutineScope()
+    var password by remember { mutableStateOf("") }
+    var checking by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { if (!checking) onDismiss() },
+        title = { Text("Your Navidrome password") },
+        text = {
+            Column {
+                Text("Hearth needs your password once to change playlist photos. It's kept encrypted on this phone.")
+                Spacer(Modifier.size(HearthTheme.spacing.m))
+                OutlinedTextField(
+                    password, { password = it; error = null }, singleLine = true, enabled = !checking,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    placeholder = { Text("Password") },
+                    isError = error != null,
+                    supportingText = error?.let { { Text(it) } },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = password.isNotEmpty() && !checking, onClick = {
+                val creds = c.session.credentials.value ?: return@TextButton
+                checking = true
+                scope.launch {
+                    val result = runCatching {
+                        c.nativeApi.login(creds.serverUrl, creds.username, password)
+                        c.session.vault.save(password)
+                    }
+                    checking = false
+                    result.onSuccess { onSaved() }.onFailure { e ->
+                        error = when (e) {
+                            is WrongPasswordException -> "That password didn't work"
+                            is IOException -> "Couldn't reach the server"
+                            else -> "Couldn't save the password on this phone"
+                        }
+                    }
+                }
+            }) { Text(if (checking) "Checking…" else "Continue") }
+        },
+        dismissButton = { TextButton(enabled = !checking, onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Error text for a failed photo change; a stale saved password is forgotten so the next try asks again. */
+internal fun photoError(e: Throwable, clearPassword: () -> Unit): String = when (e) {
+    is WrongPasswordException, is PasswordNeededException -> {
+        clearPassword()
+        "Navidrome didn't accept your saved password. Try again to enter it."
+    }
+    is IOException -> e.message?.takeIf { it.startsWith("That photo") } ?: couldNot("Couldn't change the photo", e)
+    else -> "Couldn't use that photo"
+}
