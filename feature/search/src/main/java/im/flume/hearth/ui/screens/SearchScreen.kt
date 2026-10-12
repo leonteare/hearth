@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.api.AbsPodcastSearchResult
 import im.flume.hearth.api.TidalSearchResults
@@ -41,6 +40,7 @@ import im.flume.hearth.spoken.SpokenSearchResults
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.LocalTabRequests
 import im.flume.hearth.ui.components.PageHeader
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -178,7 +178,7 @@ fun SearchScreen() {
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Search")
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(HearthTheme.spacing.s))
         SearchField(
             query = query,
             onQueryChange = { query = it },
@@ -188,7 +188,7 @@ fun SearchScreen() {
         )
         SearchFilterChips(filter) { filter = it }
 
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.s)) {
             if (query.isBlank()) {
                 searchLanding(
                     recent = recent,
