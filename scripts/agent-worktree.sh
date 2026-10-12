@@ -16,13 +16,17 @@ remove_dir() {
     git worktree unlock "$dir" 2>/dev/null || true
     git worktree remove --force --force "$dir" 2>/dev/null || true
     if [ -d "$dir" ]; then
-        # Build outputs nest deeper than Windows' 260-character limit; rd with the \\?\ prefix ignores it.
-        if command -v cmd.exe >/dev/null 2>&1; then
-            cmd.exe //c "rd /s /q \"\\\\?\\$(cygpath -w "$(pwd)/$dir")\"" >/dev/null 2>&1 || true
+        # Build outputs nest deeper than Windows' 260-character limit; PowerShell with the \\?\ prefix ignores it.
+        if command -v powershell.exe >/dev/null 2>&1; then
+            local win
+            win="$(cygpath -w "$(pwd)/$dir")"
+            powershell.exe -NoProfile -Command "Remove-Item -LiteralPath '\\\\?\\$win' -Recurse -Force" >/dev/null 2>&1 || true
         else
             rm -rf "$dir"
         fi
     fi
+    if [ -d "$dir" ]; then echo "Couldn't delete $dir; remove it by hand." >&2; fi
+    return 0
 }
 
 case "${1:-}" in
