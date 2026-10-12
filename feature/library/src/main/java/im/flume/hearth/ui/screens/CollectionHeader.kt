@@ -38,17 +38,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.ui.components.AvailabilityIcon
-import im.flume.hearth.ui.components.BackButton
-import im.flume.hearth.ui.components.CoverArt
-import im.flume.hearth.ui.components.CoverGradientHeader
-import im.flume.hearth.ui.components.DownloadToggle
-import im.flume.hearth.ui.components.DownloadsIndicator
-import im.flume.hearth.ui.components.PlayShuffleButtons
-import im.flume.hearth.ui.components.RemoteCover
-import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.ui.theme.NotOnServerAlpha
+import im.flume.hearth.core.ui.components.AvailabilityIcon
+import im.flume.hearth.core.ui.components.BackButton
+import im.flume.hearth.core.ui.components.CoverArt
+import im.flume.hearth.core.ui.components.CoverGradientHeader
+import im.flume.hearth.core.ui.components.DownloadToggle
+import im.flume.hearth.core.ui.components.DownloadsIndicator
+import im.flume.hearth.core.ui.components.PlayShuffleButtons
+import im.flume.hearth.core.ui.components.RemoteCover
+import im.flume.hearth.core.ui.theme.CoverSize
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.theme.NotOnServerAlpha
 
 /**
  * The big header at the top of the list, over a wash of the cover's colour. Landscape puts the art

@@ -9,9 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.api.TidalTrack
-import im.flume.hearth.container
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.network.TidalTrack
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.SongItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

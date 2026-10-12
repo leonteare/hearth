@@ -20,19 +20,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.data.AlbumEntity
-import im.flume.hearth.data.ArtistEntity
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
 import im.flume.hearth.data.LibraryOrder
 import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.SongOrder
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.SongRow
-import im.flume.hearth.ui.components.TopBar
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.SongRow
+import im.flume.hearth.core.ui.components.TopBar
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.ui.screens.AlbumListRow
+import im.flume.hearth.core.ui.screens.ArtistRow
+import im.flume.hearth.core.ui.screens.SortMenu
 
 internal val ARTIST_SORTS = listOf("A–Z", "Most albums")
 internal val ALBUM_SORTS = listOf("A–Z", "Recently added", "Artist", "Most played", "Year")

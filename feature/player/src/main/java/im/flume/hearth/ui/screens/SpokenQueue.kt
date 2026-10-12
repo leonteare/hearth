@@ -26,13 +26,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
 import im.flume.hearth.spoken.SpokenLists
-import im.flume.hearth.ui.components.playerBackdrop
-import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.playerBackdrop
+import im.flume.hearth.core.ui.components.rememberCoverColor
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.EpisodeListRow
+import im.flume.hearth.core.ui.screens.spokenCover
 
 /** The queue in spoken-word mode: what's playing, then more from the same show. */
 @Composable

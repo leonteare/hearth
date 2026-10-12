@@ -1,12 +1,18 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsPodcastSearchResult
+import im.flume.hearth.core.network.AbsPodcastSearchResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 import java.util.TimeZone
+import im.flume.hearth.core.data.spoken.BookEntity
+import im.flume.hearth.core.data.spoken.BookRow
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.EpisodeEntity
+import im.flume.hearth.core.data.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.PodcastEntity
 
 class SpokenPresentationTest {
     private val utc = TimeZone.getTimeZone("UTC")

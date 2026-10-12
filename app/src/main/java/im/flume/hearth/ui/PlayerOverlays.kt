@@ -28,13 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.Usage
-import im.flume.hearth.playback.PlayerUiState
+import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.ui.screens.NowPlayingScreen
 import im.flume.hearth.ui.screens.QueueScreen
 import im.flume.hearth.ui.screens.visualiser.VisualiserScreen
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.theme.HearthTheme
 
 /**
  * Now Playing slides up over the pages; the queue and the visualiser open above it. The open flags stay

@@ -1,6 +1,6 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsFeedResponse
+import im.flume.hearth.core.network.AbsFeedResponse
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -9,6 +9,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.spoken.EpisodeEntity
+import im.flume.hearth.core.data.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 class ShowFeedTest {
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true; explicitNulls = false }

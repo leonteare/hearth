@@ -7,9 +7,9 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.work.WorkManager
-import im.flume.hearth.data.AppDatabase
-import im.flume.hearth.logHandledError
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.common.logHandledError
+import im.flume.hearth.core.common.userMessage
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
@@ -26,6 +26,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalBookFileEntity
+import im.flume.hearth.core.data.spoken.LocalBookRow
 
 /** A folder picked in Settings. [uri] is the document tree URI the app has lasting access to. */
 data class LocalFolder(val uri: String, val name: String)

@@ -1,9 +1,9 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsPodcastSearchResult
-import im.flume.hearth.data.Scored
-import im.flume.hearth.data.SearchIndex
-import im.flume.hearth.data.SearchMatch
+import im.flume.hearth.core.network.AbsPodcastSearchResult
+import im.flume.hearth.core.data.Scored
+import im.flume.hearth.core.data.SearchIndex
+import im.flume.hearth.core.data.SearchMatch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -11,6 +11,10 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.ceil
 import kotlin.math.roundToLong
+import im.flume.hearth.core.data.spoken.BookRow
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.PodcastEntity
 
 // Plain-words formatting and small decisions for the podcasts & audiobooks screens. No Android here,
 // so it's all unit-tested.

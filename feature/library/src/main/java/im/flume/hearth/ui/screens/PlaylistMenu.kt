@@ -19,20 +19,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import im.flume.hearth.api.SubsonicException
-import im.flume.hearth.container
+import im.flume.hearth.core.common.SubsonicException
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.PhotoPrep
 import im.flume.hearth.data.PlaylistItem
 import im.flume.hearth.data.PlaylistRules
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.util.couldNot
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.couldNot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.coverArt
 
 /** The playlist's ⋯ menu. What's in it depends on whether you own it, can add to it, or only listen. */
 @Composable

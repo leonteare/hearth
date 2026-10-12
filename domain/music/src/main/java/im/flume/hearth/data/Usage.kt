@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import im.flume.hearth.core.data.Settings
 
 /**
  * Counts how often each feature gets used, so unused ones can be spotted and removed. Stays on the

@@ -1,11 +1,11 @@
 // Adding podcasts to the server (from a feed or the podcast directory) and importing OPML files.
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsAuthException
-import im.flume.hearth.api.AbsFolder
-import im.flume.hearth.api.AbsLibrary
-import im.flume.hearth.api.AbsPodcastSearchResult
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.common.AbsAuthException
+import im.flume.hearth.core.network.AbsFolder
+import im.flume.hearth.core.network.AbsLibrary
+import im.flume.hearth.core.network.AbsPodcastSearchResult
+import im.flume.hearth.core.common.userMessage
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject

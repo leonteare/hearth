@@ -40,17 +40,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
-import im.flume.hearth.ui.components.CoverArt
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.playerBackdrop
-import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
+import im.flume.hearth.core.ui.components.CoverArt
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.playerBackdrop
+import im.flume.hearth.core.ui.components.rememberCoverColor
+import im.flume.hearth.core.ui.theme.CoverSize
+import im.flume.hearth.core.ui.theme.Dimens
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.bookRoute
+import im.flume.hearth.core.ui.screens.podcastRoute
+import im.flume.hearth.core.ui.screens.spokenCover
 
 @Composable
 internal fun SpokenNowPlayingScreen(state: PlayerUiState, spoken: SpokenNowPlaying, onClose: () -> Unit, onOpenQueue: () -> Unit) {

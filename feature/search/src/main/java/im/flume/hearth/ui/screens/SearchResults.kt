@@ -30,21 +30,28 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.AlbumItem
 import im.flume.hearth.data.ArtistItem
-import im.flume.hearth.data.GenreCount
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.data.SearchHit
-import im.flume.hearth.data.SearchIndex
+import im.flume.hearth.core.data.GenreCount
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.domain.SearchHit
+import im.flume.hearth.core.data.SearchIndex
 import im.flume.hearth.data.SongItem
-import im.flume.hearth.spoken.PodcastEntity
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MissingAlbumRow
-import im.flume.hearth.ui.components.MissingArtistRow
-import im.flume.hearth.ui.components.MissingSongRow
-import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.components.SongRow
-import im.flume.hearth.ui.components.remoteAlbumId
-import im.flume.hearth.ui.components.remoteArtistId
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.data.spoken.PodcastEntity
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MissingAlbumRow
+import im.flume.hearth.core.ui.components.MissingArtistRow
+import im.flume.hearth.core.ui.components.MissingSongRow
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.SongRow
+import im.flume.hearth.core.ui.components.remoteAlbumId
+import im.flume.hearth.core.ui.components.remoteArtistId
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.AlbumListRow
+import im.flume.hearth.core.ui.screens.ArtistRow
+import im.flume.hearth.core.ui.screens.BookListRow
+import im.flume.hearth.core.ui.screens.DirectoryRow
+import im.flume.hearth.core.ui.screens.EpisodeListRow
+import im.flume.hearth.core.ui.screens.PodcastListRow
+import im.flume.hearth.core.ui.screens.gridColumns
 
 /** Before anything is typed: recent searches (with Clear), then a grid of genres to browse. */
 internal fun LazyListScope.searchLanding(

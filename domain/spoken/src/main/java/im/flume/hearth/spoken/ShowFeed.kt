@@ -12,6 +12,8 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.text.Normalizer
 import kotlin.math.abs
+import im.flume.hearth.core.data.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 // A show's whole feed (every episode it ever published, fetched through Audiobookshelf's
 // POST /api/podcasts/feed) lined up with the few episodes the server has actually downloaded. Pure

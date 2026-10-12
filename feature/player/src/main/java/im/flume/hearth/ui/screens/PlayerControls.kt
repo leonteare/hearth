@@ -24,16 +24,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import im.flume.hearth.container
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.Usage
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.ui.components.BigPlayButton
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.PlayerSlider
-import im.flume.hearth.ui.components.formatDuration
-import im.flume.hearth.ui.components.rememberSeekState
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.ui.components.BigPlayButton
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.PlayerSlider
+import im.flume.hearth.core.ui.components.formatDuration
+import im.flume.hearth.core.ui.components.rememberSeekState
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.rememberPosition
 
 @Composable
 internal fun PlayerControls(

@@ -34,25 +34,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.Ranked
 import im.flume.hearth.data.Stats
 import im.flume.hearth.data.StatsCalculator
 import im.flume.hearth.data.StatsPeriod
-import im.flume.hearth.ui.components.CoverGradientHeader
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.TopBar
-import im.flume.hearth.ui.components.LoadingPage
-import im.flume.hearth.ui.theme.AccentDeep
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.CoverGradientHeader
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.components.TopBar
+import im.flume.hearth.core.ui.components.LoadingPage
+import im.flume.hearth.core.ui.theme.AccentDeep
+import im.flume.hearth.core.ui.theme.HearthTheme
 import java.time.Month
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.format.TextStyle
 import java.util.Locale
+import im.flume.hearth.core.ui.screens.coverArt
 
 @Composable
 private fun rememberStats(period: StatsPeriod): Stats? {

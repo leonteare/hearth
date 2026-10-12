@@ -1,6 +1,6 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsBookSearchResult
+import im.flume.hearth.core.network.AbsBookSearchResult
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -8,6 +8,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalBookMerge
+import im.flume.hearth.core.data.spoken.LocalMatchState
 
 class BookMatchTest {
     // What the server's audible.uk search answered for "Goldfinch" (lengths in minutes).

@@ -7,6 +7,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
+import im.flume.hearth.core.data.HistoryRow
 
 data class Ranked(val id: String, val name: String, val detail: String, val coverArt: String?, val plays: Int)
 

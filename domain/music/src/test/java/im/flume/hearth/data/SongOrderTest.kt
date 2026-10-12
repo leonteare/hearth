@@ -3,6 +3,7 @@ package im.flume.hearth.data
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.random.Random
+import im.flume.hearth.core.data.SongEntity
 
 class SongOrderTest {
     private fun song(id: String, title: String, artist: String = "Someone", album: String = "Album", disc: Int = 1, track: Int = 1) =

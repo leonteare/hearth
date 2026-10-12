@@ -15,11 +15,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.data.DownloadCounts
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.DownloadCounts
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.formatBytes
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

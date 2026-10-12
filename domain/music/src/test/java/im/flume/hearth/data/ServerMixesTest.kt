@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.PlaylistEntity
 
 class ServerMixesTest {
     private fun pl(id: String, name: String, comment: String?, owner: String = "leon") =

@@ -1,7 +1,7 @@
 package im.flume.hearth.ui.screens
 
 import androidx.compose.ui.graphics.Color
-import im.flume.hearth.ui.theme.HearthColors
+import im.flume.hearth.core.ui.theme.HearthColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

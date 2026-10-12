@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneOffset
+import im.flume.hearth.core.data.HistoryRow
 
 class StatsTest {
     private fun row(song: String, artist: String, at: Long, minutes: Int = 4) =

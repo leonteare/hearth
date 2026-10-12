@@ -1,6 +1,6 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.LyricLine
+import im.flume.hearth.core.network.LyricLine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

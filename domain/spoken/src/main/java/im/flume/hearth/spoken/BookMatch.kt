@@ -1,6 +1,6 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsBookSearchResult
+import im.flume.hearth.core.network.AbsBookSearchResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -10,6 +10,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.text.Normalizer
 import kotlin.math.abs
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalMatchState
+import im.flume.hearth.core.data.spoken.isOnlineCoverPath
 
 // Finding proper details (title, author, narrator, cover…) for a phone book whose files are badly
 // named, like "Goldfinch_NTG". The server's book search (Audible first) gives candidates; the book's

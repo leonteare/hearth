@@ -1,6 +1,6 @@
 package im.flume.hearth.download
 
-import im.flume.hearth.data.DownloadCounts
+import im.flume.hearth.core.data.DownloadCounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

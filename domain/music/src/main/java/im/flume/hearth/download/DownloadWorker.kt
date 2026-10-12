@@ -14,9 +14,9 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import im.flume.hearth.MusicContainer
 import im.flume.hearth.core.common.R
-import im.flume.hearth.data.DownloadEntity
-import im.flume.hearth.data.DownloadState
-import im.flume.hearth.util.scrubSecrets
+import im.flume.hearth.core.data.DownloadEntity
+import im.flume.hearth.core.data.DownloadState
+import im.flume.hearth.core.common.scrubSecrets
 import java.io.File
 import java.net.ConnectException
 import java.net.SocketTimeoutException

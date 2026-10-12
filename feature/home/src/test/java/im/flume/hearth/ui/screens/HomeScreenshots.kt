@@ -3,10 +3,10 @@ package im.flume.hearth.ui.screens
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import im.flume.hearth.spoken.ContinueItem
-import im.flume.hearth.testing.Samples
-import im.flume.hearth.testing.ScreenshotTest
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.testing.Samples
+import im.flume.hearth.core.testing.ScreenshotTest
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.theme.HearthTheme
 import org.junit.Test
 
 /** Home's pieces. */

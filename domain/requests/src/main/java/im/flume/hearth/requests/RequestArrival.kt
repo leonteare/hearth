@@ -1,7 +1,7 @@
 package im.flume.hearth.requests
 
 import im.flume.hearth.requestsContainer
-import im.flume.hearth.EXTRA_ROUTE
+import im.flume.hearth.core.common.EXTRA_ROUTE
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,16 +9,16 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import im.flume.hearth.core.common.R
-import im.flume.hearth.api.TidalType
-import im.flume.hearth.data.AlbumEntity
-import im.flume.hearth.data.ArtistEntity
-import im.flume.hearth.data.RequestEntity
+import im.flume.hearth.core.network.TidalType
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
+import im.flume.hearth.core.data.RequestEntity
 import im.flume.hearth.data.RequestIntent
 import im.flume.hearth.data.RequestMatching
-import im.flume.hearth.data.RequestStatus
+import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.data.RequestTracking
-import im.flume.hearth.data.SongEntity
-import im.flume.hearth.data.toEntity
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.data.toEntity
 import im.flume.hearth.download.DownloadRepository
 import kotlinx.coroutines.launch
 

@@ -8,17 +8,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.PlaylistEdits
 import im.flume.hearth.data.PlaylistRules
 import im.flume.hearth.data.ServerMixes
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.components.EmptyState
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.util.couldNot
+import im.flume.hearth.core.ui.components.EmptyState
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.couldNot
 import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.coverArt
 
 @Composable
 fun PlaylistScreen(id: String) {

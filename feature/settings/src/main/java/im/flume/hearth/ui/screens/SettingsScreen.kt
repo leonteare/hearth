@@ -15,8 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.theme.HearthTheme
 
 /** Settings home: three groups, each its own page. */
 @Composable

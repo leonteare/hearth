@@ -7,16 +7,18 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import im.flume.hearth.api.AbsLibrary
-import im.flume.hearth.api.AbsLibraryItem
-import im.flume.hearth.logHandledError
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.AbsLibrary
+import im.flume.hearth.core.network.AbsLibraryItem
+import im.flume.hearth.core.common.logHandledError
+import im.flume.hearth.core.common.userMessage
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.TrackEntity
 
 /** Keeps the phone's podcast and audiobook catalogue in step with the server. */
 internal class SpokenSync(private val repo: SpokenRepository) {

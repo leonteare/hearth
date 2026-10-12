@@ -22,10 +22,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.data.Settings
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.Settings
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

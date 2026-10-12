@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.math.abs
+import im.flume.hearth.core.data.spoken.OutboxKind
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 // Decisions about progress, following, downloads and timelines that don't need Android, so they can
 // be unit tested. Everything with a clock uses the server's clock (see ServerClock).

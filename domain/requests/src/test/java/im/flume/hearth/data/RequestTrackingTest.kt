@@ -1,12 +1,14 @@
 // Tests for RequestTracking: how a request moves along as Tidarr's queue changes.
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidarrQueueItem
+import im.flume.hearth.core.network.TidarrQueueItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.RequestStatus
 
 class RequestTrackingTest {
     private fun req(status: RequestStatus, seen: Boolean = false, updatedAt: Long = 0, finishedAt: Long? = null, attempts: Int = 0) = RequestEntity(

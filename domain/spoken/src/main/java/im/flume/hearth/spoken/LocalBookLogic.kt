@@ -1,6 +1,6 @@
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.PodcastPaths
+import im.flume.hearth.core.network.PodcastPaths
 import java.security.MessageDigest
 import kotlin.math.abs
 

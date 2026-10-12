@@ -1,10 +1,10 @@
 package im.flume.hearth.ui.screens
 
-import im.flume.hearth.data.DownloadEntity
-import im.flume.hearth.data.DownloadState
-import im.flume.hearth.testing.Samples
-import im.flume.hearth.testing.ScreenshotTest
-import im.flume.hearth.testing.liveRows
+import im.flume.hearth.core.data.DownloadEntity
+import im.flume.hearth.core.data.DownloadState
+import im.flume.hearth.core.testing.Samples
+import im.flume.hearth.core.testing.ScreenshotTest
+import im.flume.hearth.core.testing.liveRows
 import im.flume.hearth.ui.LoginScreen
 import kotlinx.coroutines.runBlocking
 import org.junit.Test

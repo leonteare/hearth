@@ -22,11 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.components.plural
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
 /** Settings → Podcasts & audiobooks: folders on the phone that hold audiobooks. */

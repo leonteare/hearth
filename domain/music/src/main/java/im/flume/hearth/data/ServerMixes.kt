@@ -1,5 +1,7 @@
 package im.flume.hearth.data
 
+import im.flume.hearth.core.data.PlaylistEntity
+
 /**
  * The Daily Mix and Discover Weekly the server builds each night (monitoring/hearth-mixes.py on the
  * homelab). They're ordinary Navidrome playlists marked in their comment. Songs fetched for them are

@@ -11,17 +11,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import im.flume.hearth.container
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
 import im.flume.hearth.spoken.LocalBookIds
-import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenKey
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.removeEpisodeDownload
+import im.flume.hearth.core.ui.screens.spokenCover
 
 @Composable
 internal fun SpokenPlayerMenu(state: PlayerUiState, spoken: SpokenNowPlaying, info: SpokenInfo, onClose: () -> Unit, openPage: () -> Unit, onSleep: () -> Unit) {

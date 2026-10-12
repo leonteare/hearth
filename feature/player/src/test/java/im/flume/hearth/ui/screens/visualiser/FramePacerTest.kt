@@ -1,6 +1,6 @@
 package im.flume.hearth.ui.screens.visualiser
 
-import im.flume.hearth.playback.AudioFrame
+import im.flume.hearth.core.playback.AudioFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

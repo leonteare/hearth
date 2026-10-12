@@ -1,10 +1,12 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidalType
+import im.flume.hearth.core.network.TidalType
 import im.flume.hearth.data.RequestIntent.Action
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.RequestStatus
 
 class RequestIntentTest {
     private fun req(type: String = "track", like: Boolean, toPhone: Boolean, status: RequestStatus = RequestStatus.REQUESTED) = RequestEntity(

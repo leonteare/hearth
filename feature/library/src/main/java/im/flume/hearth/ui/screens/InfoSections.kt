@@ -29,20 +29,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.text.HtmlCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.api.AlbumDto
-import im.flume.hearth.api.ArtistInfo
-import im.flume.hearth.api.ItemDate
-import im.flume.hearth.container
-import im.flume.hearth.data.AlbumEntity
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaCard
-import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.components.formatLongDuration
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.network.AlbumDto
+import im.flume.hearth.core.network.ArtistInfo
+import im.flume.hearth.core.network.ItemDate
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaCard
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.formatLongDuration
+import im.flume.hearth.core.ui.theme.HearthTheme
 import java.time.LocalDate
 import java.time.Month
 import java.time.format.TextStyle
 import java.util.Locale
+import im.flume.hearth.core.ui.screens.coverArt
 
 private fun cleanHtml(html: String?): String? {
     if (html.isNullOrBlank()) return null

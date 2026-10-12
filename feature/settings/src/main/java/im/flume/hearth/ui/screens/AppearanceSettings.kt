@@ -28,10 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.ui.theme.AccentChoices
-import im.flume.hearth.ui.theme.AccentDeep
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.ui.theme.AccentChoices
+import im.flume.hearth.core.ui.theme.AccentDeep
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.LYRIC_GAPS
+import im.flume.hearth.core.ui.screens.LYRIC_SIZES
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

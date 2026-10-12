@@ -25,17 +25,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.data.SongEntity
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.TopBar
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.util.couldNot
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.components.TopBar
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.couldNot
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import im.flume.hearth.core.ui.screens.coverArt
 
 /** Drag songs into a new order, then save it to Navidrome. */
 @Composable

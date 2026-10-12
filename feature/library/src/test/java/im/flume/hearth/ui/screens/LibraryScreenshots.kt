@@ -16,14 +16,16 @@ import im.flume.hearth.data.PlaylistAccess
 import im.flume.hearth.data.PlaylistItem
 import im.flume.hearth.data.ShareRole
 import im.flume.hearth.data.SongItem
-import im.flume.hearth.testing.FakeActions
-import im.flume.hearth.testing.Samples
-import im.flume.hearth.testing.ScreenshotTest
-import im.flume.hearth.testing.liveRows
-import im.flume.hearth.ui.components.CoverArt
-import im.flume.hearth.ui.components.PlayShuffleButtons
-import im.flume.hearth.ui.components.SongRow
+import im.flume.hearth.core.testing.FakeActions
+import im.flume.hearth.core.testing.Samples
+import im.flume.hearth.core.testing.ScreenshotTest
+import im.flume.hearth.core.testing.liveRows
+import im.flume.hearth.core.ui.components.CoverArt
+import im.flume.hearth.core.ui.components.PlayShuffleButtons
+import im.flume.hearth.core.ui.components.SongRow
 import org.junit.Test
+import im.flume.hearth.core.ui.screens.EqualWidthChips
+import im.flume.hearth.core.ui.screens.FollowButton
 
 /** Your Library's controls and lists, a collection page and an artist page. */
 class LibraryScreenshots : ScreenshotTest() {

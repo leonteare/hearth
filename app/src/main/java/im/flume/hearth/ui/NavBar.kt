@@ -23,11 +23,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.ui.components.PreviewBar
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.ui.components.PreviewBar
 import im.flume.hearth.ui.screens.MiniPlayer
-import im.flume.hearth.ui.theme.HearthIcons
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.theme.HearthIcons
+import im.flume.hearth.core.ui.theme.HearthTheme
 
 /** Route, label and the tab's icon slot (read from the theme when drawn, so a skin can swap it). */
 internal val TABS: List<Triple<String, String, (HearthIcons) -> ImageVector>> = listOf(

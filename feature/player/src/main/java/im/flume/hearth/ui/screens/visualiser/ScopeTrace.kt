@@ -1,6 +1,6 @@
 package im.flume.hearth.ui.screens.visualiser
 
-import im.flume.hearth.playback.AutoGain
+import im.flume.hearth.core.playback.AutoGain
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min

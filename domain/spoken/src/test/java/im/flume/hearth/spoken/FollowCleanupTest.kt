@@ -2,6 +2,7 @@ package im.flume.hearth.spoken
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 /** The follower tags the server's cleanup job reads, self-healing, and clearing a show off the phone on unfollow. */
 class FollowCleanupTest {

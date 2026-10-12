@@ -12,11 +12,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import im.flume.hearth.core.common.BuildConfig
-import im.flume.hearth.api.AbsAuthException
-import im.flume.hearth.api.AbsClient
-import im.flume.hearth.api.AbsHttpException
-import im.flume.hearth.api.AbsMediaProgress
-import im.flume.hearth.data.AppDatabase
+import im.flume.hearth.core.common.AbsAuthException
+import im.flume.hearth.core.network.AbsClient
+import im.flume.hearth.core.common.AbsHttpException
+import im.flume.hearth.core.network.AbsMediaProgress
+import im.flume.hearth.core.data.AppDatabase
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,6 +37,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.IOException
+import im.flume.hearth.core.data.spoken.AbsAccountStore
+import im.flume.hearth.core.data.spoken.LocalBookProgressEntity
+import im.flume.hearth.core.data.spoken.OutboxEntity
+import im.flume.hearth.core.data.spoken.OutboxKind
+import im.flume.hearth.core.data.spoken.SpokenProgressEntity
 
 /** Shown once by the UI: playback picked up from a position another device saved. */
 data class ResumeNotice(

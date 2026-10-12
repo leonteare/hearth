@@ -1,8 +1,9 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.core.common.SubsonicException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import im.flume.hearth.core.data.PlaylistEntity
 
 enum class ShareRole(val wire: String) {
     /** Can add, remove and reorder songs, rename and change the photo. */

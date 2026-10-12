@@ -49,19 +49,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.Usage
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.ui.components.CoverPrefetcher
-import im.flume.hearth.ui.components.PlayerCoverArt
-import im.flume.hearth.ui.components.playerBackdrop
-import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.ui.components.CoverPrefetcher
+import im.flume.hearth.core.ui.components.PlayerCoverArt
+import im.flume.hearth.core.ui.components.playerBackdrop
+import im.flume.hearth.core.ui.components.rememberCoverColor
+import im.flume.hearth.core.ui.theme.CoverSize
+import im.flume.hearth.core.ui.theme.Dimens
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import im.flume.hearth.core.ui.screens.coverArt
 
 /** Cover size asked of the server by Now Playing; the prefetch asks for the same so caches match. */
 private const val NOW_PLAYING_COVER_SIZE = CoverSize.LARGE

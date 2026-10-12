@@ -31,23 +31,24 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.api.PasswordNeededException
-import im.flume.hearth.api.WrongPasswordException
-import im.flume.hearth.container
+import im.flume.hearth.core.common.PasswordNeededException
+import im.flume.hearth.core.common.WrongPasswordException
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.PlaylistItem
 import im.flume.hearth.data.PlaylistRules
 import im.flume.hearth.data.ShareRole
 import im.flume.hearth.data.Sharing
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.BannerCard
-import im.flume.hearth.ui.components.ChoiceSheet
-import im.flume.hearth.ui.components.IconTile
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.util.couldNot
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.BannerCard
+import im.flume.hearth.core.ui.components.ChoiceSheet
+import im.flume.hearth.core.ui.components.IconTile
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.couldNot
 import java.io.IOException
 import kotlinx.coroutines.launch
+import im.flume.hearth.core.ui.screens.coverArt
 
 private fun roleLabel(role: ShareRole) = when (role) {
     ShareRole.ADD -> "Can add songs"

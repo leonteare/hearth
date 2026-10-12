@@ -1,6 +1,8 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidalType
+import im.flume.hearth.core.network.TidalType
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.RequestStatus
 
 /**
  * What the user wants done with requested music once it's on the server: like it (save an album),

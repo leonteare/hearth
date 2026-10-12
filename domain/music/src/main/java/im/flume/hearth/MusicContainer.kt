@@ -2,14 +2,14 @@
 package im.flume.hearth
 
 import android.content.Context
-import im.flume.hearth.api.NavidromeNativeApi
-import im.flume.hearth.api.SubsonicClient
-import im.flume.hearth.data.AppDatabase
+import im.flume.hearth.core.network.NavidromeNativeApi
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.data.LibraryRepository
 import im.flume.hearth.data.LyricsRepository
 import im.flume.hearth.data.MixRepository
-import im.flume.hearth.data.NetworkMonitor
-import im.flume.hearth.data.SessionStore
+import im.flume.hearth.core.data.NetworkMonitor
+import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.data.Usage
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.sync.LibrarySync

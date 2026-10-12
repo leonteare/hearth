@@ -2,6 +2,8 @@ package im.flume.hearth.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
 
 class YourLibraryTest {
     private fun artist(id: String, starred: Boolean = false) = ArtistEntity(id, "Artist $id", 1, null, starred)

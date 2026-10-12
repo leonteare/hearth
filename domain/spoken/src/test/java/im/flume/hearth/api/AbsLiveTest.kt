@@ -16,6 +16,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.util.UUID
+import im.flume.hearth.core.network.AbsClient
+import im.flume.hearth.core.network.AbsTokens
+import im.flume.hearth.core.network.Jwt
 
 /**
  * End-to-end check against a real Audiobookshelf server. Skipped unless ABS_LIVE_URL, ABS_LIVE_USER and

@@ -1,9 +1,9 @@
 package im.flume.hearth.spoken
 
 import android.content.Context
-import im.flume.hearth.api.AbsAuthException
-import im.flume.hearth.api.AbsLibraryItem
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.common.AbsAuthException
+import im.flume.hearth.core.network.AbsLibraryItem
+import im.flume.hearth.core.common.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

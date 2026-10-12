@@ -20,19 +20,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.spoken.SpokenDownloadRow
-import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.spoken.SpokenDownloadRow
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 import im.flume.hearth.spoken.SpokenKey
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.components.formatBytes
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.formatBytes
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import im.flume.hearth.core.ui.screens.bookRoute
+import im.flume.hearth.core.ui.screens.podcastRoute
+import im.flume.hearth.core.ui.screens.removeEpisodeDownload
+import im.flume.hearth.core.ui.screens.spokenCover
 
 /** Podcast / audiobook downloads in a section of their own (when no songs share that section). */
 internal fun LazyListScope.spokenSection(

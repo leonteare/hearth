@@ -1,13 +1,13 @@
 package im.flume.hearth.sync
 
-import im.flume.hearth.api.SongDto
-import im.flume.hearth.api.SubsonicClient
-import im.flume.hearth.data.AppDatabase
-import im.flume.hearth.data.PlaylistSongEntity
-import im.flume.hearth.data.SessionStore
-import im.flume.hearth.data.toEntity
-import im.flume.hearth.util.scrubSecrets
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.SongDto
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.PlaylistSongEntity
+import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.core.data.toEntity
+import im.flume.hearth.core.common.scrubSecrets
+import im.flume.hearth.core.common.userMessage
 import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow

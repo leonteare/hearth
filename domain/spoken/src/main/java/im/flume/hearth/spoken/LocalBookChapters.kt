@@ -4,8 +4,10 @@ package im.flume.hearth.spoken
 import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
-import im.flume.hearth.logHandledError
+import im.flume.hearth.core.common.logHandledError
 import java.util.concurrent.ConcurrentHashMap
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.LocalBookFileEntity
 
 /** Chapters of a phone book, from the chapters stored inside its files or else one per file. */
 internal class LocalBookChapters(private val context: Context) {

@@ -23,28 +23,29 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.api.AbsPodcastSearchResult
-import im.flume.hearth.api.TidalSearchResults
-import im.flume.hearth.container
+import im.flume.hearth.core.network.AbsPodcastSearchResult
+import im.flume.hearth.core.network.TidalSearchResults
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.data.SearchHit
-import im.flume.hearth.data.SearchIndex
-import im.flume.hearth.data.SearchRanking
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.domain.SearchHit
+import im.flume.hearth.core.data.SearchIndex
+import im.flume.hearth.core.domain.SearchRanking
 import im.flume.hearth.data.SongItem
 import im.flume.hearth.data.Usage
-import im.flume.hearth.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.EpisodeRow
 import im.flume.hearth.spoken.SpokenDiscovery
 import im.flume.hearth.spoken.SpokenSearch
 import im.flume.hearth.spoken.SpokenSearchResults
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.LocalTabRequests
-import im.flume.hearth.ui.components.PageHeader
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.LocalTabRequests
+import im.flume.hearth.core.ui.components.PageHeader
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.ui.screens.gridColumns
 
 /**
  * Set when the Search tab is tapped. Search only takes the keyboard then (with nothing typed), not

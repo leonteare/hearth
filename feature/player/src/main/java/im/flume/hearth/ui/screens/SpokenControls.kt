@@ -35,18 +35,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import im.flume.hearth.container
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.ChapterEntity
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
+import im.flume.hearth.core.data.spoken.ChapterEntity
 import im.flume.hearth.spoken.ChapterMarks
 import im.flume.hearth.spoken.SpokenFormat
-import im.flume.hearth.ui.components.BigPlayButton
-import im.flume.hearth.ui.components.PlayPauseIcon
-import im.flume.hearth.ui.components.PlayerSlider
-import im.flume.hearth.ui.components.formatDuration
-import im.flume.hearth.ui.components.rememberSeekState
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.BigPlayButton
+import im.flume.hearth.core.ui.components.PlayPauseIcon
+import im.flume.hearth.core.ui.components.PlayerSlider
+import im.flume.hearth.core.ui.components.formatDuration
+import im.flume.hearth.core.ui.components.rememberSeekState
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.rememberSpokenPosition
 
 /** Circular arrow with the number of seconds inside: back 15 / forward 30. */
 @Composable

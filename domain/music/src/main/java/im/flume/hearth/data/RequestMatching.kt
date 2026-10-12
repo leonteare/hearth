@@ -1,9 +1,12 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidalAlbum
-import im.flume.hearth.api.TidalSearchResults
-import im.flume.hearth.api.TidalTrack
-import im.flume.hearth.data.SearchIndex.Companion.norm
+import im.flume.hearth.core.network.TidalAlbum
+import im.flume.hearth.core.network.TidalSearchResults
+import im.flume.hearth.core.network.TidalTrack
+import im.flume.hearth.core.data.SearchIndex.Companion.norm
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
+import im.flume.hearth.core.data.SongEntity
 
 /**
  * Deciding whether Tidal music is already on the server, and finding it there once Tidarr has

@@ -32,20 +32,22 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.Usage
-import im.flume.hearth.playback.PlaybackService
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.ChapterEntity
+import im.flume.hearth.core.playback.PlaybackService
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
+import im.flume.hearth.core.data.spoken.ChapterEntity
 import im.flume.hearth.spoken.ChapterMarks
 import im.flume.hearth.spoken.SpokenFormat
 import im.flume.hearth.spoken.SpokenSpeed
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.components.plural
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlin.math.abs
+import im.flume.hearth.core.ui.screens.ChapterRow
+import im.flume.hearth.core.ui.screens.rememberSpokenPosition
 
 /** Any speed from 0.5× to 3×: drag, nudge by 0.05 or tap a common one. Changes are heard straight away. */
 @Composable

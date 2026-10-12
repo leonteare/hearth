@@ -1,9 +1,9 @@
 package im.flume.hearth.spoken
 
 import android.content.Context
-import im.flume.hearth.api.AbsAuthException
-import im.flume.hearth.api.AbsHttpException
-import im.flume.hearth.logHandledError
+import im.flume.hearth.core.common.AbsAuthException
+import im.flume.hearth.core.common.AbsHttpException
+import im.flume.hearth.core.common.logHandledError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +15,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Request
 import java.io.File
+import im.flume.hearth.core.data.spoken.LocalBookDao
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalMatchState
 
 /**
  * Proper titles, authors and covers for phone books with poor file names, from the audiobook

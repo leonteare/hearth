@@ -1,8 +1,11 @@
 // Turning Audiobookshelf server items into the podcast, book and episode rows stored on the phone.
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsEpisode
-import im.flume.hearth.api.AbsLibraryItem
+import im.flume.hearth.core.network.AbsEpisode
+import im.flume.hearth.core.network.AbsLibraryItem
+import im.flume.hearth.core.data.spoken.BookEntity
+import im.flume.hearth.core.data.spoken.EpisodeEntity
+import im.flume.hearth.core.data.spoken.PodcastEntity
 
 internal fun AbsLibraryItem.toPodcast(old: PodcastEntity?): PodcastEntity = PodcastEntity(
     id = id,

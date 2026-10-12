@@ -34,11 +34,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.api.Credentials
-import im.flume.hearth.container
+import im.flume.hearth.core.network.Credentials
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.ui.screens.SpokenSignInForm
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.common.userMessage
 import java.security.cert.CertificateException
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.launch

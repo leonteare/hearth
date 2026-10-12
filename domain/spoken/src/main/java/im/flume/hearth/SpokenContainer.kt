@@ -2,7 +2,7 @@
 package im.flume.hearth
 
 import android.content.Context
-import im.flume.hearth.data.AppDatabase
+import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.spoken.SpokenRepository
 
 /** The spoken-word part of the app's container; [DomainContainer] extends it. */

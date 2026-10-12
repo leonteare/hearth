@@ -1,10 +1,13 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.LyricLine
-import im.flume.hearth.api.SubsonicClient
-import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.core.network.LyricLine
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.common.SubsonicException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import im.flume.hearth.core.data.LyricsDao
+import im.flume.hearth.core.data.LyricsEntity
+import im.flume.hearth.core.data.SongEntity
 
 @Serializable
 data class Lyrics(

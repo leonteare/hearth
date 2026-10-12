@@ -2,6 +2,9 @@ package im.flume.hearth.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
+import im.flume.hearth.core.data.SongEntity
 
 class LibraryOrderTest {
     private fun artist(id: String, name: String, albums: Int = 1) = ArtistEntity(id, name, albums, null, false)

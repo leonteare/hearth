@@ -6,9 +6,9 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import im.flume.hearth.data.RequestIntent
-import im.flume.hearth.data.RequestStatus
+import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.data.RequestTracking
-import im.flume.hearth.logHandledError
+import im.flume.hearth.core.common.logHandledError
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

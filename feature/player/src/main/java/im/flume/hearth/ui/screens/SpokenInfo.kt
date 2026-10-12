@@ -7,10 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.SpokenDownloadState
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.playback.SpokenNowPlaying
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 /** Title and show / author of what's playing, from the catalogue (falls back to the player's own). */
 internal data class SpokenInfo(val title: String, val subtitle: String, val isBook: Boolean, val downloadState: SpokenDownloadState?, val finished: Boolean)

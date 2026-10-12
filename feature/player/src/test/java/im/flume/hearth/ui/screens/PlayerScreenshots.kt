@@ -4,11 +4,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
-import im.flume.hearth.playback.PlaybackService
-import im.flume.hearth.spoken.ChapterEntity
-import im.flume.hearth.testing.Samples
-import im.flume.hearth.testing.ScreenshotTest
-import im.flume.hearth.ui.theme.Dimens
+import im.flume.hearth.core.playback.PlaybackService
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.testing.Samples
+import im.flume.hearth.core.testing.ScreenshotTest
+import im.flume.hearth.core.ui.theme.Dimens
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 

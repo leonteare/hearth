@@ -12,17 +12,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.navigation.NavHostController
-import im.flume.hearth.AppContainer
+import im.flume.hearth.core.playback.AppContainer
 import im.flume.hearth.data.PlaySource
 import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.Usage
-import im.flume.hearth.ui.components.Actions
-import im.flume.hearth.ui.components.NewPlaylistDialog
-import im.flume.hearth.ui.components.PlaylistPickerDialog
-import im.flume.hearth.ui.components.TabRequests
-import im.flume.hearth.util.couldNot
+import im.flume.hearth.core.ui.components.Actions
+import im.flume.hearth.core.ui.components.NewPlaylistDialog
+import im.flume.hearth.core.ui.components.PlaylistPickerDialog
+import im.flume.hearth.core.ui.components.TabRequests
+import im.flume.hearth.core.common.couldNot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

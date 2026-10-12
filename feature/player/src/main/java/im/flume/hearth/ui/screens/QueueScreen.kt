@@ -42,17 +42,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
-import im.flume.hearth.container
-import im.flume.hearth.data.SongEntity
-import im.flume.hearth.playback.QueueEntry
-import im.flume.hearth.playback.isManual
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.playerBackdrop
-import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.playback.QueueEntry
+import im.flume.hearth.core.playback.isManual
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.playerBackdrop
+import im.flume.hearth.core.ui.components.rememberCoverColor
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import im.flume.hearth.core.ui.screens.coverArt
 
 @Composable
 fun QueueScreen(onBack: (() -> Unit)? = null) {

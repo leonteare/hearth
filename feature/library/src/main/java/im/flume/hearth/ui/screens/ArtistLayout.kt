@@ -28,21 +28,23 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.AlbumItem
 import im.flume.hearth.data.Discography
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.SongItem
-import im.flume.hearth.ui.components.BackButton
-import im.flume.hearth.ui.components.CoverGradientHeader
-import im.flume.hearth.ui.components.DownloadsIndicator
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaCard
-import im.flume.hearth.ui.components.MissingAlbumCard
-import im.flume.hearth.ui.components.MissingSongRow
-import im.flume.hearth.ui.components.SectionHeader
-import im.flume.hearth.ui.components.SongRow
-import im.flume.hearth.ui.components.albumKind
-import im.flume.hearth.ui.components.remoteAlbumId
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.ui.theme.NotOnServerAlpha
+import im.flume.hearth.core.ui.components.BackButton
+import im.flume.hearth.core.ui.components.CoverGradientHeader
+import im.flume.hearth.core.ui.components.DownloadsIndicator
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaCard
+import im.flume.hearth.core.ui.components.MissingAlbumCard
+import im.flume.hearth.core.ui.components.MissingSongRow
+import im.flume.hearth.core.ui.components.SectionHeader
+import im.flume.hearth.core.ui.components.SongRow
+import im.flume.hearth.core.ui.components.albumKind
+import im.flume.hearth.core.ui.components.remoteAlbumId
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.theme.NotOnServerAlpha
+import im.flume.hearth.core.ui.screens.coverArt
+import im.flume.hearth.core.ui.screens.isWideWindow
 
 /** The artist page layout, shared by artists on the server and ones that aren't. */
 @Composable

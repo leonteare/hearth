@@ -1,8 +1,8 @@
 package im.flume.hearth.requests
 
-import im.flume.hearth.api.TidarrQueueItem
-import im.flume.hearth.data.RequestEntity
-import im.flume.hearth.data.RequestStatus
+import im.flume.hearth.core.network.TidarrQueueItem
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.data.RequestTracking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

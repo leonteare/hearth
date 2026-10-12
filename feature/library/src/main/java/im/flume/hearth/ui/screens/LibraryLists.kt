@@ -28,19 +28,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.AlbumEntity
-import im.flume.hearth.data.ArtistEntity
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
 import im.flume.hearth.data.PlaylistItem
 import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.spoken.BookRow
-import im.flume.hearth.spoken.PodcastEntity
-import im.flume.hearth.ui.components.Actions
-import im.flume.hearth.ui.components.IconTile
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.data.spoken.BookRow
+import im.flume.hearth.core.data.spoken.PodcastEntity
+import im.flume.hearth.core.ui.components.Actions
+import im.flume.hearth.core.ui.components.IconTile
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.components.plural
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.AlbumListRow
+import im.flume.hearth.core.ui.screens.ArtistRow
+import im.flume.hearth.core.ui.screens.BookListRow
+import im.flume.hearth.core.ui.screens.PodcastListRow
+import im.flume.hearth.core.ui.screens.SpokenSignInPrompt
+import im.flume.hearth.core.ui.screens.coverArt
 
 internal fun LazyListScope.playlistsList(playlists: List<PlaylistItem>, actions: Actions) {
     item {

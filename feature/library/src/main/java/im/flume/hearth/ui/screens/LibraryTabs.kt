@@ -5,7 +5,7 @@ enum class LibrarySection(val label: String) { MUSIC("Music"), PODCASTS("Podcast
 
 /**
  * What Your Library lists. Its [name] is also the key for that list's saved sort ("sort-<name>"),
- * so these names must not change, and [im.flume.hearth.ui.components.Actions.openLibraryTab] uses them too.
+ * so these names must not change, and [im.flume.hearth.core.ui.components.Actions.openLibraryTab] uses them too.
  */
 enum class LibraryTab(val label: String, val section: LibrarySection) {
     PLAYLISTS("Playlists", LibrarySection.MUSIC),

@@ -11,8 +11,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.edit
 import im.flume.hearth.domain.update.BuildConfig
-import im.flume.hearth.util.scrubSecrets
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.common.scrubSecrets
+import im.flume.hearth.core.common.userMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

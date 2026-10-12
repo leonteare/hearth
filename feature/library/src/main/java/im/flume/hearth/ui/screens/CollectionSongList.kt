@@ -10,11 +10,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.SongItem
-import im.flume.hearth.ui.components.MissingSongRow
-import im.flume.hearth.ui.components.formatDuration
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.MissingSongRow
+import im.flume.hearth.core.ui.components.formatDuration
+import im.flume.hearth.core.ui.theme.HearthTheme
 
 /**
  * The songs, one of three ways: just the matches while searching ([filtered] holds their indexes),

@@ -34,13 +34,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.Lyrics
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.currentIndex
 import im.flume.hearth.data.rows
-import im.flume.hearth.playback.PlayerUiState
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.PlayerUiState
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.LYRIC_GAPS
+import im.flume.hearth.core.ui.screens.LYRIC_SIZES
+import im.flume.hearth.core.ui.screens.rememberPosition
 
 @Composable
 internal fun LyricsView(song: SongEntity?, state: PlayerUiState, modifier: Modifier) {

@@ -11,25 +11,25 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import im.flume.hearth.api.NavidromeNativeApi
-import im.flume.hearth.api.SubsonicClient
-import im.flume.hearth.data.AppDatabase
+import im.flume.hearth.core.network.NavidromeNativeApi
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.data.LibraryRepository
 import im.flume.hearth.data.LyricsRepository
 import im.flume.hearth.data.MixRepository
-import im.flume.hearth.data.NetworkMonitor
-import im.flume.hearth.data.SessionStore
+import im.flume.hearth.core.data.NetworkMonitor
+import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.data.Usage
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.playback.CoverCacheKeys
-import im.flume.hearth.playback.PlayerConnection
-import im.flume.hearth.playback.PreviewPlayer
-import im.flume.hearth.playback.QueueInfo
+import im.flume.hearth.core.playback.CoverCacheKeys
+import im.flume.hearth.core.playback.PlayerConnection
+import im.flume.hearth.core.playback.PreviewPlayer
+import im.flume.hearth.core.playback.QueueInfo
 import im.flume.hearth.requests.RequestsRepository
 import im.flume.hearth.spoken.SpokenRepository
 import im.flume.hearth.sync.LibrarySync
 import im.flume.hearth.update.Updater
-import im.flume.hearth.ui.theme.accentState
+import im.flume.hearth.core.ui.theme.accentState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +42,11 @@ import androidx.media3.datasource.cache.SimpleCache
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
+import im.flume.hearth.core.common.crashLoggingHandler
+import im.flume.hearth.core.common.writeCrash
+import im.flume.hearth.core.playback.AppContainer
+import im.flume.hearth.core.playback.ContainerOwner
+import im.flume.hearth.core.playback.container
 
 class HearthApp : Application(), SingletonImageLoader.Factory, ContainerOwner {
     override lateinit var container: HearthContainer

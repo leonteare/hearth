@@ -9,6 +9,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.spoken.OutboxKind
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
 
 class SpokenLogicTest {
     private fun p(pos: Double, at: Long, finished: Boolean = false, duration: Double = 3600.0, finishedAt: Long? = null) =

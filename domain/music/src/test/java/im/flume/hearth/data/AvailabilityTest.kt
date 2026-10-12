@@ -1,13 +1,16 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidalAlbum
-import im.flume.hearth.api.TidalArtist
-import im.flume.hearth.api.TidalSearchResults
-import im.flume.hearth.api.TidalTrack
+import im.flume.hearth.core.network.TidalAlbum
+import im.flume.hearth.core.network.TidalArtist
+import im.flume.hearth.core.network.TidalSearchResults
+import im.flume.hearth.core.network.TidalTrack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.ArtistEntity
+import im.flume.hearth.core.data.SongEntity
 
 class AvailabilityTest {
     private fun song(id: String, title: String, artist: String = "Daft Punk", disc: Int = 1, track: Int = 1, isrc: String? = null) = SongEntity(

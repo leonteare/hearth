@@ -1,7 +1,9 @@
 // How a request moves along as Tidarr's queue changes (pure, unit tested).
 package im.flume.hearth.data
 
-import im.flume.hearth.api.TidarrQueueItem
+import im.flume.hearth.core.network.TidarrQueueItem
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.RequestStatus
 
 /** How a request moves along as Tidarr's queue changes. Pure, for testing. */
 object RequestTracking {

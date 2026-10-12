@@ -2,12 +2,13 @@
 // clearing unfollowed shows off the server, and re-writing follows the server lost.
 package im.flume.hearth.spoken
 
-import im.flume.hearth.api.AbsLibraryItem
-import im.flume.hearth.logHandledError
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.AbsLibraryItem
+import im.flume.hearth.core.common.logHandledError
+import im.flume.hearth.core.common.userMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
+import im.flume.hearth.core.data.spoken.FollowIntent
 
 /** Following and unfollowing podcasts for this user, through follower tags on the server item. */
 internal class SpokenFollows(private val repo: SpokenRepository) {

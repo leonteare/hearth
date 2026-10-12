@@ -3,8 +3,8 @@ package im.flume.hearth.ui.screens.visualiser
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.toArgb
-import im.flume.hearth.playback.AudioFrame
-import im.flume.hearth.playback.StereoWindow
+import im.flume.hearth.core.playback.AudioFrame
+import im.flume.hearth.core.playback.StereoWindow
 import kotlin.math.exp
 import kotlin.math.floor
 

@@ -36,15 +36,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.SongEntity
-import im.flume.hearth.playback.EXTRA_COVER_ART
-import im.flume.hearth.playback.QueueEntry
-import im.flume.hearth.ui.components.BannerCard
-import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.theme.HearthTheme
-import im.flume.hearth.ui.theme.LocalReducedMotion
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.playback.EXTRA_COVER_ART
+import im.flume.hearth.core.playback.QueueEntry
+import im.flume.hearth.core.ui.components.BannerCard
+import im.flume.hearth.core.ui.components.MediaRow
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import im.flume.hearth.core.ui.screens.coverArt
 
 @Composable
 internal fun RepeatNote(icon: ImageVector, text: String) {

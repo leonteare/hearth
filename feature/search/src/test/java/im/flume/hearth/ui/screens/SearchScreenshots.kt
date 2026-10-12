@@ -5,14 +5,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.focus.FocusRequester
 import im.flume.hearth.data.AlbumItem
 import im.flume.hearth.data.ArtistItem
-import im.flume.hearth.data.GenreCount
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.data.SearchHit
-import im.flume.hearth.data.SearchIndex
+import im.flume.hearth.core.data.GenreCount
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.domain.SearchHit
+import im.flume.hearth.core.data.SearchIndex
 import im.flume.hearth.data.SongItem
-import im.flume.hearth.testing.Samples
-import im.flume.hearth.testing.ScreenshotTest
+import im.flume.hearth.core.testing.Samples
+import im.flume.hearth.core.testing.ScreenshotTest
 import org.junit.Test
+import im.flume.hearth.core.ui.screens.gridColumns
 
 /** Search's field, filters, landing page and results. */
 class SearchScreenshots : ScreenshotTest() {

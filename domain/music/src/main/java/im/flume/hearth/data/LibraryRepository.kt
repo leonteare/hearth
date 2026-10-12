@@ -1,10 +1,10 @@
 package im.flume.hearth.data
 
 import android.os.Bundle
-import im.flume.hearth.api.NavidromeNativeApi
-import im.flume.hearth.api.PlaylistDto
-import im.flume.hearth.api.SubsonicClient
-import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.core.network.NavidromeNativeApi
+import im.flume.hearth.core.network.PlaylistDto
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.common.SubsonicException
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +14,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import im.flume.hearth.download.DownloadRepository
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.data.AlbumEntity
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.ArtistEntity
+import im.flume.hearth.core.data.PlaylistSongEntity
+import im.flume.hearth.core.data.SearchIndex
+import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.data.toEntity
 
 /**
  * Something the user can press play on. Converted to a Bundle to travel to the playback service, so

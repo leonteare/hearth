@@ -2,7 +2,7 @@ package im.flume.hearth.data
 
 import android.content.Context
 import androidx.core.content.edit
-import im.flume.hearth.api.SubsonicClient
+import im.flume.hearth.core.network.SubsonicClient
 import im.flume.hearth.playback.QueuePlanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,6 +10,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import kotlin.random.Random
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.core.data.SongEntity
 
 @Serializable
 data class Mix(val title: String, val subtitle: String, val songIds: List<String>, val covers: List<String?>)

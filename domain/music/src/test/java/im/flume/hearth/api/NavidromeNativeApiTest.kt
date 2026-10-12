@@ -11,6 +11,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import im.flume.hearth.core.common.PasswordNeededException
+import im.flume.hearth.core.common.WrongPasswordException
+import im.flume.hearth.core.network.Credentials
+import im.flume.hearth.core.network.NavidromeNativeApi
 
 class NavidromeNativeApiTest {
     private lateinit var server: MockWebServer

@@ -21,18 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.container
-import im.flume.hearth.data.DownloadState
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.DownloadState
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.Usage
-import im.flume.hearth.playback.PlaybackService
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.LocalRowContext
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.components.SongInfoDialog
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.PlaybackService
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.LocalRowContext
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.components.SongInfoDialog
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.delay
+import im.flume.hearth.core.ui.screens.LocalSpokenNow
+import im.flume.hearth.core.ui.screens.coverArt
 
 @Composable
 internal fun NowPlayingMenu(song: SongEntity?, sleepAt: Long, onClose: () -> Unit) {

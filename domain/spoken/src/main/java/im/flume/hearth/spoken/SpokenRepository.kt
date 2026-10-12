@@ -7,15 +7,15 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
-import im.flume.hearth.api.AbsClient
-import im.flume.hearth.api.AbsLibraryItem
-import im.flume.hearth.api.AbsPodcastSearchResult
-import im.flume.hearth.api.AbsTokens
-import im.flume.hearth.api.ServerClock
-import im.flume.hearth.data.AppDatabase
-import im.flume.hearth.data.NetworkMonitor
-import im.flume.hearth.data.SessionStore
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.AbsClient
+import im.flume.hearth.core.network.AbsLibraryItem
+import im.flume.hearth.core.network.AbsPodcastSearchResult
+import im.flume.hearth.core.network.AbsTokens
+import im.flume.hearth.core.network.ServerClock
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.NetworkMonitor
+import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.core.common.userMessage
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +31,15 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import im.flume.hearth.core.data.spoken.AbsAccount
+import im.flume.hearth.core.data.spoken.AbsAccountStore
+import im.flume.hearth.core.data.spoken.BookRow
+import im.flume.hearth.core.data.spoken.ChapterEntity
+import im.flume.hearth.core.data.spoken.EpisodeRow
+import im.flume.hearth.core.data.spoken.PodcastEntity
+import im.flume.hearth.core.data.spoken.SpokenDownloadRow
+import im.flume.hearth.core.data.spoken.SpokenProgressEntity
+import im.flume.hearth.core.data.spoken.SpokenSettings
 
 /** An episode or book with progress, for "Continue listening". */
 data class ContinueItem(

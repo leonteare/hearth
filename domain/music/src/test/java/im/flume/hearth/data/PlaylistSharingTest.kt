@@ -1,12 +1,13 @@
 package im.flume.hearth.data
 
-import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.core.common.SubsonicException
 import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import im.flume.hearth.core.data.PlaylistEntity
 
 class PlaylistSharingTest {
     @Test

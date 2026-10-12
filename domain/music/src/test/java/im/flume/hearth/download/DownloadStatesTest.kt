@@ -1,7 +1,7 @@
 package im.flume.hearth.download
 
-import im.flume.hearth.data.DownloadState
-import im.flume.hearth.data.DownloadStateRow
+import im.flume.hearth.core.data.DownloadState
+import im.flume.hearth.core.data.DownloadStateRow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest

@@ -27,6 +27,8 @@ import java.security.cert.CertificateFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
+import im.flume.hearth.core.network.AbsClient
+import im.flume.hearth.core.network.AbsTokens
 
 /**
  * The show page's "every episode" flow against a real Audiobookshelf server: add a show (followed, as

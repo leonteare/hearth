@@ -8,11 +8,14 @@ import android.provider.DocumentsContract
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.MetadataRetriever
-import im.flume.hearth.logHandledError
+import im.flume.hearth.core.common.logHandledError
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.data.spoken.LocalBookDao
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalBookFileEntity
 
 /** Reads a picked folder: finds the books in it, measures and tags their files, and saves their covers. */
 internal class LocalBookScanner(

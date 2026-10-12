@@ -26,23 +26,24 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.api.tidalImageUrl
-import im.flume.hearth.container
-import im.flume.hearth.data.DownloadState
+import im.flume.hearth.core.network.tidalImageUrl
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.data.DownloadState
 import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.RequestEntity
-import im.flume.hearth.data.SongEntity
-import im.flume.hearth.data.SongFilter
+import im.flume.hearth.core.data.RequestEntity
+import im.flume.hearth.core.data.SongEntity
+import im.flume.hearth.core.data.SongFilter
 import im.flume.hearth.data.SongItem
 import im.flume.hearth.data.Usage
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.LocalRowContext
-import im.flume.hearth.ui.components.SongRow
-import im.flume.hearth.ui.components.formatLongDuration
-import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.components.rememberCoverColor
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.LocalRowContext
+import im.flume.hearth.core.ui.components.SongRow
+import im.flume.hearth.core.ui.components.formatLongDuration
+import im.flume.hearth.core.ui.components.plural
+import im.flume.hearth.core.ui.components.rememberCoverColor
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.isWideWindow
 
 /** Header of a page for music that isn't on the server: its artwork, a status line, and what Play does (a preview). */
 data class RemoteHeader(

@@ -21,17 +21,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
+import im.flume.hearth.core.playback.container
 import im.flume.hearth.data.Mix
 import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.SongEntity
+import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.data.SongOrder
 import im.flume.hearth.download.DownloadRepository
-import im.flume.hearth.ui.components.EmptyState
-import im.flume.hearth.ui.components.LoadingPage
-import im.flume.hearth.ui.components.MixCover
-import im.flume.hearth.ui.components.UnavailablePage
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.EmptyState
+import im.flume.hearth.core.ui.components.LoadingPage
+import im.flume.hearth.core.ui.components.MixCover
+import im.flume.hearth.core.ui.components.UnavailablePage
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.SortMenu
+import im.flume.hearth.core.ui.screens.coverArt
 
 /**
  * A mix built on this phone, found by its title ("Artist Mix", one per artist) rather than its place

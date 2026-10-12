@@ -19,11 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.ui.components.ActionSheet
-import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.components.MenuItem
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.ui.components.ActionSheet
+import im.flume.hearth.core.ui.components.LocalActions
+import im.flume.hearth.core.ui.components.MenuItem
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.SortMenu
 
 /**
  * Second row: Music's lists on the left, then the sort (and Podcasts' "+") on the right.

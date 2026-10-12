@@ -26,8 +26,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.SearchFilter
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.domain.SearchFilter
+import im.flume.hearth.core.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.screens.EqualWidthChips
 
 /** The rounded search box at the top of Search, with a clear button once something is typed. */
 @Composable

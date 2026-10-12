@@ -9,10 +9,10 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import im.flume.hearth.api.AbsUploadFile
-import im.flume.hearth.data.AppDatabase
-import im.flume.hearth.logHandledError
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.AbsUploadFile
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.common.logHandledError
+import im.flume.hearth.core.common.userMessage
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +24,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import im.flume.hearth.core.data.spoken.LocalBookEntity
+import im.flume.hearth.core.data.spoken.LocalUploadState
+import im.flume.hearth.core.data.spoken.SpokenPlayPrefEntity
 
 /** Adding a phone book to the server: sending its files, waiting for the server to add it, and linking the two. */
 internal class LocalBookUpload(

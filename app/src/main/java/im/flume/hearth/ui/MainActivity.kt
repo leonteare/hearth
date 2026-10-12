@@ -1,6 +1,6 @@
 package im.flume.hearth.ui
 
-import im.flume.hearth.EXTRA_ROUTE
+import im.flume.hearth.core.common.EXTRA_ROUTE
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
@@ -14,9 +14,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import im.flume.hearth.container
-import im.flume.hearth.ui.theme.HearthColors
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.playback.container
+import im.flume.hearth.core.ui.theme.HearthColors
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {

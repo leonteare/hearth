@@ -24,9 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import im.flume.hearth.ui.components.ChoiceSheet
-import im.flume.hearth.ui.components.TopBar
-import im.flume.hearth.ui.theme.HearthTheme
+import im.flume.hearth.core.ui.components.ChoiceSheet
+import im.flume.hearth.core.ui.components.TopBar
+import im.flume.hearth.core.ui.theme.HearthTheme
 
 internal val BITRATES = listOf(0 to "Original quality", 320 to "320 kbps", 256 to "256 kbps", 192 to "192 kbps", 128 to "128 kbps (saves data)")
 

@@ -22,11 +22,11 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import im.flume.hearth.core.common.R
-import im.flume.hearth.api.AbsClient
-import im.flume.hearth.data.AppDatabase
-import im.flume.hearth.data.NetworkMonitor
-import im.flume.hearth.data.SessionStore
-import im.flume.hearth.util.userMessage
+import im.flume.hearth.core.network.AbsClient
+import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.NetworkMonitor
+import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.core.common.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +45,10 @@ import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import im.flume.hearth.core.data.spoken.PodcastEntity
+import im.flume.hearth.core.data.spoken.SpokenDownloadEntity
+import im.flume.hearth.core.data.spoken.SpokenDownloadState
+import im.flume.hearth.core.data.spoken.SpokenSettings
 
 /** Identifies a download: an episode, or a whole book ([episodeId] ""). */
 data class SpokenKey(val libraryItemId: String, val episodeId: String = "") {
