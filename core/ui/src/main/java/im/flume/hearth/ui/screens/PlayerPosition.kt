@@ -18,7 +18,7 @@ import im.flume.hearth.playback.EXTRA_COVER_ART
 import im.flume.hearth.playback.PlayerUiState
 import kotlinx.coroutines.delay
 
-internal val PlayerUiState.coverArt: String? get() = current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
+val PlayerUiState.coverArt: String? get() = current?.mediaMetadata?.extras?.getString(EXTRA_COVER_ART)
 
 /**
  * Polls [read] (a playback position) 4 times a second while playing, once a second while paused,
@@ -45,22 +45,22 @@ internal fun rememberPolledPosition(state: PlayerUiState, read: () -> Long): Lon
 
 /** Position in the current song, polled while visible (see [rememberPolledPosition]). */
 @Composable
-internal fun rememberPositionState(state: PlayerUiState): LongState {
+fun rememberPositionState(state: PlayerUiState): LongState {
     val player = LocalContext.current.container.player
     return rememberPolledPosition(state) { player.positionMs }
 }
 
 /** The current value of [rememberPositionState], for screens that redraw with it anyway (the seek bar, lyrics). */
 @Composable
-internal fun rememberPosition(state: PlayerUiState): Long = rememberPositionState(state).longValue
+fun rememberPosition(state: PlayerUiState): Long = rememberPositionState(state).longValue
 
 /** Position on the whole episode / book (not the current file), polled while visible (see [rememberPolledPosition]). */
 @Composable
-internal fun rememberSpokenPositionState(state: PlayerUiState): LongState {
+fun rememberSpokenPositionState(state: PlayerUiState): LongState {
     val player = LocalContext.current.container.player
     return rememberPolledPosition(state) { player.spokenPositionMs }
 }
 
 /** The current value of [rememberSpokenPositionState], for screens that redraw with it anyway. */
 @Composable
-internal fun rememberSpokenPosition(state: PlayerUiState): Long = rememberSpokenPositionState(state).longValue
+fun rememberSpokenPosition(state: PlayerUiState): Long = rememberSpokenPositionState(state).longValue

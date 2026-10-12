@@ -41,7 +41,7 @@ private const val LARGE_FONT_SCALE = 1.15f
  * With large text they scroll sideways instead, at their natural width.
  */
 @Composable
-internal fun <T> EqualWidthChips(
+fun <T> EqualWidthChips(
     options: List<T>,
     selected: T,
     label: (T) -> String,

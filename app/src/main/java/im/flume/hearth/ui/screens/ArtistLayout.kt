@@ -1,4 +1,4 @@
-// The artist page's layout (header, Popular, album carousels) and the Follow button.
+// The artist page's layout (header, Popular, album carousels).
 package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.BorderStroke
@@ -133,20 +133,5 @@ private fun LazyListScope.albumCarousel(key: String, title: String, albums: List
                 }
             }
         }
-    }
-}
-
-/** Outlined pill: "Follow" adds the artist to Your Library, "Following" when they're already there. */
-@Composable
-internal fun FollowButton(following: Boolean, onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    OutlinedButton(
-        onClick = onClick,
-        shape = CircleShape,
-        border = BorderStroke(1.dp, if (following) accent else TextSecondary),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-        modifier = Modifier.height(32.dp),
-    ) {
-        Text(if (following) "Following" else "Follow", color = if (following) accent else Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }

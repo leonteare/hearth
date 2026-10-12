@@ -126,14 +126,14 @@ fun ListenedBar(fraction: Float, modifier: Modifier = Modifier, color: Color = M
     )
 }
 
-internal fun downloadingMessage(c: AppContainer): String =
+fun downloadingMessage(c: AppContainer): String =
     if (c.session.settings.value.wifiOnlyDownloads && !c.network.wifi.value) "Downloading when you're on Wi-Fi" else "Downloading"
 
 // ---------------------------------------------------------------------------------- page header
 
 /** Expandable description: three lines, tap for the rest. */
 @Composable
-internal fun Description(text: String?) {
+fun Description(text: String?) {
     // Feeds send HTML (or plain text with entities like &amp;): show it as text.
     val clean = remember(text) {
         text?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim() }
@@ -153,7 +153,7 @@ internal fun Description(text: String?) {
 
 /** Cover-tinted header shared by the show and book pages. */
 @Composable
-internal fun SpokenHeader(
+fun SpokenHeader(
     coverUrl: String?, title: String, lines: List<String>, artSize: Dp = 200.dp,
     /** Opens the page's ⋮ menu, shown top right opposite the back button. */
     onMenu: (() -> Unit)? = null,
@@ -183,7 +183,7 @@ internal fun SpokenHeader(
 
 /** Big round play button, as on album pages. */
 @Composable
-internal fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit) {
+fun RoundPlayButton(label: String, playing: Boolean = false, onClick: () -> Unit) {
     val accent = MaterialTheme.colorScheme.primary
     FilledIconButton(
         onClick = onClick,

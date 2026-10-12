@@ -45,7 +45,7 @@ fun AlbumListRow(a: AlbumEntity) {
 }
 
 @Composable
-internal fun SortMenu(options: List<String>, sort: Int, modifier: Modifier = Modifier, onSort: (Int) -> Unit) {
+fun SortMenu(options: List<String>, sort: Int, modifier: Modifier = Modifier, onSort: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
     // Shortened with "…" rather than squeezing whatever sits beside it when space is tight.
     TextButton(onClick = { open = true }, modifier = modifier) {
@@ -64,7 +64,7 @@ internal fun SortMenu(options: List<String>, sort: Int, modifier: Modifier = Mod
 
 /** Columns for tile grids (genres, Home's quick tiles): 2 on phones, 3-4 on wide windows. */
 @Composable
-internal fun gridColumns(): Int {
+fun gridColumns(): Int {
     val width = LocalConfiguration.current.screenWidthDp
     return when {
         width > 840 -> 4
@@ -75,7 +75,7 @@ internal fun gridColumns(): Int {
 
 /** True when the window is wider than tall (landscape), so tall headers go side by side. */
 @Composable
-internal fun isWideWindow(): Boolean {
+fun isWideWindow(): Boolean {
     val config = LocalConfiguration.current
     return config.screenWidthDp > config.screenHeightDp
 }
