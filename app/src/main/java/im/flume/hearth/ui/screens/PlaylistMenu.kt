@@ -1,0 +1,184 @@
+// A playlist's options menu: queueing, rename, reorder, photo, share, delete and leave.
+package im.flume.hearth.ui.screens
+
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import im.flume.hearth.api.SubsonicException
+import im.flume.hearth.container
+import im.flume.hearth.data.PhotoPrep
+import im.flume.hearth.data.PlaylistItem
+import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.ui.components.ActionSheet
+import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.MenuItem
+import im.flume.hearth.ui.theme.Destructive
+import im.flume.hearth.util.couldNot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+
+/** The playlist's ⋯ menu. What's in it depends on whether you own it, can add to it, or only listen. */
+@Composable
+internal fun PlaylistMenu(item: PlaylistItem, screenScope: CoroutineScope, songIds: List<String>) {
+    val c = LocalContext.current.container
+    val context = LocalContext.current
+    val actions = LocalActions.current
+    val back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val id = item.playlist.id
+    val name = item.playlist.name
+    val access = item.access
+    var open by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    // A photo action waiting for the password dialog to finish.
+    var afterPassword by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var newName by remember(name) { mutableStateOf(name) }
+
+    fun withPassword(action: () -> Unit) {
+        if (c.session.vault.hasPassword) action() else afterPassword = action
+    }
+    fun photoChange(progress: String, done: String, change: suspend () -> Unit) {
+        c.appScope.launch {
+            actions.showMessage(progress)
+            runCatching { change() }
+                .onSuccess { actions.showMessage(done) }
+                .onFailure { e ->
+                    actions.showMessage(
+                        if (e is SubsonicException) c.library.editError(e, access.owner, couldNot("Couldn't change the photo", e, !c.network.isOnline.value))
+                        else photoError(e) { c.session.vault.clear(); c.nativeApi.forgetSession() }
+                    )
+                }
+        }
+    }
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) withPassword {
+            photoChange("Uploading photo…", "Photo updated") {
+                c.library.setPlaylistPhoto(id, PhotoPrep.jpeg(context, uri))
+            }
+        }
+    }
+
+    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "Playlist options") }
+    ActionSheet(open, { open = false }, title = name, subtitle = "Playlist", coverArt = item.playlist.coverArt, fallback = name) {
+        if (songIds.isNotEmpty()) {
+            MenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay) { open = false; actions.playNext(songIds) }
+            MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic) { open = false; actions.addToQueue(songIds) }
+            MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd) { open = false; actions.addToPlaylist(songIds) }
+        }
+        if (access.canEdit) {
+
+            MenuItem("Rename", Icons.Default.Edit) { open = false; renaming = true }
+            MenuItem("Edit order", Icons.Default.SwapVert) { open = false; actions.open("playlist-edit/$id") }
+            MenuItem("Change photo", Icons.Default.AddPhotoAlternate) {
+                open = false
+                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+            // Navidrome doesn't say whether the photo is custom; removing an automatic one is harmless.
+            MenuItem("Remove photo", Icons.Default.HideImage) {
+                open = false
+                withPassword { photoChange("Removing photo…", "Photo removed") { c.library.removePlaylistPhoto(id) } }
+            }
+        }
+        if (access.isOwner) {
+            MenuItem("Share", Icons.Default.GroupAdd) { open = false; sharing = true }
+            MenuItem("Delete playlist", Icons.Default.Delete, tint = Destructive, tintText = true) { open = false; deleting = true }
+        }
+        if (access.isMember) {
+            MenuItem("Leave playlist", Icons.AutoMirrored.Filled.ExitToApp, tint = Destructive, tintText = true) { open = false; leaving = true }
+        }
+    }
+    if (sharing) ShareSheet(item) { sharing = false }
+    afterPassword?.let { action ->
+        PasswordDialog(onDismiss = { afterPassword = null }, onSaved = { afterPassword = null; action() })
+    }
+    if (renaming) {
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("Rename playlist") },
+            text = { OutlinedTextField(newName, { newName = it }, singleLine = true) },
+            confirmButton = {
+                TextButton(enabled = newName.isNotBlank(), onClick = {
+                    renaming = false
+                    c.appScope.launch {
+                        runCatching { c.library.renamePlaylist(id, newName.trim()) }
+                            .onFailure { actions.showMessage(c.library.editError(it, access.owner, couldNot("Couldn't rename the playlist", it, !c.network.isOnline.value))) }
+                    }
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+        )
+    }
+    if (leaving) {
+        AlertDialog(
+            onDismissRequest = { leaving = false },
+            title = { Text("Leave \"$name\"?") },
+            text = { Text("It disappears from your library. ${PlaylistRules.displayName(access.owner)} can invite you again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    leaving = false
+                    screenScope.launch {
+                        c.appScope.async { c.library.answerInvite(id, accept = false) }.await()
+                        back?.onBackPressed()
+                    }
+                }) { Text("Leave", color = Destructive) }
+            },
+            dismissButton = { TextButton(onClick = { leaving = false }) { Text("Cancel") } },
+        )
+    }
+    if (deleting) {
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text("Delete \"$name\"?") },
+            text = { Text("The playlist is removed from Navidrome for good. The songs stay in your library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleting = false
+                    // The request runs in the app scope so leaving the screen can't cut it short; going
+                    // back is tied to the screen (this menu vanishes once the playlist row is deleted).
+                    screenScope.launch {
+                        val ok = c.appScope.async {
+                            // Read the songs first: deleting the playlist drops them, and its downloads would stay forever.
+                            val songIds = c.db.library().playlistSongsOnce(id).map { it.id }
+                            runCatching { c.library.deletePlaylist(id) }
+                                .onSuccess { c.downloads.unpinAndRemove(DownloadRepository.KIND_PLAYLIST, id, songIds) }
+                                .isSuccess
+                        }.await()
+                        if (ok) back?.onBackPressed() else actions.showMessage(couldNot("Couldn't delete the playlist", null, !c.network.isOnline.value))
+                    }
+                }) { Text("Delete", color = Destructive) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
+        )
+    }
+}
