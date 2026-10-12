@@ -12,6 +12,8 @@ Run from the repo root. There is no CI.
 |---|---|
 | **Check a change (compile + all unit tests)** | `./verify.sh` (every module; one PASS/FAIL line naming failing tests; `release.sh` runs it too) |
 | One test class | `./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'` |
+| Screenshot tests: verify | Part of `./verify.sh` / `testDebugUnitTest`: each compares with `src/test/screenshots/`; a changed one fails, and its `*_compare.png` (reference / new / diff) lands in `<module>/build/outputs/roborazzi/` |
+| Screenshot tests: record new references | `./gradlew testDebugUnitTest -Proborazzi.test.record=true` (add `--tests '...'` for one class). Look at every changed PNG before committing it |
 | Compile only | `./gradlew compileDebugKotlin` |
 | Debug APK (installs as `im.flume.hearth.debug`, alongside the release app) | `./gradlew assembleDebug` |
 | Release APK | `./gradlew assembleRelease` (fails on purpose without `keystore.properties`) |
@@ -35,6 +37,9 @@ convention plugin in `build-logic/`.
 - `:core:domain`: repositories and logic (rest of `data/`, `spoken/`, `sync/`, `download/`, `requests/`, `update/`,
   `QueuePlanner`), `DomainContainer` (the container's interface below the player), notification icon.
 - `:core:playback`: `playback/` and `AppContainer` (DomainContainer + player) with `Context.container`.
+- `:core:testing` (test-only, used via `testImplementation`): `testing/Samples` (sample songs, albums, episodes, books,
+  `PlayerUiState`), `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication` (fake
+  `context.container`: in-memory Room, signed out, nothing started), `ScreenshotTest` (base class: `snap`, `snapScreen`).
 - `:core:ui`: `ui/theme/` (+ `Tokens.kt`: `HearthTheme.colors/spacing/shapes/icons`), `ui/components/`, screen pieces
   several areas share. `:app`: `HearthApp.kt` (`HearthContainer`, the real container), `ui/*.kt`, the rest of `ui/screens/`.
 
@@ -112,10 +117,16 @@ Paths below are under each module's `src/main/java/im/flume/hearth/`. **Update t
 
 ## Conventions this code follows
 
-- **Put logic in pure, JVM-testable units.** Tests are plain JUnit 4 on the JVM, with no Robolectric and no
-  instrumented tests. Put decisions in an `object` or top-level function that takes plain values and injectable
-  `Random`/time, then test that. Examples: `QueuePlanner`, `internal object DownloadPolicy`, `Stats`, `SearchIndex`.
-  Don't try to unit-test code that needs a `Context`.
+- **Put logic in pure, JVM-testable units.** Tests are plain JUnit 4 on the JVM, with no instrumented tests. Put
+  decisions in an `object` or top-level function that takes plain values and injectable `Random`/time, then test that.
+  Examples: `QueuePlanner`, `internal object DownloadPolicy`, `Stats`, `SearchIndex`. Don't try to unit-test logic
+  that needs a `Context`. Robolectric is only for screenshot tests.
+- **Screenshot tests** (Roborazzi on Robolectric, JVM only) pin today's look. Opt a module in with
+  `id("hearth.screenshots")` in its `plugins { }` (adds Roborazzi, Robolectric and `:core:testing` to its tests). Extend
+  `ScreenshotTest` and call `snap("name") { Composable() }` (cropped to the content) or `snapScreen` (whole phone,
+  needed for sheets and dialogs); images go to `<module>/src/test/screenshots/<Class>_<name>.png` and are committed.
+  Fixed: SDK 34 (35+ breaks when the home folder has a space), 411x891dp xxhdpi, default accent, Compose clock advanced
+  by hand. Use `Samples` with fixed dates, never "now". A test moves with its screen, together with its `<Class>_*.png` files.
 - **Test names are backtick sentences that describe behaviour**, e.g.
   ``fun `shuffle with a chosen song plays that song first`()``. Use `MockWebServer` for API tests and
   `kotlinx-coroutines-test` for suspend code.

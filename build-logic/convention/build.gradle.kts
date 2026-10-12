@@ -13,5 +13,9 @@ gradlePlugin {
             id = "hearth.android.library"
             implementationClass = "HearthLibraryPlugin"
         }
+        register("hearthScreenshots") {
+            id = "hearth.screenshots"
+            implementationClass = "HearthScreenshotsPlugin"
+        }
     }
 }

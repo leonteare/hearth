@@ -2,7 +2,7 @@
 # Compile and run the unit tests, then print one PASS/FAIL line (with the failing tests' names).
 # Exit code is non-zero on any failure. release.sh runs this before it builds.
 #
-#   ./verify.sh                 # compileDebugKotlin + testDebugUnitTest
+#   ./verify.sh                 # compileDebugKotlin + testDebugUnitTest (screenshot tests compare with their references)
 #   ./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'   # extra args go to Gradle
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -61,6 +61,13 @@ fi
 if [ -n "$failed" ]; then
     echo "FAIL: $(printf '%s\n' "$failed" | wc -l | tr -d ' ') failing test(s):"
     printf '%s\n' "$failed"
+    # A screenshot test that no longer matches its reference leaves a comparison image in its module's build output.
+    diffs=$(find . \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/outputs/roborazzi/*_compare.png' -newer "$started" -print 2>/dev/null)
+    if [ -n "$diffs" ]; then
+        echo "Screenshots that changed (each image shows reference | new | difference):"
+        printf '  %s\n' $diffs
+        echo "If the new look is intended, record it: ./gradlew testDebugUnitTest -Proborazzi.test.record=true"
+    fi
 else
     # No failing tests recorded: the compile (or Gradle itself) failed. Show the errors.
     grep -E '^e: |error:|FAILURE|What went wrong' -A3 "$log" | head -40

@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    id("hearth.screenshots")
     alias(libs.plugins.kotlin.compose)
 }
 

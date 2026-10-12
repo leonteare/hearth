@@ -28,4 +28,6 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
   `verify.sh`, signs, tags, pushes, creates the GitHub release). Phones self-update from GitHub Releases.
 - **Visualisers never use the microphone.** No `RECORD_AUDIO`, ever. Audio comes from tapping the player's own output
   with a `ForwardingAudioSink` (`AudioAnalyzer`).
-- **Tests are JVM-only** (JUnit 4, no Robolectric, no instrumented tests): logic goes in pure objects/functions.
+- **Tests are JVM-only** (JUnit 4, no instrumented tests): logic goes in pure objects/functions. The one exception is
+  screenshot tests (Roborazzi + Robolectric, still on the JVM, no device), approved to prove refactors leave the look
+  unchanged. Plain test runs verify against committed PNGs; recording is opt-in (`-Proborazzi.test.record=true`).
