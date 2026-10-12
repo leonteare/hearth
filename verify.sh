@@ -28,7 +28,7 @@ if [ ! -f local.properties ] && [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SD
     fi
 fi
 
-# Every module's unit test results (app/, core/*/, feature/*/).
+# Every module's unit test results (app/, core/*/, domain/*/, feature/*/).
 results() { find . \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/test-results/testDebugUnitTest/*.xml' "$@" -print 2>/dev/null; }
 log=$(mktemp)
 started=$(mktemp)   # only results newer than this count, so a stale run can't be reported

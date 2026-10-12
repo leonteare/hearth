@@ -51,7 +51,11 @@ Gradle modules, each depending only on the ones above it (features never depend 
 | `core/common` | Error logging, crash files, scrubbing secrets from messages |
 | `core/network` | Clients: Subsonic (token auth), Navidrome native API (playlist photos, users), Audiobookshelf, Tidarr |
 | `core/data` | Room database, migrations and schemas, settings, password vault |
-| `core/domain` | Library/search/stats logic, sync (shrink guard), downloads, requests via Tidarr, podcasts and audiobooks, self-update |
+| `domain/music` | Library, search, stats, playlists, mixes, lyrics, sync (shrink guard), song downloads |
+| `domain/spoken` | Podcasts and audiobooks: sync, follows, progress, downloads, phone audiobooks |
+| `domain/requests` | Getting missing music via Tidarr and acting when it arrives |
+| `domain/update` | Self-update from GitHub Releases |
+| `core/domain` | Ties the domain modules together: the container interface and Search's combined results |
 | `core/playback` | Media3 service, queue, data source (download → cache → stream), scrobbling, previews, visualiser audio analysis |
 | `core/ui` | Theme and design tokens, shared components and rows |
 | `core/testing` | Test helpers: sample data, fake container, screenshot test base |

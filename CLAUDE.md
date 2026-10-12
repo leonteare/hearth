@@ -31,17 +31,24 @@ Run from the repo root. There is no CI.
 
 Dependency rule: `:core:common ← :core:network ← :core:data ← :core:domain ← :core:playback ← :core:ui ← :feature:* ← :app`.
 Core modules `api` the one below; each feature depends only on `:core:ui`; **features never depend on each other**.
-Packages are unchanged by the split (`im.flume.hearth.data` spans `:core:data` and `:core:domain`, `ui.screens` spans
+The domain layer is split by area: `:core:data ← :domain:{music,spoken,update}`, `:domain:music ← :domain:requests`,
+and `:core:domain` (aggregator) `api`s all four. Domain modules never depend on `:core:domain` or on each other, except
+requests → music. Packages are unchanged (`im.flume.hearth.data` spans `:core:data`, `:domain:music`, `:domain:requests`
+and `:core:domain`; `ui.screens` spans
 `:core:ui` and every feature). Each module has `src/main/java/im/flume/hearth/...` and a mirrored `src/test/...`. Shared
 Gradle setup: `build-logic/` plugins `hearth.android.library` (namespace `im.flume.hearth.<module path>`, SDKs, Java 17)
 and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 
 | Module | Holds |
 |---|---|
-| `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `util/Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `api/ApiExceptions` |
+| `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `util/Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `api/ApiExceptions`, `EXTRA_ROUTE`, `ic_notification` (`im.flume.hearth.core.common.R`) |
 | `:core:network` | `api/`: `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
-| `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore` |
-| `:core:domain` | Repositories and logic; `DomainContainer` (container interface for workers/receivers) |
+| `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`; `data/SearchIndex` (`SearchMatch`, `Scored`, `SongFilter`: text matching music and spoken share) |
+| `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning (below); `MusicContainer` |
+| `:domain:spoken` | Podcasts and audiobooks (`spoken/`, below); `SpokenContainer` |
+| `:domain:requests` | Tidarr requests (`requests/`, `data/RequestIntent`, `data/RequestTracking`); `RequestsContainer` |
+| `:domain:update` | `update/Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
+| `:core:domain` | Aggregator: `DomainContainer` (extends the four area containers), `data/SearchHits` (Search's one list across areas) |
 | `:core:playback` | `playback/`: Media3 service and player; `AppContainer` (DomainContainer + player) and `Context.container` |
 | `:core:ui` | `ui/theme/` (`Tokens.kt`, legacy `Theme.kt`, `CoverSizes`, `Contrast`), `ui/components/`, screen pieces two+ features share |
 | `:core:testing` | Test-only (via `testImplementation`): `Samples`, `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication`, `ScreenshotTest` |
@@ -55,13 +62,13 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 
 ### Where things live (under each module's `src/main/java/im/flume/hearth/`)
 
-- **domain `data/`**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `SearchIndex`/`SearchHits`, `Stats`,
-  `Usage`, `Lyrics` (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`,
-  `PlaylistEdits`, `PhotoPrep`, `Availability`, `RequestIntent`/`RequestMatching`.
-- **domain other**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
-  `DownloadPolicy`), `requests/` (Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker),
-  `update/Updater` (GitHub Releases, `UPDATE_REPO` in its BuildConfig), `playback/QueuePlanner` + `SavedQueue`.
-- **domain `spoken/`**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
+- **domain:music `data/`**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `Stats`, `Usage`, `Lyrics`
+  (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`, `PlaylistEdits`,
+  `PhotoPrep`, `Availability`, `RequestMatching` (is Tidal music on the server; `Availability` needs it).
+- **domain:music other**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
+  `DownloadPolicy`), `playback/QueuePlanner` + `SavedQueue`.
+- **domain:requests `requests/`**: Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker.
+- **domain:spoken `spoken/`**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
   `SpokenMapping`, `SpokenProgress`, `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`), `SpokenDownloads`,
   `SpokenPresentation`, `ShowFeed`/`ShowFeeds`; phone books: `LocalBooks`, `LocalBookScanner`, `LocalBookUpload`(+Worker),
   `LocalBookChapters`, `LocalBookLogic`, `LocalBookDetails`, `BookMatch`, `EmbeddedChapters`.
@@ -85,9 +92,11 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
   `screen("name/{id}") { entry -> Page(entry.arg("id")) }` (from `:core:ui` `Routing.kt`). Other features reach it by
   route via `NavActions`, never by calling the composable. New feature module: add to `settings.gradle.kts`, `:app`'s
   dependencies, and `:app` `Routes.kt`.
-- **Something two features need**: UI → `:core:ui`; logic → `:core:domain`. Never a feature → feature dependency.
-- **New repository / singleton**: class in `:core:domain` (or `:core:playback` if it needs the player), a property on
-  `DomainContainer` (or `AppContainer`), built in `HearthContainer` (`:app` `HearthApp.kt`) and in `TestContainer`.
+- **Something two features need**: UI → `:core:ui`; logic → its area's `:domain:*` module (`:core:domain` only for
+  code that merges areas). Never a feature → feature dependency.
+- **New repository / singleton**: class in its `:domain:*` module (or `:core:playback` if it needs the player), a
+  property on that area's container (`MusicContainer`, ...; or `AppContainer`), built in `HearthContainer` (`:app`
+  `HearthApp.kt`) and in `TestContainer`. Workers reach it via the module's internal `Context.<area>Container`.
 - **New DB table / column**: entity + DAO in `:core:data`, migration (below), exported `core/data/schemas/.../N.json`,
   `MigrationTest` case. Sync-only columns: bump `SCHEMA` in `LibrarySync`'s companion (forces a resync).
 - **New user action**: a method on the right `Actions` sub-interface (`SongActions`, `PlaylistActions`,
@@ -117,7 +126,7 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 - **Comments**: plain-language KDoc on *why* or what the user sees. New files start with a `//` line saying what they hold.
 - User-facing strings: plain, non-technical English in Kotlin. Only `app_name` is in `strings.xml`.
 - `@Serializable` classes stay under `im.flume.hearth`; the R8 keep rule is in the `consumer-rules.pro` of each module
-  holding them (network, data, domain, playback). A module that gains its first one copies that file.
+  holding them (network, data, domain:music, domain:spoken, playback). A module that gains its first one copies that file.
 - Imports, not inline fully-qualified names.
 - Regexes run on Android's ICU engine: escape literal `]` and `}` outside classes (`RegexLiteralsTest` checks).
 - Smart casts don't work on another module's public `val`s: copy to a local `val` first.
@@ -153,7 +162,7 @@ and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 - Commit secrets: `keystore.properties`, `*.jks`, passwords, Navidrome credentials, tokens, real server URLs.
 - Add `fallbackToDestructiveMigration()`, or edit an already-released `core/data/schemas/.../N.json`.
 - Sign a release with the debug key or weaken the `requireReleaseKey` check (installed apps would stop updating).
-- Remove the empty/shrunken library guard in `:core:domain` `sync/LibrarySync.kt`.
+- Remove the empty/shrunken library guard in `:domain:music` `sync/LibrarySync.kt`.
 - Add a feature → feature dependency, or a core module depending upward.
 
 ## Server-side contracts (homelab, `/opt/homelab`)
