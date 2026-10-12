@@ -1,11 +1,33 @@
 #!/usr/bin/env bash
-# Compile and run the unit tests, then print one PASS/FAIL line (with the failing tests' names).
-# Exit code is non-zero on any failure. release.sh runs this before it builds.
+# Check the structure rules, compile and run the unit tests, then print one PASS/FAIL line (with the failing
+# tests' names). Exit code is non-zero on any failure. release.sh runs this before it builds.
 #
-#   ./verify.sh                 # compileDebugKotlin + testDebugUnitTest (screenshot tests compare with their references)
+#   ./verify.sh                 # every module: compileDebugKotlin + testDebugUnitTest (screenshot tests compare
+#                               # with their references) after scripts/check-structure.sh
+#   ./verify.sh :feature:library                 # only that module (its screenshot tests included)
 #   ./verify.sh --tests 'im.flume.hearth.domain.music.playback.QueuePlannerTest'   # extra args go to Gradle
 set -uo pipefail
 cd "$(dirname "$0")"
+
+# An argument starting with ':' is a module to run on its own; everything else is passed through to Gradle.
+modules=()
+gradle_args=()
+for arg in "$@"; do
+    case "$arg" in
+        :*) modules+=("$arg") ;;
+        *) gradle_args+=("$arg") ;;
+    esac
+done
+
+# The structure rules first: a second of shell, and a wrong dependency or an oversized file would compile fine.
+if [ -x scripts/check-structure.sh ]; then
+    structure=$(scripts/check-structure.sh)
+    if [ -n "$structure" ]; then
+        echo "FAIL: $(printf '%s\n' "$structure" | wc -l | tr -d ' ') structure problem(s):"
+        printf '%s\n' "$structure"
+        exit 1
+    fi
+fi
 
 case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) windows=1 ;;
@@ -28,13 +50,24 @@ if [ ! -f local.properties ] && [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SD
     fi
 fi
 
-# Every module's unit test results (app/, core/*/, domain/*/, feature/*/).
-results() { find . \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/test-results/testDebugUnitTest/*.xml' "$@" -print 2>/dev/null; }
+# Unit test results from the modules this run covers (all of app/, core/*/, domain/*/, feature/*/, or the
+# directories of the modules named on the command line).
+scopes=(.)
+tasks=(compileDebugKotlin testDebugUnitTest)
+if [ "${#modules[@]}" -gt 0 ]; then
+    scopes=()
+    tasks=()
+    for module in "${modules[@]}"; do
+        scopes+=("./$(printf '%s' "${module#:}" | tr ':' '/')")
+        tasks+=("$module:compileDebugKotlin" "$module:testDebugUnitTest")
+    done
+fi
+results() { find "${scopes[@]}" \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/test-results/testDebugUnitTest/*.xml' "$@" -print 2>/dev/null; }
 log=$(mktemp)
 started=$(mktemp)   # only results newer than this count, so a stale run can't be reported
 trap 'rm -f "$log" "$started"' EXIT
 
-./gradlew --console=plain -q compileDebugKotlin testDebugUnitTest "$@" >"$log" 2>&1
+./gradlew --console=plain -q "${tasks[@]}" ${gradle_args[@]+"${gradle_args[@]}"} >"$log" 2>&1
 status=$?
 
 # Each <testcase> that holds a <failure> or <error> is a failed test.
@@ -54,7 +87,9 @@ fi
 if [ "$status" = 0 ]; then
     # shellcheck disable=SC2046
     total=$(cat $(results) /dev/null | grep -o '<testcase ' | wc -l | tr -d ' ')
-    echo "PASS: compiled, $total tests passed"
+    what=""
+    [ "${#modules[@]}" -gt 0 ] && what="${modules[*]} "
+    echo "PASS: ${what}compiled, $total tests passed"
     exit 0
 fi
 
@@ -62,7 +97,7 @@ if [ -n "$failed" ]; then
     echo "FAIL: $(printf '%s\n' "$failed" | wc -l | tr -d ' ') failing test(s):"
     printf '%s\n' "$failed"
     # A screenshot test that no longer matches its reference leaves a comparison image in its module's build output.
-    diffs=$(find . \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/outputs/roborazzi/*_compare.png' -newer "$started" -print 2>/dev/null)
+    diffs=$(find "${scopes[@]}" \( -path './.*' -o -path ./build-logic \) -prune -o -path '*/build/outputs/roborazzi/*_compare.png' -newer "$started" -print 2>/dev/null)
     if [ -n "$diffs" ]; then
         echo "Screenshots that changed (each image shows reference | new | difference):"
         printf '  %s\n' $diffs

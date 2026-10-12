@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
  * dropped. Periodic jobs are kept rather than replaced, so these names can turn up indefinitely: never remove one.
  */
 object LegacyWorkers {
+    // fqn-ok: every name below is saved data, not a reference to a class.
     val NAMES: Map<String, String> = mapOf(
         "im.flume.hearth.download.DownloadWorker" to "im.flume.hearth.domain.music.download.DownloadWorker",
         "im.flume.hearth.requests.RequestsWorker" to "im.flume.hearth.domain.requests.RequestsWorker",
