@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Hearth: an Android app (Kotlin, Jetpack Compose, Media3, Room, WorkManager, OkHttp) that plays music
-from a Navidrome/Subsonic server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, split
-into `:app` and layer modules under `core/` (see Layout; RESTRUCTURE.md has the plan). See README.md for features and DECISIONS.md for settled design choices (read before re-litigating one).
+Hearth: an Android app (Kotlin, Compose, Media3, Room, WorkManager, OkHttp) that plays music from a Navidrome/Subsonic
+server, plus podcasts and audiobooks from Audiobookshelf. Package `im.flume.hearth`, split into layer and feature
+modules. README.md has features; DECISIONS.md has settled choices (read it before re-litigating one).
 
 ## Commands
 
@@ -10,191 +10,159 @@ Run from the repo root. There is no CI.
 
 | Purpose | Command |
 |---|---|
-| **Check a change (compile + all unit tests)** | `./verify.sh` (every module; one PASS/FAIL line naming failing tests; `release.sh` runs it too) |
-| One test class | `./verify.sh --tests 'im.flume.hearth.playback.QueuePlannerTest'` |
-| Screenshot tests: verify | Part of `./verify.sh` / `testDebugUnitTest`: each compares with `src/test/screenshots/`; a changed one fails, and its `*_compare.png` (reference / new / diff) lands in `<module>/build/outputs/roborazzi/` |
-| Screenshot tests: record new references | `./gradlew testDebugUnitTest -Proborazzi.test.record=true` (add `--tests '...'` for one class). Look at every changed PNG before committing it |
-| Compile only | `./gradlew compileDebugKotlin` |
-| Debug APK (installs as `im.flume.hearth.debug`, alongside the release app) | `./gradlew assembleDebug` |
+| **Check a change** (compile + unit + screenshot tests, all modules) | `./verify.sh` (one PASS/FAIL line naming failing tests and changed screenshots) |
+| One module's tests | `./gradlew :feature:library:testDebugUnitTest --tests 'im.flume.hearth.ui.screens.LibraryTabsTest'` |
+| Record screenshot references | `./gradlew :feature:library:testDebugUnitTest -Proborazzi.test.record=true` (per module; add `--tests`). Look at every changed PNG before committing |
+| Debug APK (`im.flume.hearth.debug`, installs beside release) | `./gradlew assembleDebug` |
 | Release APK | `./gradlew assembleRelease` (fails on purpose without `keystore.properties`) |
-| Lint | Nothing set up or enforced (only AGP's unused `lintDebug`). |
+| Publish a release | `./release.sh "What changed" [minor]`: bumps version, runs `verify.sh`, signs, tags, pushes, GitHub release. **Release tested work straight away, without asking** (only work that passes `./verify.sh`) |
+| Worktree for a parallel agent | `scripts/agent-worktree.sh add <name>` / `remove <name>` / `prune` |
 
-- `gradle.properties` hard-codes `org.gradle.java.home` to Android Studio's jbr on Windows. Elsewhere, override it in
+- A failed screenshot leaves `<module>/build/outputs/roborazzi/*_compare.png` (reference / new / diff).
+- `gradle.properties` hard-codes `org.gradle.java.home` to Android Studio's jbr on Windows. Elsewhere override it in
   `~/.gradle/gradle.properties`; don't edit the project file.
-- Worktrees have no `local.properties` (git-ignored): `verify.sh` sets `ANDROID_HOME` itself; for raw Gradle, `export
+- Worktrees have no `local.properties`: `verify.sh` sets `ANDROID_HOME`; for raw Gradle `export
   ANDROID_HOME="$LOCALAPPDATA/Android/Sdk"`. Don't create `local.properties`. No JDK or SDK? Say so and stop.
 - Live tests `AbsLiveTest`/`ShowFeedLiveTest` skip unless `ABS_LIVE_URL`/`_USER`/`_PASSWORD` (+ `ABS_LIVE_FEED`,
-  optional `ABS_LIVE_CA`) are set. They touch a real server; never commit the values.
+  optional `ABS_LIVE_CA`) are set. They hit a real server; never commit the values.
+- Lint: nothing set up or enforced (only AGP's unused `lintDebug`).
 
-## Layout: where new code goes
+## Modules
 
-Modules (dependencies point down; packages are unchanged, so a package can span modules). Each has
-`src/main/java/im/flume/hearth/...` and `src/test/...`; shared Gradle settings are the `hearth.android.library`
-convention plugin in `build-logic/`.
-- `:core:common`: `util/Errors.kt`, `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), API exceptions.
-- `:core:network`: `api/`. `:core:data`: Room, DAOs, migrations, schemas (`core/data/schemas`), `SessionStore`,
-  `PasswordVault`, `NetworkMonitor`, `AbsAccountStore`. Only module with KSP.
-- `:core:domain`: repositories and logic (rest of `data/`, `spoken/`, `sync/`, `download/`, `requests/`, `update/`,
-  `QueuePlanner`), `DomainContainer` (the container's interface below the player), notification icon.
-- `:core:playback`: `playback/` and `AppContainer` (DomainContainer + player) with `Context.container`.
-- `:core:testing` (test-only, used via `testImplementation`): `testing/Samples` (sample songs, albums, episodes, books,
-  `PlayerUiState`), `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication` (fake
-  `context.container`: in-memory Room, signed out, nothing started), `ScreenshotTest` (base class: `snap`, `snapScreen`).
-- `:core:ui`: `ui/theme/` (+ `Tokens.kt`: `HearthTheme.colors/spacing/shapes/icons`), `ui/components/`, screen pieces
-  several areas share. `:app`: `HearthApp.kt` (`HearthContainer`, the real container), `ui/*.kt`, the rest of `ui/screens/`.
+Dependency rule: `:core:common ← :core:network ← :core:data ← :core:domain ← :core:playback ← :core:ui ← :feature:* ← :app`.
+Core modules `api` the one below; each feature depends only on `:core:ui`; **features never depend on each other**.
+Packages are unchanged by the split (`im.flume.hearth.data` spans `:core:data` and `:core:domain`, `ui.screens` spans
+`:core:ui` and every feature). Each module has `src/main/java/im/flume/hearth/...` and a mirrored `src/test/...`. Shared
+Gradle setup: `build-logic/` plugins `hearth.android.library` (namespace `im.flume.hearth.<module path>`, SDKs, Java 17)
+and `hearth.screenshots` (Roborazzi + Robolectric + `:core:testing` for tests).
 
-Paths below are under each module's `src/main/java/im/flume/hearth/`. **Update this map when you add, move or split a file.**
+| Module | Holds |
+|---|---|
+| `:core:common` | `ErrorLog.kt` (`logHandledError`, `crashLoggingHandler`, crash files), `util/Errors.kt` (`scrubSecrets`, `userMessage`, `couldNot`), `api/ApiExceptions` |
+| `:core:network` | `api/`: `SubsonicClient` + `Models` (token auth), `NavidromeNativeApi` (playlist photos, users), `AbsClient` + `AbsModels` (Audiobookshelf, JWT), `TidarrClient` |
+| `:core:data` | Room (only KSP module): `Entities`, `AppDatabase`, `Converters`, `Migrations`, DAOs (`Library`, `Download`, `Request`, `Lyrics`), `spoken/*Entities` (+ DAOs), schemas in `core/data/schemas`; `SessionStore`, `PasswordVault`, `NetworkMonitor`, `AbsAccountStore` |
+| `:core:domain` | Repositories and logic; `DomainContainer` (container interface for workers/receivers) |
+| `:core:playback` | `playback/`: Media3 service and player; `AppContainer` (DomainContainer + player) and `Context.container` |
+| `:core:ui` | `ui/theme/` (`Tokens.kt`, legacy `Theme.kt`, `CoverSizes`, `Contrast`), `ui/components/`, screen pieces two+ features share |
+| `:core:testing` | Test-only (via `testImplementation`): `Samples`, `HearthTestTheme` + `FakeActions` + `liveRows()`, `TestContainer`/`TestApplication`, `ScreenshotTest` |
+| `:feature:home` | `HomeScreen`, `SpokenHome`, `StatsScreen`; `HomeRoutes.kt` |
+| `:feature:library` | Library tabs/lists/controls, Browse, Album/Artist, Collection* (playlist/mix/genre/liked pages), Playlist{Screen,Edit,Menu,SharingUi}, `InfoSections`, `LocalBookRows`; `LibraryRoutes.kt` |
+| `:feature:search` | `SearchScreen`, `SearchField`, `SearchResults`; `SearchRoutes.kt` |
+| `:feature:player` | `MiniPlayer`, `NowPlaying*`, `PlayerControls`, `LyricsView`, `Queue*`, `Spoken*` player pieces, `visualiser/`. No routes: `:app`'s `NavBar`/`PlayerOverlays` draw it |
+| `:feature:spoken` | `ShowPage`, `BookScreen`, `LocalBookScreen`, `FindDetailsSheet`; `SpokenRoutes.kt` |
+| `:feature:settings` | `Settings*` and its pages (General, Appearance, Storage, GetMusic, PodcastsAndAudiobooks, LocalBook), `Downloads*`, `SpokenDownloadRows`, `LoginScreen`; `SettingsRoutes.kt` |
+| `:app` | `HearthApp.kt` (`HearthContainer`, the one real container), `ui/`: `MainActivity`, `AppRoot`, `Routes` (calls each `<feature>Routes()`), `AppActions`, `NavBar`, `PlayerOverlays`; manifest, signing, versioning |
 
-- `HearthApp.kt` (`:app`): `HearthContainer` builds every singleton by hand (no DI, no ViewModels); add new
-  repositories/services there and to `DomainContainer`/`AppContainer`. Composables use `LocalContext.current.container`.
-- `api/` (HTTP clients; `@Serializable` models)
-  - `SubsonicClient` + `Models.kt`: Navidrome via Subsonic, token+salt auth. Library, stars, playlists, scrobbles, users.
-  - `NavidromeNativeApi`: Navidrome's own API (password login): playlist photos, users to share with.
-  - `AbsClient` + `AbsModels`: Audiobookshelf (JWT login/refresh, `ServerClock` skew, uploads, safe file names).
-  - `TidarrClient`: Tidarr/Tidal search, artist/album pages, queueing downloads, preview stream info.
-- `data/`
-  - Room: `Entities`, `AppDatabase` (+ `Converters`), `Migrations` (`MIGRATION_X_Y_SQL`), DAOs in `LibraryDao`,
-    `DownloadDao` (+ `DownloadCounts`), `RequestDao`. Spoken DAOs live in `spoken/*Entities.kt`.
-  - `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`, `YourLibrary`), `SearchIndex` + `SearchHits` (ranking).
-  - `SessionStore` (prefs, `Settings`), `PasswordVault` (Keystore password), `NetworkMonitor`, `Usage` (local counts).
-  - `PlaylistSharing` (sharing info in the playlist comment), `PlaylistEdits`, `PhotoPrep` (playlist photo JPEGs).
-  - `ServerMixes`: server-built mixes (see contract below). `Mixes`: on-phone artist mixes. `Stats`, `Lyrics`.
-  - `Availability` (owned vs missing music, preview window), `RequestIntent`/`RequestMatching` (Tidarr request logic).
-- `requests/`: "get music you don't have". `RequestsRepository` (state, lock), `RequestPolling` (poll loop, background
-  scheduling), `RequestArrival` (found on server: like/download, notify), `RequestsWorker`.
-- `sync/LibrarySync.kt`: full library sync (shrink guard).
-- `download/`: `DownloadRepository` (files, queue, sync clean-up), `DownloadWorker` (parallel lanes), `DownloadPolicy`.
-- `spoken/` (Audiobookshelf podcasts and audiobooks)
-  - `SpokenRepository` (facade, Continue listening), `SpokenSync` (+ `SpokenSyncWorker`), `SpokenFollows`, `SpokenAdd`
-    (feeds, OPML), `SpokenMapping` (API -> entities), `SpokenEntities` (Room + `SpokenDao`), `AbsAccountStore`.
-  - `SpokenProgress` (resume points, outbox worker), `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`).
-  - `SpokenDownloads` (+ worker), `SpokenPresentation` (formatting, chapters, speed, search, `FeedUrls`).
-  - `ShowFeed` (RSS parse/match to server episodes) + `ShowFeeds` (fetch/cache feeds for show pages).
-  - Phone audiobooks: `LocalBooks` (folders, facade), `LocalBookScanner`, `LocalBookUpload` (+ `LocalBookUploadWorker`),
-    `LocalBookChapters`, `LocalBookLogic` (scan/naming), `LocalBookEntities` (+ `LocalBookDao`), `LocalBookDetails`,
-    `BookMatch` (metadata search matching), `EmbeddedChapters` (MP4/ID3 chapter parsing).
-- `playback/`
-  - `PlaybackService` (MediaSessionService lifecycle). Its logic is split into extension files: `PlayerSetup`,
-    `PlayerListener`, `SessionCallback` (connect, custom commands), `SessionExtras` (lock-screen buttons), `QueueEdits`,
-    `QueuePersistence`, `PlaybackRecovery`, `StreamCaching` (prefetch, wake mode), `SpokenMode`, `SleepTimer`,
-    `VolumeLevelling`, `SpokenAwarePlayer` (headset skips in spoken mode).
-  - `PlayerConnection` (UI handle, `PlayerUiState`), `QueuePlanner`/`QueueStore` (window of ~50, saved queue),
-    `SongDataSource` (download -> cache -> stream), `Scrobbler`, `PlaybackErrors`, `PlaybackPolicy`, `CoverArt`
-    (session artwork, cache keys), `SpokenPlayback` (episode/book media items, listening tracker).
-  - `PreviewPlayer`: separate 30 s preview player for music not on the server.
-  - Visualiser audio: `AudioAnalyzer` (tap via `ForwardingAudioSink`), `AudioAnalysis` (FFT, bands), `BeatTracker`,
-    `TimedRing`.
-- `ui/`
-  - `AppRoot` (state, wiring), `Routes` (NavHost; add routes as `screen("name/{arg}") { ... }`), `AppActions` (the
-    `Actions` implementation), `NavBar` (bottom bar/side rail), `PlayerOverlays`, `MainActivity`, `LoginScreen`.
-  - `components/`: `Actions` (`LocalActions`), `SongRows`, `MediaItems`, `MissingRows`, `SongMenu`, `Sheets`,
-    `PageChrome` (headers, empty states), `CoverArt`, `CoverColor`, `CoverPrefetcher`, `GetMusic` (+ `GetMusicSheets`,
-    `NotOnServer` with `LocalGetMusic`, `NotOnServerIcons`), `PreviewBar`, `PlayShuffleButtons`, `PlaylistPicker`,
-    `LiveRows`/`RowContext`, `Formatters`.
-  - `screens/` (one page or part per file; names say which): Home, Search{Screen,Field,Results}, Library{Screen,Tabs,
-    Controls,Lists,Rows}, BrowseScreens, Album/Artist{Screen,Layout}, MusicPageLoading, Collection{Screen,Header,
-    SongList,Selection,DownloadDialogs} (playlist/mix/genre/liked), Playlist{Screen,EditScreen,Menu,SharingUi},
-    LikedGenreMixScreens; player: MiniPlayer, NowPlaying{Screen,Menu}, PlayerControls, PlayerPosition, LyricsView,
-    Queue{Screen,Rows}; spoken: Spoken{Common,Rows,Menus,Sheets,Controls,Home,Info,Queue,NowPlayingScreen,PlayerMenu,
-    DownloadRows}, ShowPage, BookScreen, LocalBook{Screen,Rows,Settings}, FindDetailsSheet, OpmlImport; Downloads
-    {Screen,Rows}; Settings{Screen,Rows} + General/Appearance/Storage/GetMusic/PodcastsAndAudiobooks settings pages;
-    Stats, InfoSections, EqualWidthChips, UpdateUi, CrashBanner.
-  - `screens/visualiser/`: `VisualiserScreen`, `VisualiserCore` (styles, renderer base), one `*Renderer` per style,
-    helpers `FramePacer`, `Retro3d`, `Ridges`, `ScopeTrace`.
-  - `theme/`: `Theme` (colours, `Dimens`, `HearthShapes`), `CoverSizes`, `Contrast`.
-- `update/Updater.kt`: self-update from GitHub Releases (`UPDATE_REPO` in `:core:domain`'s BuildConfig). `util/Errors.kt`: `scrubSecrets`,
-  `userMessage`, `couldNot`.
-- Tests live in the module of the code they test, mirroring the package under `<module>/src/test/java/im/flume/hearth/`;
-  fixtures in that module's `src/test/resources/`.
+### Where things live (under each module's `src/main/java/im/flume/hearth/`)
 
-### Server-side contracts (code on the homelab, `/opt/homelab`)
+- **domain `data/`**: `LibraryRepository` (queries, `PlaySource`, `LibraryOrder`), `SearchIndex`/`SearchHits`, `Stats`,
+  `Usage`, `Lyrics` (`LyricsRepository`), `Mixes` (on-phone), `ServerMixes` (server contract), `PlaylistSharing`,
+  `PlaylistEdits`, `PhotoPrep`, `Availability`, `RequestIntent`/`RequestMatching`.
+- **domain other**: `sync/LibrarySync` (shrink guard), `download/` (`DownloadRepository`, `DownloadWorker`,
+  `DownloadPolicy`), `requests/` (Tidarr: `RequestsRepository`, `RequestPolling`, `RequestArrival`, worker),
+  `update/Updater` (GitHub Releases, `UPDATE_REPO` in its BuildConfig), `playback/QueuePlanner` + `SavedQueue`.
+- **domain `spoken/`**: `SpokenRepository` (facade), `SpokenSync`(+Worker), `SpokenFollows`, `SpokenAdd` (feeds, OPML),
+  `SpokenMapping`, `SpokenProgress`, `SpokenLogic` (`ProgressMerge`, `OutboxPlan`, `FollowTags`), `SpokenDownloads`,
+  `SpokenPresentation`, `ShowFeed`/`ShowFeeds`; phone books: `LocalBooks`, `LocalBookScanner`, `LocalBookUpload`(+Worker),
+  `LocalBookChapters`, `LocalBookLogic`, `LocalBookDetails`, `BookMatch`, `EmbeddedChapters`.
+- **playback `playback/`**: `PlaybackService` + its extension files (`PlayerSetup`, `PlayerListener`, `SessionCallback`,
+  `SessionExtras`, `QueueEdits`, `QueuePersistence`, `PlaybackRecovery`, `StreamCaching`, `SpokenMode`, `SleepTimer`,
+  `VolumeLevelling`, `SpokenAwarePlayer`); `PlayerConnection` (`PlayerUiState`), `QueueStore`, `SongDataSource`
+  (download → cache → stream), `Scrobbler`, `PlaybackErrors`/`Policy`, `CoverArt`, `SpokenPlayback`, `PreviewPlayer`
+  (30 s previews); visualiser audio `AudioAnalyzer`, `AudioAnalysis`, `BeatTracker`, `TimedRing`.
+- **ui `components/`**: `Actions` (+ `LocalActions`), `Routing` (`screen()`, `arg()`), `SongRows`, `MediaItems`,
+  `MissingRows`, `SongMenu`, `Sheets`, `PageChrome`, `PlayerChrome`, `CoverArt`/`CoverColor`/`CoverPrefetcher`/
+  `CoverGradientHeader`/`MixCover`, `GetMusic`(+`Sheets`)/`NotOnServer`(+`Icons`), `PreviewBar`, `PlayShuffleButtons`,
+  `PlaylistPicker`, `LiveRows`/`RowContext`, `Formatters`.
+- **ui `screens/` (shared)**: `LibraryRows`, `SpokenCommon`, `SpokenRows`, `SpokenMenus`, `FollowButton`, `LyricStyle`,
+  `PlayerPosition`, `EqualWidthChips`, `OpmlImport`, `UpdateUi`, `CrashBanner`.
 
-- `monitoring/hearth-mixes.py` builds Navidrome playlists "Daily Mix"/"Discover Weekly" whose comment holds
-  `[hearth-mix]`. Downloaded mix songs go into a hidden playlist "Hearth · On my phone" marked `[hearth-kept]`, which
-  the job counts as saved. Keep the names/markers in `ServerMixes` in step with the script.
-- `podcast-cleanup.sh` (server) reads Audiobookshelf podcast tags `hearth-follower:<user>` and `hearth-unfollowed:<ms>`
-  (`FollowTags`) to delete episodes nobody follows.
+**Update this map when you add, move or split a file.**
 
-## Conventions this code follows
+## Where new code goes
 
-- **Put logic in pure, JVM-testable units.** Tests are plain JUnit 4 on the JVM, with no instrumented tests. Put
-  decisions in an `object` or top-level function that takes plain values and injectable `Random`/time, then test that.
-  Examples: `QueuePlanner`, `internal object DownloadPolicy`, `Stats`, `SearchIndex`. Don't try to unit-test logic
-  that needs a `Context`. Robolectric is only for screenshot tests.
-- **Screenshot tests** (Roborazzi on Robolectric, JVM only) pin today's look. Opt a module in with
-  `id("hearth.screenshots")` in its `plugins { }` (adds Roborazzi, Robolectric and `:core:testing` to its tests). Extend
-  `ScreenshotTest` and call `snap("name") { Composable() }` (cropped to the content) or `snapScreen` (whole phone,
-  needed for sheets and dialogs); images go to `<module>/src/test/screenshots/<Class>_<name>.png` and are committed.
-  Fixed: SDK 34 (35+ breaks when the home folder has a space), 411x891dp xxhdpi, default accent, Compose clock advanced
-  by hand. Use `Samples` with fixed dates, never "now". A test moves with its screen, together with its `<Class>_*.png` files.
-- **Test names are backtick sentences that describe behaviour**, e.g.
-  ``fun `shuffle with a chosen song plays that song first`()``. Use `MockWebServer` for API tests and
-  `kotlinx-coroutines-test` for suspend code.
-- **Room schema changes:** bump `version` in `@Database`. Write the SQL as a public `MIGRATION_X_Y_SQL` list and wrap
-  it in `MIGRATION_X_Y`, then add it to `.addMigrations(...)`. Commit the new `core/data/schemas/.../N.json` that KSP
-  exports. Add a case to `MigrationTest` that compares the SQL with the exported schema. (`MigrationTest` also fails if a migration isn't
-  registered or `version` doesn't match the newest JSON.) Real example:
-  ```kotlin
-  val MIGRATION_4_5_SQL = listOf(
-      "ALTER TABLE downloads ADD COLUMN completedAt INTEGER NOT NULL DEFAULT 0",
-      "CREATE TABLE IF NOT EXISTS `song_download_prefs` (`songId` TEXT NOT NULL, `wanted` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`songId`))",
-  )
-  ```
-- When new columns can only be filled by a full sync, bump `SCHEMA` in `LibrarySync`'s companion and update its
-  comment. `syncedSchema` then forces a resync.
-- Chunk `IN (:ids)` queries at 900 (see `applyStars`). Wrap multi-step DAO writes in `@Transaction` so the UI never
-  sees a half-empty library.
-- **Errors:** never use `android.util.Log`, which has 0 uses. Record caught errors with `logHandledError(context,
-  where, e)`. Long-lived scopes use `crashLoggingHandler`. Pass any error text that reaches the UI through
-  `userMessage(e)`. Stream and cover URLs carry the Subsonic token and salt, so text that might contain a URL must go
-  through `scrubSecrets`.
-- **UI:** use the theme tokens (`Dimens.Gutter`, `HearthShapes.Card`, `TextSecondary`, `Accent`) and existing
-  components from `ui/components/`. Don't hard-code dp values or colours. Row and card actions go through
-  `LocalActions.current`, not callbacks threaded through each layer.
-- **Comments:** KDoc in plain language that explains *why* or what the user sees, not what the code does. Example:
-  `/** No destructive fallback: a missing migration should fail loudly, not wipe downloads and history. */`
-- User-facing strings are plain, non-technical English, written in Kotlin. Only the app name is in `strings.xml`.
-- `@Serializable` classes must stay under `im.flume.hearth`. The R8 keep rule (in the `consumer-rules.pro` of each
-  module that has such classes; copy it into a new module that gets one) only covers that package, and release
-  builds are minified.
-- Commit subjects are short, user-facing summaries, e.g. `Compact queue section headers`. `Release x.y.z` commits
-  come only from `release.sh`.
-- Add new dependencies through `gradle/libs.versions.toml` and reference them as `libs.*`.
-- Regexes run on Android's ICU engine, which rejects some patterns the JVM accepts: escape a literal `]` and `}`
-  outside character classes. `RegexLiteralsTest` scans every `Regex("…")` literal for this.
-- Prefer imports over inline fully-qualified names (`im.flume.hearth.spoken.Foo`) in new code.
+- **New screen**: a file in its feature's `ui/screens/`, registered in that feature's `<Feature>Routes.kt` with
+  `screen("name/{id}") { entry -> Page(entry.arg("id")) }` (from `:core:ui` `Routing.kt`). Other features reach it by
+  route via `NavActions`, never by calling the composable. New feature module: add to `settings.gradle.kts`, `:app`'s
+  dependencies, and `:app` `Routes.kt`.
+- **Something two features need**: UI → `:core:ui`; logic → `:core:domain`. Never a feature → feature dependency.
+- **New repository / singleton**: class in `:core:domain` (or `:core:playback` if it needs the player), a property on
+  `DomainContainer` (or `AppContainer`), built in `HearthContainer` (`:app` `HearthApp.kt`) and in `TestContainer`.
+- **New DB table / column**: entity + DAO in `:core:data`, migration (below), exported `core/data/schemas/.../N.json`,
+  `MigrationTest` case. Sync-only columns: bump `SCHEMA` in `LibrarySync`'s companion (forces a resync).
+- **New user action**: a method on the right `Actions` sub-interface (`SongActions`, `PlaylistActions`,
+  `LibraryActions`, `NavActions`, `MessageActions`, `CoverActions`), implemented in `:app` `AppActions` and
+  `FakeActions`. Rows and cards call `LocalActions.current`, not callbacks threaded through layers.
+- **New colour / size / shape / icon**: a slot in `core/ui/.../theme/Tokens.kt` (`HearthColors`, `HearthSpacing`,
+  `HearthShapeSet`, `HearthIcons`), read as `HearthTheme.colors/spacing/shapes/icons`. The globals in `Theme.kt`
+  (`TextSecondary`, `Dimens`, `HearthShapes`, ...) are deprecated: don't use them in new code. No hard-coded dp or colours.
+- **New screenshot test**: in the screen's module (`id("hearth.screenshots")` in its plugins), extend `ScreenshotTest`,
+  `snap("name") { Page() }` (cropped) or `snapScreen` (whole phone: sheets, dialogs), use `Samples` (fixed dates, never
+  "now"), record, commit `src/test/screenshots/<Class>_<name>.png`. A test moves with its screen and its PNGs.
 
-## Parallel agents (several worktrees at once)
+## Conventions
 
-- One feature per worktree and branch. Commit there; don't touch other worktrees or the main checkout.
-- Hot files (`HearthApp.kt`, `ui/Routes.kt`, `ui/AppActions.kt`, `data/Migrations.kt`, `data/LibraryDao.kt`) are edited by
-  many agents: keep changes small and localised (add, don't reorder or reformat), so merges stay clean. Put new
-  screens/logic in new files rather than growing these.
-- Never edit `version.properties` (only `release.sh` does). Two schema bumps in parallel collide: rebase and renumber.
-- Remove your worktree when done (`git worktree remove <path>`).
+- **Pure, JVM-testable logic.** JUnit 4 on the JVM, no instrumented tests. Decisions go in an `object` or top-level
+  function taking plain values and injectable `Random`/time (`QueuePlanner`, `DownloadPolicy`, `Stats`, `SearchIndex`).
+  Don't unit-test logic that needs a `Context`; Robolectric is only for screenshot tests (SDK 34, 411x891dp xxhdpi).
+- **Test names are backtick sentences**: ``fun `shuffle with a chosen song plays that song first`()``. `MockWebServer`
+  for API tests, `kotlinx-coroutines-test` for suspend code. Tests live in the module of the code they test.
+- **Room migrations**: bump `version` in `@Database`; write a public `MIGRATION_X_Y_SQL` list, wrap it in
+  `MIGRATION_X_Y`, add it to `.addMigrations(...)`; commit the new schema JSON; add a `MigrationTest` case (it also fails
+  if a migration isn't registered or `version` doesn't match the newest JSON). E.g.
+  `val MIGRATION_4_5_SQL = listOf("ALTER TABLE downloads ADD COLUMN completedAt INTEGER NOT NULL DEFAULT 0")`.
+- Chunk `IN (:ids)` queries at 900 (see `applyStars`). Wrap multi-step DAO writes in `@Transaction`.
+- **Errors**: never `android.util.Log`. Caught errors → `logHandledError(context, where, e)`; long-lived scopes use
+  `crashLoggingHandler`; UI error text → `userMessage(e)`; anything that may hold a URL (token + salt) → `scrubSecrets`.
+- **Comments**: plain-language KDoc on *why* or what the user sees. New files start with a `//` line saying what they hold.
+- User-facing strings: plain, non-technical English in Kotlin. Only `app_name` is in `strings.xml`.
+- `@Serializable` classes stay under `im.flume.hearth`; the R8 keep rule is in the `consumer-rules.pro` of each module
+  holding them (network, data, domain, playback). A module that gains its first one copies that file.
+- Imports, not inline fully-qualified names.
+- Regexes run on Android's ICU engine: escape literal `]` and `}` outside classes (`RegexLiteralsTest` checks).
+- Smart casts don't work on another module's public `val`s: copy to a local `val` first.
+- New dependencies go in `gradle/libs.versions.toml`, referenced as `libs.*`.
+- Commit subjects are short user-facing summaries (`Compact queue section headers`). `Release x.y.z` only from `release.sh`.
+
+## Parallel agents
+
+- Own one module (one feature per worktree and branch). Don't edit another feature's module.
+- Before starting, check `git log --oneline -1` against `main`: a worktree's base may be stale.
+- Shared additions to core modules go in **new files** where possible. Hot files (`HearthApp.kt`, `AppActions.kt`,
+  `Actions.kt`, `DomainContainer.kt`, `AppContainer.kt`, `Migrations.kt`, `LibraryDao.kt`): small, local additions;
+  don't reorder or reformat. `Tokens.kt` slots are append-only (add at the end of the class, never rename or reorder).
+- Never edit `version.properties` (only `release.sh`). Parallel schema bumps collide: rebase and renumber.
+- Remove your worktree when done: `scripts/agent-worktree.sh remove <name>`.
 
 ## Boundaries
 
 ### Always
-- Run `./verify.sh` after changing logic, and add or extend a JVM test for any new pure logic.
-- Ship a Room schema bump together with its migration, exported schema JSON and `MigrationTest` case.
+- Run `./verify.sh` before calling a change done; add or extend a JVM test for new pure logic.
+- Ship a Room schema bump with its migration, `core/data/schemas` JSON and `MigrationTest` case.
 - Scrub URLs and credentials from anything logged, saved to `errors.log`/`last-crash.txt`, or shown to the user.
 - Keep the password in `PasswordVault` only. Sign-in uses the Subsonic token, not a stored plain password.
 
 ### Ask first
-- `gh release`, `git push` or tags by hand. (`./release.sh` itself: the owner wants tested changes released straight away, without asking — only release work that passes `./verify.sh`.)
-- Editing `version.properties`, which `release.sh` manages, or `gradle.properties`.
+- `gh release`, `git push` or tags by hand (`./release.sh` itself needs no asking; see Commands).
+- Editing `gradle.properties`.
 - Adding a dependency, Gradle plugin, lint tool, or DI framework.
-- Changing `minSdk`/`targetSdk`, the `applicationId`, signing config, `network_security_config.xml`, or `AndroidManifest.xml` permissions.
-- Changing the Subsonic auth scheme or what `SessionStore`/`PasswordVault` persist. Users would have to sign in again.
+- Changing `minSdk`/`targetSdk`, `applicationId`, signing config, `network_security_config.xml`, manifest permissions.
+- Changing the Subsonic auth scheme or what `SessionStore`/`PasswordVault` persist (users would sign in again).
 
 ### Never
-- Commit secrets: `keystore.properties`, `*.jks`, passwords, Navidrome credentials, tokens, or server URLs from a
-  real install.
+- Commit secrets: `keystore.properties`, `*.jks`, passwords, Navidrome credentials, tokens, real server URLs.
 - Add `fallbackToDestructiveMigration()`, or edit an already-released `core/data/schemas/.../N.json`.
-- Sign a release with the debug key or weaken the `requireReleaseKey` check. Installed apps would no longer update.
-- Remove the empty or shrunken library guard in `LibrarySync`, which stops a bad server response from wiping the
-  local index.
+- Sign a release with the debug key or weaken the `requireReleaseKey` check (installed apps would stop updating).
+- Remove the empty/shrunken library guard in `:core:domain` `sync/LibrarySync.kt`.
+- Add a feature → feature dependency, or a core module depending upward.
+
+## Server-side contracts (homelab, `/opt/homelab`)
+
+- `monitoring/hearth-mixes.py` builds Navidrome playlists "Daily Mix"/"Discover Weekly" whose comment holds
+  `[hearth-mix]`. Downloaded mix songs go into a hidden playlist "Hearth · On my phone" marked `[hearth-kept]`, which
+  the job counts as saved. Keep names/markers in `ServerMixes` in step with the script.
+- `podcast-cleanup.sh` reads Audiobookshelf podcast tags `hearth-follower:<user>` and `hearth-unfollowed:<ms>`
+  (`FollowTags`) to delete episodes nobody follows.
 
 ## Open questions
 - Lint: nothing is configured or enforced. Is `lintDebug` expected to pass?

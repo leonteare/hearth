@@ -1,3 +1,5 @@
+> **Done in 2.20.0 — kept for history; CLAUDE.md is the live map.**
+
 # Restructure manifest: where every file goes
 
 This is the working map for splitting the single `:app` module into layer and feature modules. Agents follow it. When a rule below doesn't settle a file, move it to the **lowest** module that compiles.

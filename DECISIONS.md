@@ -31,3 +31,14 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **Tests are JVM-only** (JUnit 4, no instrumented tests): logic goes in pure objects/functions. The one exception is
   screenshot tests (Roborazzi + Robolectric, still on the JVM, no device), approved to prove refactors leave the look
   unchanged. Plain test runs verify against committed PNGs; recording is opt-in (`-Proborazzi.test.record=true`).
+- **Modules by layer, then by feature** (2.20.0). `core:common ← network ← data ← domain ← playback ← ui ←
+  feature:* ← app`; features never depend on each other and reach each other's pages by route. Why: parallel agents
+  can each own one module without merge fights, builds recompile less, and the boundaries are enforced by Gradle
+  rather than by convention. Packages stayed as they were so the move renamed nothing.
+- **Container interfaces.** `:app` builds the one `HearthContainer`; lower modules see it as `DomainContainer`
+  (`:core:domain`) or `AppContainer` (`:core:playback`, adds the player). Tests swap in `TestContainer`.
+- **Design tokens, ready for skins.** Colours, spacing, shapes and icons are named by purpose in `Tokens.kt` and read
+  through `HearthTheme`, so a skin can swap them in one place. The old globals in `Theme.kt` are deprecated, kept
+  only until every screen reads the tokens.
+- **Screenshot tests run on Robolectric SDK 34.** SDK 35+ fails when the home folder path has a space (the owner's
+  does). Fixed phone size (411x891dp, xxhdpi) and fixed sample dates so images only change when the look does.
