@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -234,11 +235,15 @@ fun LocalBookScreen(id: String) {
     if (b.hidden) return UnavailablePage(Icons.Outlined.VisibilityOff, "Removed from your library. The files are still on your phone.")
     val isThis = now?.libraryItemId == id
     var livePosSec by remember { mutableStateOf<Double?>(null) }
-    LaunchedEffect(isThis, playerState.isPlaying) {
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(isThis, playerState.isPlaying, lifecycle) {
         if (!isThis) { livePosSec = null; return@LaunchedEffect }
-        while (true) {
-            livePosSec = c.player.spokenPositionMs / 1000.0
-            kotlinx.coroutines.delay(if (playerState.isPlaying) 1000 else 3000)
+        // Only while the app is in the foreground: nothing shows it in the background.
+        lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                livePosSec = c.player.spokenPositionMs / 1000.0
+                kotlinx.coroutines.delay(if (playerState.isPlaying) 1000 else 3000)
+            }
         }
     }
     val posSec = livePosSec ?: r.positionSec ?: 0.0
@@ -296,7 +301,7 @@ fun LocalBookScreen(id: String) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item(key = "header") {
             SpokenHeader(
-                c.spokenCover(id, 600), b.title,
+                c.spokenCover(id, im.flume.hearth.ui.theme.CoverSize.LARGE), b.title,
                 listOfNotNull(
                     b.author, b.narrator?.let { "Read by $it" }, b.series,
                     listOfNotNull("On this phone", SpokenFormat.length(b.durationSec).ifEmpty { null }, b.publishedYear).joinToString(" • "),

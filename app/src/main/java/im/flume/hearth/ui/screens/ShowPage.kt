@@ -160,7 +160,7 @@ fun PodcastScreen(id: String?, feedUrl: String? = null) {
     val latest = remember(serverList) { SpokenLists.playLatest(serverList) }
     val title = p?.title ?: feed?.title ?: "Podcast"
     val author = p?.author ?: feed?.author
-    val coverUrl = p?.let { c.spokenCover(it.id, 600) } ?: feed?.image
+    val coverUrl = p?.let { c.spokenCover(it.id, im.flume.hearth.ui.theme.CoverSize.LARGE) } ?: feed?.image
     val playingThisShow = p != null && now?.libraryItemId == p.id
     val onServerCount = merged.count { it.server != null }
     val countLine = when {

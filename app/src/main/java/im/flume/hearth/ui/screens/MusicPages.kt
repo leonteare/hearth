@@ -361,7 +361,7 @@ fun ArtistScreen(id: String) {
     ArtistLayout(
         name = name,
         headerColor = rememberCoverColor(artistCover),
-        art = { size -> CoverArt(artistCover, size, Modifier.clip(CircleShape), requestSize = 600, fallback = name) },
+        art = { size -> CoverArt(artistCover, size, Modifier.clip(CircleShape), requestSize = im.flume.hearth.ui.theme.CoverSize.LARGE, fallback = name) },
         counts = "${plural(albums.size, "album")} • ${plural(songs.size, "song")}",
         buttons = {
             PlayShuffleButtons(
