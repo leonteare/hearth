@@ -30,6 +30,13 @@ import java.io.IOException
 object CoverArt {
     const val SCHEME = "hearth-cover"
 
+    /**
+     * Size the session's artwork bitmap is decoded at. Plenty for the notification, lock screen and car,
+     * and about a quarter of the memory of 1000 px, which matters because the bitmap is copied to
+     * system UI and every connected controller.
+     */
+    const val SESSION_ARTWORK_PX = 512
+
     fun uriFor(coverArtId: String?): Uri? =
         if (coverArtId.isNullOrEmpty()) null
         else Uri.Builder().scheme(SCHEME).authority("art").appendPath(coverArtId).build()
@@ -90,14 +97,15 @@ class CoverBitmapLoader(
         // Only our own artwork: never fetch arbitrary URIs a controller might hand us.
         val url = SpokenMedia.coverItemId(uri)?.let { absCoverUrl(it) ?: return Futures.immediateFailedFuture(IOException("Not signed in")) } ?: run {
             val id = CoverArt.idFrom(uri) ?: return Futures.immediateFailedFuture(IOException("Unsupported artwork URI"))
-            // Large enough to stay sharp on the lock screen and car displays.
+            // Same 1000 px file the full player shows, so it comes from the cover cache (and works offline);
+            // it's decoded smaller below.
             api.coverArtUrl(id, 1000) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
         }
         val future = SettableFuture.create<Bitmap>()
         scope.launch {
             val result = runCatching {
                 SingletonImageLoader.get(context).execute(
-                    ImageRequest.Builder(context).data(url).size(1000).allowHardware(false).build()
+                    ImageRequest.Builder(context).data(url).size(CoverArt.SESSION_ARTWORK_PX).allowHardware(false).build()
                 )
             }.getOrNull()
             val bitmap = (result as? SuccessResult)?.image?.toBitmap()
