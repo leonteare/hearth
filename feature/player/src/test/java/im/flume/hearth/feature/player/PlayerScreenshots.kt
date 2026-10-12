@@ -8,7 +8,7 @@ import im.flume.hearth.core.playback.PlaybackService
 import im.flume.hearth.core.data.spoken.ChapterEntity
 import im.flume.hearth.core.testing.Samples
 import im.flume.hearth.core.testing.ScreenshotTest
-import im.flume.hearth.core.ui.theme.Dimens
+import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
@@ -34,7 +34,7 @@ class PlayerScreenshots : ScreenshotTest() {
 
     @Test
     fun `the music player controls below the cover`() = snap("player_controls") {
-        Column(Modifier.padding(horizontal = Dimens.Gutter)) {
+        Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) {
             PlayerControls(
                 state.copy(shuffle = true), songs[1].copy(starred = true), onClose = {}, showLyrics = false,
                 onToggleLyrics = {}, onOpenQueue = {}, onOpenVisualiser = {},
@@ -46,7 +46,7 @@ class PlayerScreenshots : ScreenshotTest() {
     fun `the podcast player controls with speed and chapters`() {
         val spokenState = Samples.spokenPlayerState(speed = 1.25f)
         snap("spoken_controls") {
-            Column(Modifier.padding(horizontal = Dimens.Gutter)) {
+            Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) {
                 SpokenControls(
                     spokenState, spokenState.spoken!!,
                     SpokenInfo("The town that forgot to sleep", "The Long Read", isBook = false, downloadState = null, finished = false),
