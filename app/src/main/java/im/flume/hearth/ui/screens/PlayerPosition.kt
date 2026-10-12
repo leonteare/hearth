@@ -1,6 +1,6 @@
 package im.flume.hearth.ui.screens
 
-// Shared player helpers: where in the song we are (polled only while it's on screen) and the playing cover.
+// Shared player helpers: where in the song (or episode / book) we are (polled only while it's on screen) and the playing cover.
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,3 +53,14 @@ internal fun rememberPositionState(state: PlayerUiState): LongState {
 /** The current value of [rememberPositionState], for screens that redraw with it anyway (the seek bar, lyrics). */
 @Composable
 internal fun rememberPosition(state: PlayerUiState): Long = rememberPositionState(state).longValue
+
+/** Position on the whole episode / book (not the current file), polled while visible (see [rememberPolledPosition]). */
+@Composable
+internal fun rememberSpokenPositionState(state: PlayerUiState): LongState {
+    val player = LocalContext.current.container.player
+    return rememberPolledPosition(state) { player.spokenPositionMs }
+}
+
+/** The current value of [rememberSpokenPositionState], for screens that redraw with it anyway. */
+@Composable
+internal fun rememberSpokenPosition(state: PlayerUiState): Long = rememberSpokenPositionState(state).longValue
