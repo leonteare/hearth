@@ -36,6 +36,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import androidx.media3.common.util.UnstableApi
+import androidx.work.Configuration
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -44,11 +45,12 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import im.flume.hearth.core.common.crashLoggingHandler
 import im.flume.hearth.core.common.writeCrash
+import im.flume.hearth.core.domain.LegacyWorkerFactory
 import im.flume.hearth.core.playback.AppContainer
 import im.flume.hearth.core.playback.ContainerOwner
 import im.flume.hearth.core.playback.container
 
-class HearthApp : Application(), SingletonImageLoader.Factory, ContainerOwner {
+class HearthApp : Application(), SingletonImageLoader.Factory, ContainerOwner, Configuration.Provider {
     override lateinit var container: HearthContainer
         private set
 
@@ -62,6 +64,13 @@ class HearthApp : Application(), SingletonImageLoader.Factory, ContainerOwner {
         }
         container = HearthContainer(this)
     }
+
+    /**
+     * WorkManager starts here instead of at launch (its auto-start is off in the manifest) so it can be given
+     * [LegacyWorkerFactory]: jobs saved before the package move still run.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(LegacyWorkerFactory()).build()
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
