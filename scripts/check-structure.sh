@@ -3,10 +3,10 @@
 # Gradle, no SDK and about a second. One line per problem, nothing on success, non-zero exit if anything failed.
 #
 #   scripts/check-structure.sh             # all checks
-#   HEARTH_REQUIRE_READMES=1 scripts/...   # also insist every module has a README.md (off by default)
 #
 # Checked here: the module dependency rule, Kotlin file size, a `//` header line on every file, no inline
-# fully-qualified names, no android.util.Log, and that CLAUDE.md's module table and file names match the repo.
+# fully-qualified names, no android.util.Log, a README.md per module, and that CLAUDE.md's module table and
+# file names match the repo.
 #
 # Two grandfather lists keep the checks on for new code without a 150-file rewrite:
 #   scripts/large-files.txt      - files allowed over the line limit
@@ -171,14 +171,12 @@ while read -r name; do
     [ -n "${kt_names[$base]:-}" ] || fail "CLAUDE.md: mentions \`$name\`, which is not in the repo any more"
 done < <(grep -oE '`[^`]+\.kt`' CLAUDE.md | tr -d '`' | sort -u)
 
-# Off until the READMEs are written: HEARTH_REQUIRE_READMES=1 turns it on.
-if [ "${HEARTH_REQUIRE_READMES:-0}" = 1 ]; then
-    for m in $modules; do
-        dir=${m#:}
-        dir=${dir//:/\/}
-        [ -f "$dir/README.md" ] || fail "$dir: no README.md"
-    done
-fi
+# Every module explains itself, so an agent can read one README instead of the whole map.
+for m in $modules; do
+    dir=${m#:}
+    dir=${dir//:/\/}
+    [ -f "$dir/README.md" ] || fail "$dir: no README.md"
+done
 
 [ "$problems" = 0 ] && exit 0
 exit 1

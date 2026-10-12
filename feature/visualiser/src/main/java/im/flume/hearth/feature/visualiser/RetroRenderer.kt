@@ -1,3 +1,4 @@
+// Base for the retro styles: draws small with no anti-aliasing, then dithers, upscales and adds scanlines.
 package im.flume.hearth.feature.visualiser
 
 import android.graphics.Bitmap

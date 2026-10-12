@@ -1,3 +1,4 @@
+// Memory Card: spinning low-poly blocks, in the style of a late-90s console menu.
 package im.flume.hearth.feature.visualiser
 
 import android.graphics.Canvas

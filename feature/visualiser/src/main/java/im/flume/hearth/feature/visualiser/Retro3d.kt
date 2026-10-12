@@ -1,3 +1,4 @@
+// The small 3D helpers the retro styles share: a camera, grid snapping, fog and colour maths.
 package im.flume.hearth.feature.visualiser
 
 import kotlin.math.atan2

@@ -1,3 +1,4 @@
+// The full-screen visualiser: picks a style, feeds it audio, and handles taps, swipes and closing.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.animation.AnimatedVisibility

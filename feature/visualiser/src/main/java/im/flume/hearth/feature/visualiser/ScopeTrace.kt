@@ -1,3 +1,4 @@
+// A rolling buffer of the newest audio samples, for the styles that draw a waveform.
 package im.flume.hearth.feature.visualiser
 
 import im.flume.hearth.core.playback.AutoGain

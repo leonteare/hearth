@@ -1,3 +1,4 @@
+// Particles: dots thrown outwards on the beat and pulled back by the bass.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.geometry.Offset

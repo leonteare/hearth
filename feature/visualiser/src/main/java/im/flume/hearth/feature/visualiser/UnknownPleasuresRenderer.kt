@@ -1,3 +1,4 @@
+// Unknown Pleasures: stacked ridge lines, drawn one new line per beat.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.graphics.Color

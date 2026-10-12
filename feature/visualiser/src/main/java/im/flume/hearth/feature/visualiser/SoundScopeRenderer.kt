@@ -1,3 +1,4 @@
+// Sound Scope: an oscilloscope trace on a retro grid.
 package im.flume.hearth.feature.visualiser
 
 import android.graphics.Paint

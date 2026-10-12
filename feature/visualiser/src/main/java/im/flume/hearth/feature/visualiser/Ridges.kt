@@ -1,3 +1,4 @@
+// The ridge lines and value noise that Unknown Pleasures and Grid Runner draw with.
 package im.flume.hearth.feature.visualiser
 
 import kotlin.math.abs

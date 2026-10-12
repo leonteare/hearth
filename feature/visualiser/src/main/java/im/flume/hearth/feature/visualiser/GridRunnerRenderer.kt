@@ -1,3 +1,4 @@
+// Grid Runner: a retro drive over a wireframe landscape that rises with the music.
 package im.flume.hearth.feature.visualiser
 
 import android.graphics.Canvas

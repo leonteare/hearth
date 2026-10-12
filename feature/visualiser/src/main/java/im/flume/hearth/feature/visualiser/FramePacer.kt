@@ -1,3 +1,4 @@
+// Keeps the visualiser at a steady frame rate, and eases it up to speed when it starts.
 package im.flume.hearth.feature.visualiser
 
 import im.flume.hearth.core.playback.AudioFrame

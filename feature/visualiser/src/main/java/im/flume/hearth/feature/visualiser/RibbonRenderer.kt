@@ -1,3 +1,4 @@
+// Ribbon: a flowing band whose shape follows the waveform.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.geometry.Offset

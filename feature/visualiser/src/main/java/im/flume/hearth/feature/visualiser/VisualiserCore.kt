@@ -1,3 +1,4 @@
+// What every style shares: the list of styles, the audio frame they draw from, and the palette.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.graphics.Color

@@ -1,3 +1,4 @@
+// Sphere: a ball of points that breathes with the music.
 package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.geometry.Offset

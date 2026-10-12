@@ -53,3 +53,21 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
   once every screen read the tokens.
 - **Screenshot tests run on Robolectric SDK 34.** SDK 35+ fails when the home folder path has a space (the owner's
   does). Fixed phone size (411x891dp, xxhdpi) and fixed sample dates so images only change when the look does.
+- **The structure rules are checked, not remembered.** `scripts/check-structure.sh` enforces the module dependency
+  rule, a 400-line ceiling per Kotlin file, a `//` header line, no inline fully-qualified names, no `android.util.Log`,
+  a `README.md` per module, and that CLAUDE.md's module table and file names still match the repo. It is plain bash,
+  runs in about a second without Gradle, and `verify.sh` runs it before anything else. Rules that would have meant
+  rewriting 150 files are grandfathered in `scripts/no-header-files.txt` and `scripts/large-files.txt`: a missing path
+  on either list is not an error, so the lists only shrink. A fully-qualified name that is data rather than a reference
+  gets `// fqn-ok`.
+- **Android Lint runs against committed baselines** (one `lint-baseline.xml` per module, `abortOnError`,
+  `checkDependencies = false`), so a new error fails while the existing 174 wait. It stays out of `verify.sh`: a warm
+  `lintDebug` after a one-line change costs about 2 m 20 s against verify's 4 m 42 s.
+- **CI runs `verify.sh` on Linux** (`.github/workflows/verify.yml`, every push to main and every pull request), with
+  `org.gradle.java.home` overridden in the runner's `~/.gradle/gradle.properties` so the checked-in Windows path is
+  ignored. This answers the old "can it build anywhere else" question. Screenshots are still compared exactly.
+- **Each module documents itself** in its own `README.md` (2.21.0). CLAUDE.md keeps the map, the rules and the ledger;
+  the file-by-file detail lives next to the code, so an agent reads one README instead of the whole map.
+- **The visualiser is its own module** `:feature:visualiser` (2.21.0), not a package inside `:feature:player`. The two
+  never depend on each other: the player hands out an "open the visualiser" callback and `:app` draws the overlay. The
+  audio tap stays in `:core:playback`.
