@@ -92,16 +92,58 @@ data class SavedQueue(
     val spokenEpisodeId: String? = null,
     /** Position on the whole episode/book, seconds. */
     val spokenPositionSec: Double? = null,
+    /** Which full save this is, so a newer position-only save is only ever applied to the queue it was taken from. */
+    val revision: Long = 0,
 )
+
+/**
+ * Where playback had got to in the queue saved as [revision]. Written on its own every few seconds
+ * while playing, so the (possibly very long) queue isn't rewritten just because the song moved on.
+ */
+@Serializable
+data class SavedPosition(val revision: Long, val positionMs: Long, val spokenPositionSec: Double? = null)
+
+/** Decides how much of the queue needs writing, and puts the two saved halves back together. */
+internal object QueueSaves {
+    enum class Write { NOTHING, POSITION, FULL }
+
+    /** [last] is what's on disk now (null: unknown, so write everything). Only the position moving needs just the small file. */
+    fun plan(last: SavedQueue?, next: SavedQueue): Write = when {
+        last == null || shape(last) != shape(next) -> Write.FULL
+        last.positionMs != next.positionMs || last.spokenPositionSec != next.spokenPositionSec -> Write.POSITION
+        else -> Write.NOTHING
+    }
+
+    /** The saved queue at the newer position, when that position was taken from this very save. */
+    fun merge(saved: SavedQueue, position: SavedPosition?): SavedQueue =
+        if (position == null || position.revision != saved.revision) saved
+        else saved.copy(
+            positionMs = position.positionMs.coerceAtLeast(0),
+            spokenPositionSec = position.spokenPositionSec ?: saved.spokenPositionSec,
+        )
+
+    fun positionOf(q: SavedQueue) = SavedPosition(q.revision, q.positionMs, q.spokenPositionSec)
+
+    /** A revision newer than [previous] (time-based, so it keeps increasing across restarts). */
+    fun nextRevision(previous: Long, nowMs: Long): Long = maxOf(nowMs, previous + 1)
+
+    private fun shape(q: SavedQueue) = q.copy(positionMs = 0, spokenPositionSec = null, revision = 0)
+}
 
 /**
  * Saves the queue to queue.json. Writes go through a temp file and an atomic rename, and the previous
  * good save is kept as queue.json.bak in case the main file is ever unreadable.
+ *
+ * A shuffle of the whole library is hundreds of KB, so it's only rewritten when the queue itself
+ * changes (another song, an edit, shuffle). While a song plays, just the position goes to the tiny
+ * queue-position.json, and [load] puts the two back together.
  */
 class QueueStore(dir: File) {
     private val file = File(dir, "queue.json")
     private val tmp = File(dir, "queue.json.tmp")
     private val backup = File(dir, "queue.json.bak")
+    private val positionFile = File(dir, "queue-position.json")
+    private val positionTmp = File(dir, "queue-position.json.tmp")
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Records [q] as the newest snapshot. Call in order (e.g. on the main thread), then [flush]. */
@@ -110,14 +152,33 @@ class QueueStore(dir: File) {
     /** Writes the newest offered snapshot, if any. Older snapshots that were overtaken are never written. */
     suspend fun flush() = withContext(Dispatchers.IO) {
         lock.withLock {
-            val q = latest.getAndSet(null) ?: return@withLock
-            runCatching {
-                FileOutputStream(tmp).use { out ->
-                    out.write(json.encodeToString(SavedQueue.serializer(), q).toByteArray())
-                    out.fd.sync()
+            val offered = latest.getAndSet(null) ?: return@withLock
+            val last = onDisk
+            when (QueueSaves.plan(last, offered)) {
+                QueueSaves.Write.NOTHING -> Unit
+                QueueSaves.Write.POSITION -> {
+                    val q = offered.copy(revision = last!!.revision)
+                    // Not synced to disk: losing the last few seconds of position in a power cut is fine,
+                    // and a torn file is just ignored (the full save has its own position).
+                    runCatching {
+                        positionTmp.writeText(json.encodeToString(SavedPosition.serializer(), QueueSaves.positionOf(q)))
+                        Files.move(positionTmp.toPath(), positionFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                        onDisk = q
+                    }
                 }
-                if (file.exists()) Files.move(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                QueueSaves.Write.FULL -> {
+                    val q = offered.copy(revision = QueueSaves.nextRevision(last?.revision ?: 0, System.currentTimeMillis()))
+                    runCatching {
+                        FileOutputStream(tmp).use { out ->
+                            out.write(json.encodeToString(SavedQueue.serializer(), q).toByteArray())
+                            out.fd.sync()
+                        }
+                        if (file.exists()) Files.move(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                        // The old position file names the previous revision, so it's ignored from now on.
+                        onDisk = q
+                    }.onFailure { onDisk = null }
+                }
             }
         }
     }
@@ -128,16 +189,25 @@ class QueueStore(dir: File) {
     }
 
     suspend fun load(): SavedQueue? = withContext(Dispatchers.IO) {
-        lock.withLock { read(file) ?: read(backup) }
+        lock.withLock {
+            val saved = (read(file) ?: read(backup))?.let { QueueSaves.merge(it, readPosition()) }
+            onDisk = saved
+            saved
+        }
     }
+
+    private fun readPosition(): SavedPosition? =
+        runCatching { json.decodeFromString(SavedPosition.serializer(), positionFile.readText()) }.getOrNull()
 
     private fun read(f: File): SavedQueue? =
         runCatching { json.decodeFromString(SavedQueue.serializer(), f.readText()) }.getOrNull()
 
     fun clear() {
         latest.set(null)
+        onDisk = null
         file.delete()
         backup.delete()
+        positionFile.delete()
         musicFile.delete()
     }
 
@@ -158,5 +228,7 @@ class QueueStore(dir: File) {
         // Process-wide: the service and Settings each make their own QueueStore for the same file.
         val lock = Mutex()
         val latest = AtomicReference<SavedQueue?>(null)
+        /** What queue.json plus queue-position.json hold now (null: unknown). Only touched under [lock]. */
+        @Volatile var onDisk: SavedQueue? = null
     }
 }
