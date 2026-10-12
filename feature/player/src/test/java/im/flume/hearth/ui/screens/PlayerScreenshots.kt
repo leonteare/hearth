@@ -9,7 +9,7 @@ import im.flume.hearth.testing.ScreenshotTest
 import im.flume.hearth.ui.theme.Dimens
 import org.junit.Test
 
-/** The mini player, the player controls and the queue. Moves to :feature:player with those screens. */
+/** The mini player, the player controls and the queue. */
 class PlayerScreenshots : ScreenshotTest() {
     private val songs = Samples.songs(5)
     private val state = Samples.playerState(songs[1], songs)
