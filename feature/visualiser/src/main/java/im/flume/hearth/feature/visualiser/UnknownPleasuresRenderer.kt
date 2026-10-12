@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path

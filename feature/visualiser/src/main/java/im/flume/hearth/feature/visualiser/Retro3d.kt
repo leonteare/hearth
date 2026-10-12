@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import kotlin.math.atan2
 import kotlin.math.cos

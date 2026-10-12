@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable

@@ -83,6 +83,7 @@ dependencies {
     implementation(project(":feature:library"))
     implementation(project(":feature:search"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:visualiser"))
     implementation(project(":feature:spoken"))
     implementation(project(":feature:settings"))
     implementation(libs.androidx.core.ktx)

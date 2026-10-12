@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 import im.flume.hearth.core.playback.AutoGain
 import kotlin.math.abs

@@ -1,4 +1,4 @@
-package im.flume.hearth.feature.player.visualiser
+package im.flume.hearth.feature.visualiser
 
 // The visualiser's overlay controls, the layer each style draws into, and keeping the screen on while it plays.
 
