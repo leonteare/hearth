@@ -6,13 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.outlined.ArrowCircleDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -20,10 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import im.flume.hearth.data.SongEntity
 import im.flume.hearth.ui.components.LocalActions
-import im.flume.hearth.ui.theme.SurfaceHigh
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * The selection bar for [songs], where [selection] holds the row keys ([keys]) of the picked songs.
@@ -60,15 +52,15 @@ private fun SelectionBar(
     onSelectAll: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().background(SurfaceHigh).statusBarsPadding().padding(end = 4.dp),
+        Modifier.fillMaxWidth().background(HearthTheme.colors.surfaceHigh).statusBarsPadding().padding(end = HearthTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Stop selecting") }
+        IconButton(onClick = onClose) { Icon(HearthTheme.icons.close, "Stop selecting") }
         Text("$count selected", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Select all") }
-        IconButton(onClick = onPlayNext) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, "Play next") }
-        IconButton(onClick = onQueue) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Add to queue") }
-        IconButton(onClick = onPlaylist) { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist") }
-        IconButton(onClick = onDownload) { Icon(Icons.Outlined.ArrowCircleDown, "Download") }
+        IconButton(onClick = onSelectAll) { Icon(HearthTheme.icons.selectAll, "Select all") }
+        IconButton(onClick = onPlayNext) { Icon(HearthTheme.icons.playNext, "Play next") }
+        IconButton(onClick = onQueue) { Icon(HearthTheme.icons.queue, "Add to queue") }
+        IconButton(onClick = onPlaylist) { Icon(HearthTheme.icons.addToPlaylist, "Add to playlist") }
+        IconButton(onClick = onDownload) { Icon(HearthTheme.icons.download, "Download") }
     }
 }

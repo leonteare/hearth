@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +30,7 @@ import im.flume.hearth.data.SongOrder
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.TopBar
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -84,7 +84,7 @@ fun BrowseSongsScreen() {
         "All songs", "browse-SONGS", SONG_SORTS,
         extraActions = {
             IconButton(onClick = { actions.play(PlaySource.All, shuffle = true) }) {
-                Icon(Icons.Default.Shuffle, "Shuffle all songs", tint = MaterialTheme.colorScheme.primary)
+                Icon(HearthTheme.icons.shuffle, "Shuffle all songs", tint = MaterialTheme.colorScheme.primary)
             }
         },
     ) { sort ->

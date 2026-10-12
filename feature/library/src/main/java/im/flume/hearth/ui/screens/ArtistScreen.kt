@@ -9,10 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,7 +53,7 @@ import im.flume.hearth.ui.components.isComing
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.components.rememberCoverColor
 import im.flume.hearth.ui.theme.CoverSize
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -110,9 +107,9 @@ fun ArtistScreen(id: String) {
                 onShuffle = { actions.play(source, shuffle = true) },
                 extra = {
                     artist?.let { ar -> FollowButton(ar.starred) { actions.setArtistFollowed(id, !ar.starred) } }
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(HearthTheme.spacing.xs))
                     TextButton(onClick = { actions.startArtistRadio(id, name) }) {
-                        Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp))
+                        Icon(HearthTheme.icons.radio, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Radio")
                     }
@@ -150,7 +147,7 @@ private fun RemoteArtistScreen(id: String) {
     }
     when (state) {
         Load.Loading -> LoadingPage()
-        Load.Failed -> UnavailablePage(Icons.Default.CloudOff, "Couldn't load this artist. Check your connection and try again.")
+        Load.Failed -> UnavailablePage(HearthTheme.icons.offline, "Couldn't load this artist. Check your connection and try again.")
         is Load.Ready -> {
             val local = state.value.localArtistId
             if (local != null) ArtistScreen(local) else RemoteArtistContent(state.value.extras)
@@ -185,8 +182,8 @@ private fun RemoteArtistContent(x: ArtistExtras) {
         status = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AvailabilityIcon(request)
-                Spacer(Modifier.width(4.dp))
-                Text(comingLabel(request) ?: "Not on your server yet", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.width(HearthTheme.spacing.xs))
+                Text(comingLabel(request) ?: "Not on your server yet", color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
             }
         },
         buttons = {
@@ -197,9 +194,9 @@ private fun RemoteArtistContent(x: ArtistExtras) {
                 extra = {
                     FollowButton(following) { get.follow(artist, page) }
                     if (following && request == null) {
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(HearthTheme.spacing.xs))
                         TextButton(onClick = { get.offerArtist(artist, page) }) {
-                            Icon(Icons.Outlined.CloudDownload, null, modifier = Modifier.size(20.dp))
+                            Icon(HearthTheme.icons.fetchToServer, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Get music")
                         }

@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GroupAdd
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
@@ -29,7 +26,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -48,8 +44,7 @@ import im.flume.hearth.ui.components.ChoiceSheet
 import im.flume.hearth.ui.components.IconTile
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.couldNot
 import java.io.IOException
 import kotlinx.coroutines.launch
@@ -70,7 +65,7 @@ fun InviteBanner(item: PlaylistItem) {
     BannerCard(
         title = null,
         body = "$owner invited you to $what",
-        icon = Icons.Default.GroupAdd,
+        icon = HearthTheme.icons.share,
         tinted = true,
         actions = {
             Spacer(Modifier.weight(1f))
@@ -88,7 +83,7 @@ fun InviteBanner(item: PlaylistItem) {
                         }
                         .onFailure { actions.showMessage(couldNot("Couldn't decline the invite", it, !c.network.isOnline.value)) }
                 }
-            }) { Text("Decline", color = TextSecondary) }
+            }) { Text("Decline", color = HearthTheme.colors.textSecondary) }
             TextButton(onClick = {
                 c.appScope.launch {
                     runCatching { c.library.answerInvite(item.playlist.id, accept = true) }
@@ -154,29 +149,29 @@ fun ShareSheet(item: PlaylistItem, onDismiss: () -> Unit) {
     ) {
         Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
             if (users == null) {
-                Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) {
+                Row(Modifier.fillMaxWidth().padding(HearthTheme.spacing.xl), horizontalArrangement = Arrangement.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp))
                 }
             }
             names.forEach { u ->
                 MediaRow(
                     PlaylistRules.displayName(u), status(u), onClick = { choosing = u }, round = true,
-                    cover = { IconTile(Icons.Default.Person, Color(0xFF3E3E3E)) },
+                    cover = { IconTile(HearthTheme.icons.artist, HearthTheme.colors.outline) },
                 )
             }
             if (users != null && names.isEmpty() && !listFailed) {
                 Text(
                     "No one else has an account on this server yet.",
-                    color = TextSecondary, modifier = Modifier.padding(horizontal = Dimens.Gutter, vertical = 12.dp),
+                    color = HearthTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.m),
                 )
             }
             if (listFailed) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = Dimens.Gutter, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         typed, { typed = it }, singleLine = true, modifier = Modifier.weight(1f),
                         placeholder = { Text("Their Navidrome username") },
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(HearthTheme.spacing.s))
                     TextButton(enabled = typed.isNotBlank(), onClick = { choosing = typed.trim().lowercase(); typed = "" }) { Text("Share") }
                 }
             }
@@ -212,7 +207,7 @@ fun PasswordDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
         text = {
             Column {
                 Text("Hearth needs your password once to change playlist photos. It's kept encrypted on this phone.")
-                Spacer(Modifier.size(12.dp))
+                Spacer(Modifier.size(HearthTheme.spacing.m))
                 OutlinedTextField(
                     password, { password = it; error = null }, singleLine = true, enabled = !checking,
                     visualTransformation = PasswordVisualTransformation(),

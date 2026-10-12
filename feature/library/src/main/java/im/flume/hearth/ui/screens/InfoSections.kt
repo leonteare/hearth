@@ -1,17 +1,14 @@
 package im.flume.hearth.ui.screens
 
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.Box
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,9 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.text.HtmlCompat
@@ -38,13 +34,11 @@ import im.flume.hearth.api.ArtistInfo
 import im.flume.hearth.api.ItemDate
 import im.flume.hearth.container
 import im.flume.hearth.data.AlbumEntity
-import im.flume.hearth.ui.components.CoverArt
 import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.components.MediaCard
 import im.flume.hearth.ui.components.SectionHeader
 import im.flume.hearth.ui.components.formatLongDuration
-import im.flume.hearth.ui.components.MediaCard
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 import java.time.LocalDate
 import java.time.Month
 import java.time.format.TextStyle
@@ -72,11 +66,11 @@ fun AboutText(title: String, text: String, link: String?) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     SectionHeader(title)
-    Column(Modifier.padding(horizontal = 16.dp).animateContentSize()) {
+    Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter).animateContentSize()) {
         Text(
             text,
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
+            color = HearthTheme.colors.textSecondary,
             maxLines = if (expanded) Int.MAX_VALUE else 4,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.clickable { expanded = !expanded },
@@ -125,8 +119,8 @@ fun AlbumDetails(album: AlbumEntity?, albumId: String, songCount: Int, totalSec:
         full?.recordLabels?.map { it.name }?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.joinToString(", ")?.let { "© $it" },
         (full?.genre ?: album?.genre)?.takeIf { it.isNotBlank() },
     )
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        lines.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = TextSecondary) }
+    Column(Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = 20.dp), verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.xxs)) {
+        lines.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = HearthTheme.colors.textSecondary) }
     }
     notes?.let { AboutText("About this album", it, notesLink) }
 }
@@ -148,7 +142,7 @@ fun ArtistAbout(artistId: String) {
     if (fans.isNotEmpty()) {
         SectionHeader("Fans also like")
         val actions = LocalActions.current
-        LazyRow(contentPadding = PaddingValues(horizontal = Dimens.Gutter), horizontalArrangement = Arrangement.spacedBy(Dimens.CarouselSpacing)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = HearthTheme.spacing.gutter), horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.carouselSpacing)) {
             items(fans, key = { it.id }) { a ->
                 MediaCard(a.name, null, onClick = { actions.openArtist(a.id) }, coverArt = a.coverArt, width = 110.dp, round = true)
             }

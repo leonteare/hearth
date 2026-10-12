@@ -25,7 +25,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.api.tidalImageUrl
 import im.flume.hearth.container
@@ -43,6 +42,7 @@ import im.flume.hearth.ui.components.SongRow
 import im.flume.hearth.ui.components.formatLongDuration
 import im.flume.hearth.ui.components.plural
 import im.flume.hearth.ui.components.rememberCoverColor
+import im.flume.hearth.ui.theme.HearthTheme
 
 /** Header of a page for music that isn't on the server: its artwork, a status line, and what Play does (a preview). */
 data class RemoteHeader(
@@ -213,7 +213,7 @@ fun CollectionScreen(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize().then(if (searchable) Modifier.nestedScroll(pullToSearch) else Modifier),
-            state = listState, contentPadding = PaddingValues(bottom = 24.dp),
+            state = listState, contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl),
         ) {
             item {
                 CollectionHeader(

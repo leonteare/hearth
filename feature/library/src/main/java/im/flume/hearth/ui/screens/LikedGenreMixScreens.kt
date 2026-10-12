@@ -5,11 +5,6 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,8 +31,7 @@ import im.flume.hearth.ui.components.EmptyState
 import im.flume.hearth.ui.components.LoadingPage
 import im.flume.hearth.ui.components.MixCover
 import im.flume.hearth.ui.components.UnavailablePage
-import im.flume.hearth.ui.theme.HearthShapes
-import im.flume.hearth.ui.theme.LikedColor
+import im.flume.hearth.ui.theme.HearthTheme
 
 /**
  * A mix built on this phone, found by its title ("Artist Mix", one per artist) rather than its place
@@ -57,7 +51,7 @@ fun MixScreen(key: String) {
     }
     if (!loaded) return LoadingPage()
     // A stale link (e.g. today's mixes were rebuilt with fewer entries).
-    val m = mix ?: return UnavailablePage(Icons.Default.Radio, "This mix isn't available any more")
+    val m = mix ?: return UnavailablePage(HearthTheme.icons.radio, "This mix isn't available any more")
     CollectionScreen(
         title = m.title,
         subtitle = m.subtitle,
@@ -80,7 +74,7 @@ fun GenreScreen(name: String) {
         songs = songs,
         source = PlaySource(PlaySource.Kind.GENRE, name, name),
         emptyState = if (loaded?.isEmpty() == true) {
-            { EmptyState(Icons.Default.MusicNote, "No songs in this genre any more") }
+            { EmptyState(HearthTheme.icons.song, "No songs in this genre any more") }
         } else null,
     )
 }
@@ -103,7 +97,7 @@ fun LikedScreen() {
         songs = sorted,
         source = PlaySource.Liked.copy(order = order),
         pin = PinTarget(DownloadRepository.KIND_LIKED, "liked"),
-        headerIcon = { size -> BigIcon(Icons.Default.Favorite, LikedColor, size) },
+        headerIcon = { size -> BigIcon(HearthTheme.icons.likeOn, HearthTheme.colors.liked, size) },
         headerActions = {
             SortMenu(SongOrder.LIKED.map { it.second }, sort) {
                 sort = it
@@ -111,14 +105,14 @@ fun LikedScreen() {
             }
         },
         emptyState = if (loaded?.isEmpty() == true) {
-            { EmptyState(Icons.Default.FavoriteBorder, "Songs you like show up here. Tap the heart on any song to add it.") }
+            { EmptyState(HearthTheme.icons.like, "Songs you like show up here. Tap the heart on any song to add it.") }
         } else null,
     )
 }
 
 @Composable
 private fun BigIcon(icon: ImageVector, color: Color, size: Dp = 220.dp) {
-    Box(Modifier.size(size * 0.82f).clip(HearthShapes.Cover).background(color), contentAlignment = Alignment.Center) {
-        Icon(icon, null, Modifier.size(72.dp), tint = Color.White)
+    Box(Modifier.size(size * 0.82f).clip(HearthTheme.shapes.cover).background(color), contentAlignment = Alignment.Center) {
+        Icon(icon, null, Modifier.size(72.dp), tint = HearthTheme.colors.onCover)
     }
 }

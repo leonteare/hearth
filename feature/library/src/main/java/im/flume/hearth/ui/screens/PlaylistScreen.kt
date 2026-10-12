@@ -1,8 +1,6 @@
 // The page for one playlist: its songs, removing songs with Undo, and the invite banner.
 package im.flume.hearth.ui.screens
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +16,7 @@ import im.flume.hearth.data.ServerMixes
 import im.flume.hearth.download.DownloadRepository
 import im.flume.hearth.ui.components.EmptyState
 import im.flume.hearth.ui.components.LocalActions
+import im.flume.hearth.ui.theme.HearthTheme
 import im.flume.hearth.util.couldNot
 import kotlinx.coroutines.launch
 
@@ -74,7 +73,7 @@ fun PlaylistScreen(id: String) {
         source = PlaySource(PlaySource.Kind.PLAYLIST, id, playlist?.name.orEmpty()),
         pin = PinTarget(DownloadRepository.KIND_PLAYLIST, id),
         emptyState = if (loadedSongs?.isEmpty() == true) {
-            { EmptyState(Icons.AutoMirrored.Filled.QueueMusic, "This playlist is empty. Add songs from any song's menu.") }
+            { EmptyState(HearthTheme.icons.queue, "This playlist is empty. Add songs from any song's menu.") }
         } else null,
         topContent = {
             item?.takeIf { it.access.invite != null }?.let { pending -> item(key = "invite") { InviteBanner(pending) } }

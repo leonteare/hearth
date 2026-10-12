@@ -14,12 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,22 +40,18 @@ import im.flume.hearth.ui.components.IconTile
 import im.flume.hearth.ui.components.LocalActions
 import im.flume.hearth.ui.components.MediaRow
 import im.flume.hearth.ui.components.plural
-import im.flume.hearth.ui.theme.Dimens
-import im.flume.hearth.ui.theme.LikedColor
-import im.flume.hearth.ui.theme.NoticeDot
-import im.flume.hearth.ui.theme.SurfaceHigh
-import im.flume.hearth.ui.theme.TextSecondary
+import im.flume.hearth.ui.theme.HearthTheme
 
 internal fun LazyListScope.playlistsList(playlists: List<PlaylistItem>, actions: Actions) {
     item {
         MediaRow(
             "New playlist", null,
             onClick = { actions.newPlaylist() },
-            cover = { IconTile(Icons.Default.Add, SurfaceHigh) },
+            cover = { IconTile(HearthTheme.icons.add, HearthTheme.colors.surfaceHigh) },
         )
     }
     item {
-        MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(Icons.Default.Favorite, LikedColor) })
+        MediaRow("Liked Songs", null, onClick = { actions.open("liked") }, cover = { IconTile(HearthTheme.icons.likeOn, HearthTheme.colors.liked) })
     }
     // Downloads aren't here: the downloads icon at the top of every page opens them.
     items(playlists, key = { it.playlist.id }) { item -> PlaylistListRow(item) }
@@ -118,14 +109,14 @@ internal fun LazyListScope.podcastsList(
             MediaRow(
                 "Find a podcast", null,
                 onClick = { actions.openSearchTab(SearchFilter.PODCASTS) },
-                cover = { IconTile(Icons.Default.Search, SurfaceHigh) },
+                cover = { IconTile(HearthTheme.icons.search, HearthTheme.colors.surfaceHigh) },
             )
         }
         item(key = "import-opml") {
             MediaRow(
                 "Import podcasts (OPML)", "Bring the shows you follow from another app",
                 onClick = importOpml,
-                cover = { IconTile(Icons.Default.UploadFile, SurfaceHigh) },
+                cover = { IconTile(HearthTheme.icons.importFile, HearthTheme.colors.surfaceHigh) },
             )
         }
     }
@@ -159,9 +150,9 @@ internal fun LazyListScope.libraryFooter(text: String) {
     item {
         Text(
             text,
-            color = TextSecondary,
+            color = HearthTheme.colors.textSecondary,
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(HearthTheme.spacing.l),
         )
     }
 }
@@ -180,19 +171,19 @@ private fun PlaylistListRow(item: PlaylistItem) {
     MediaRow(
         p.name, subtitle, onClick = { actions.openPlaylist(p.id) }, coverArt = p.coverArt,
         trailing = if (a.invite != null) {
-            { Box(Modifier.padding(end = 12.dp).size(10.dp).clip(CircleShape).background(NoticeDot).semantics { contentDescription = "New invite" }) }
+            { Box(Modifier.padding(end = HearthTheme.spacing.m).size(10.dp).clip(CircleShape).background(HearthTheme.colors.noticeDot).semantics { contentDescription = "New invite" }) }
         } else null,
     )
 }
 
 @Composable
 private fun LibraryEmpty(title: String, body: String, button: String? = null, onBrowse: () -> Unit = {}) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.xxl, vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(body, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(HearthTheme.spacing.s))
+        Text(body, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
         if (button != null) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(HearthTheme.spacing.m))
             TextButton(onClick = onBrowse) { Text(button) }
         }
     }
@@ -205,10 +196,10 @@ private fun LibraryEmpty(title: String, body: String, button: String? = null, on
 @Composable
 private fun BrowseAllRow(label: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Dimens.Gutter, vertical = 16.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = TextSecondary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextSecondary)
+        Text(label, color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(HearthTheme.icons.chevron, null, tint = HearthTheme.colors.textSecondary)
     }
 }
