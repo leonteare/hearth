@@ -334,6 +334,8 @@ fun AppRoot() {
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     val downloads by c.downloads.states.collectAsStateWithLifecycle(emptyMap())
     val rowContext = RowContext(playerState.current?.mediaId, online, downloads)
+    val liveRows = remember { im.flume.hearth.ui.components.LiveRows() }
+    androidx.compose.runtime.SideEffect { liveRows.playingId = playerState.current?.mediaId; liveRows.online = online; liveRows.downloads = downloads }
     // Music that isn't on the server: what's on its way, the preview playing, and the hearts that get it.
     val requestList by remember { c.requests.requests }.collectAsStateWithLifecycle(emptyList())
     val requestsByKey = remember(requestList) { requestList.associateBy { "${it.type}:${it.tidalId}" } }
@@ -388,6 +390,7 @@ fun AppRoot() {
     CompositionLocalProvider(
         LocalActions provides actions,
         LocalRowContext provides rowContext,
+        im.flume.hearth.ui.components.LocalLiveRows provides liveRows,
         im.flume.hearth.ui.components.LocalRequests provides requestsByKey,
         im.flume.hearth.ui.components.LocalPreview provides preview,
         im.flume.hearth.ui.components.LocalGetMusic provides getMusic,

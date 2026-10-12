@@ -257,6 +257,8 @@ interface LibraryDao {
 @Dao
 interface DownloadDao {
     @Query("SELECT * FROM downloads") fun all(): Flow<List<DownloadEntity>>
+    /** Just what rows show: Room re-runs this on every write to the table, progress included. */
+    @Query("SELECT songId, state FROM downloads") fun states(): Flow<List<DownloadStateRow>>
     @Query("SELECT * FROM downloads") suspend fun allOnce(): List<DownloadEntity>
     @Query("SELECT * FROM downloads WHERE state = 'QUEUED' ORDER BY addedAt LIMIT 1") suspend fun nextQueued(): DownloadEntity?
     @Query("SELECT * FROM downloads WHERE state = 'FAILED' ORDER BY addedAt") suspend fun failed(): List<DownloadEntity>
@@ -311,6 +313,8 @@ interface RequestDao {
     @Query("DELETE FROM requests WHERE type = :type AND tidalId = :tidalId") suspend fun delete(type: String, tidalId: String)
     @Query("DELETE FROM requests WHERE status = 'DONE'") suspend fun clearDone()
 }
+
+data class DownloadStateRow(val songId: String, val state: DownloadState)
 
 data class DownloadCounts(val queued: Int = 0, val downloading: Int = 0, val failed: Int = 0) {
     /** Songs still to come (waiting or on their way). */
