@@ -41,11 +41,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.spoken.ChapterMarks
-import im.flume.hearth.spoken.LocalBookIds
+import im.flume.hearth.domain.spoken.ChapterMarks
+import im.flume.hearth.domain.spoken.LocalBookIds
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenFormat
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.DownloadToggle
 import im.flume.hearth.core.ui.components.LocalActions

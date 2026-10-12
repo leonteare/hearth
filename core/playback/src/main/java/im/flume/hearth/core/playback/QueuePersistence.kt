@@ -7,7 +7,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import im.flume.hearth.playback.SavedQueue
+import im.flume.hearth.domain.music.playback.SavedQueue
 
 /*
  * Saving and restoring the queue on PlaybackService, so music (or the episode or book) picks up where

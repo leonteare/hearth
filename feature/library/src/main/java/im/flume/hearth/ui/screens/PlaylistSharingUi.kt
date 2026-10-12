@@ -34,10 +34,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.common.PasswordNeededException
 import im.flume.hearth.core.common.WrongPasswordException
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.PlaylistItem
-import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.data.ShareRole
-import im.flume.hearth.data.Sharing
+import im.flume.hearth.domain.music.PlaylistItem
+import im.flume.hearth.domain.music.PlaylistRules
+import im.flume.hearth.domain.music.ShareRole
+import im.flume.hearth.domain.music.Sharing
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.BannerCard
 import im.flume.hearth.core.ui.components.ChoiceSheet

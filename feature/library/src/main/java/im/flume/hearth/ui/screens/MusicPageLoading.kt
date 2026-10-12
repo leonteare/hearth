@@ -12,7 +12,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.network.TidalTrack
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.SongItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

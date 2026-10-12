@@ -10,7 +10,7 @@ import im.flume.hearth.core.data.spoken.BookRow
 import im.flume.hearth.core.data.spoken.EpisodeEntity
 import im.flume.hearth.core.data.spoken.EpisodeRow
 import im.flume.hearth.core.data.spoken.PodcastEntity
-import im.flume.hearth.spoken.SpokenSearch
+import im.flume.hearth.domain.spoken.SpokenSearch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

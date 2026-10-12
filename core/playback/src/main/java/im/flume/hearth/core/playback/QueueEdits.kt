@@ -5,11 +5,11 @@ package im.flume.hearth.core.playback
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import kotlin.random.Random
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import im.flume.hearth.playback.QueuePlanner
+import im.flume.hearth.domain.music.playback.QueuePlanner
 
 /*
  * Music queue changes on PlaybackService: playing a source, Play next / Add to queue, the queue

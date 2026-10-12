@@ -34,7 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.DownloadCounts
-import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.domain.music.PlaylistRules
 import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.core.ui.components.DownloadsBadge
 import im.flume.hearth.core.ui.components.GetMusicSheets

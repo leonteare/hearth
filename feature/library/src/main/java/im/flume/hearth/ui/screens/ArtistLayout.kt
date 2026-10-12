@@ -26,10 +26,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.AlbumItem
-import im.flume.hearth.data.Discography
+import im.flume.hearth.domain.music.AlbumItem
+import im.flume.hearth.domain.music.Discography
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.SongItem
 import im.flume.hearth.core.ui.components.BackButton
 import im.flume.hearth.core.ui.components.CoverGradientHeader
 import im.flume.hearth.core.ui.components.DownloadsIndicator

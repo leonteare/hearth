@@ -13,11 +13,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.navigation.NavHostController
 import im.flume.hearth.core.playback.AppContainer
-import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.domain.music.PlaySource
+import im.flume.hearth.domain.music.PlaylistRules
 import im.flume.hearth.core.domain.SearchFilter
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.ui.components.Actions
 import im.flume.hearth.core.ui.components.NewPlaylistDialog
 import im.flume.hearth.core.ui.components.PlaylistPickerDialog

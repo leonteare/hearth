@@ -22,7 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.network.TidalType
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.RequestEntity
-import im.flume.hearth.data.RequestIntent
+import im.flume.hearth.domain.requests.RequestIntent
 import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.core.ui.components.AvailabilityIcon

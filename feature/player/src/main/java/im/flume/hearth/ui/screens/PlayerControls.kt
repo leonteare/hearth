@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.components.BigPlayButton
 import im.flume.hearth.core.ui.components.LocalActions

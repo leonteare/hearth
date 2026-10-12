@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.DownloadState
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.RequestStatus
 import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.core.data.spoken.SpokenDownloadState

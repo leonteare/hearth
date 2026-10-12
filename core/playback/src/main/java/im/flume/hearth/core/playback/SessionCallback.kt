@@ -13,7 +13,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.playback.PlaybackService.Companion.ARG_AFTER_KEY
 import im.flume.hearth.core.playback.PlaybackService.Companion.ARG_BEFORE_KEY
 import im.flume.hearth.core.playback.PlaybackService.Companion.ARG_EPISODE_ID
@@ -51,7 +51,7 @@ import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_TOGGLE_SHUFFL
 import im.flume.hearth.core.playback.PlaybackService.Companion.CUSTOM_COMMANDS
 import im.flume.hearth.core.playback.PlaybackService.Companion.SKIP_BACK_SEC
 import im.flume.hearth.core.playback.PlaybackService.Companion.SKIP_FORWARD_SEC
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.SpokenKey
 import kotlinx.coroutines.launch
 
 /**

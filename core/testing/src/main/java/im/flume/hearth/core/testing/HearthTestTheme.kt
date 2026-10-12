@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import im.flume.hearth.core.data.DownloadState
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.core.ui.components.Actions
 import im.flume.hearth.core.ui.components.LiveRows

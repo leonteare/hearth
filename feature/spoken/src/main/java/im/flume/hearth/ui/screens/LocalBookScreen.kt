@@ -40,11 +40,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.spoken.BookMatch
-import im.flume.hearth.spoken.ChapterMarks
+import im.flume.hearth.domain.spoken.BookMatch
+import im.flume.hearth.domain.spoken.ChapterMarks
 import im.flume.hearth.core.data.spoken.LocalMatchState
 import im.flume.hearth.core.data.spoken.LocalUploadState
-import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.BackButton
 import im.flume.hearth.core.ui.components.EmptyState

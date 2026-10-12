@@ -5,9 +5,9 @@ import androidx.compose.runtime.compositionLocalOf
 import im.flume.hearth.core.network.TidalAlbum
 import im.flume.hearth.core.network.TidalType
 import im.flume.hearth.core.data.RequestEntity
-import im.flume.hearth.data.RequestIntent
+import im.flume.hearth.domain.requests.RequestIntent
 import im.flume.hearth.core.data.RequestStatus
-import im.flume.hearth.data.RequestTracking
+import im.flume.hearth.domain.requests.RequestTracking
 import im.flume.hearth.core.playback.PreviewPlayer
 
 /*

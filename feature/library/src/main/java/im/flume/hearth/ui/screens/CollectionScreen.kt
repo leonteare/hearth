@@ -29,13 +29,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.network.tidalImageUrl
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.DownloadState
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.RequestEntity
 import im.flume.hearth.core.data.SongEntity
 import im.flume.hearth.core.data.SongFilter
-import im.flume.hearth.data.SongItem
-import im.flume.hearth.data.Usage
-import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.domain.music.SongItem
+import im.flume.hearth.domain.music.Usage
+import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.LocalRowContext
 import im.flume.hearth.core.ui.components.SongRow

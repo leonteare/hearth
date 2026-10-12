@@ -35,10 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.Lyrics
+import im.flume.hearth.domain.music.Lyrics
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.currentIndex
-import im.flume.hearth.data.rows
+import im.flume.hearth.domain.music.currentIndex
+import im.flume.hearth.domain.music.rows
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.theme.HearthTheme
 import im.flume.hearth.core.ui.screens.LYRIC_GAPS

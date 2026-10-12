@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.domain.music.PlaylistRules
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 /** Asks for a name for a new playlist, with the keyboard already up. */

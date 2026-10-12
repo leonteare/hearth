@@ -14,9 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.LibraryOrder
+import im.flume.hearth.domain.music.LibraryOrder
 import im.flume.hearth.core.data.spoken.LocalBookRow
-import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MediaRow
 import im.flume.hearth.core.ui.theme.HearthTheme

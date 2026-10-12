@@ -21,10 +21,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import im.flume.hearth.core.common.SubsonicException
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.PhotoPrep
-import im.flume.hearth.data.PlaylistItem
-import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.domain.music.PhotoPrep
+import im.flume.hearth.domain.music.PlaylistItem
+import im.flume.hearth.domain.music.PlaylistRules
+import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MenuItem

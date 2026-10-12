@@ -15,7 +15,7 @@ import im.flume.hearth.core.network.TidalTrack
 import im.flume.hearth.core.network.TidalType
 import im.flume.hearth.core.data.RequestEntity
 import im.flume.hearth.core.data.RequestStatus
-import im.flume.hearth.requests.RequestsRepository
+import im.flume.hearth.domain.requests.RequestsRepository
 import im.flume.hearth.core.common.couldNot
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex

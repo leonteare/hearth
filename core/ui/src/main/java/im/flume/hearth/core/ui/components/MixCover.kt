@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.Mix
+import im.flume.hearth.domain.music.Mix
 import im.flume.hearth.core.ui.theme.CoverSize
 import im.flume.hearth.core.ui.theme.HearthShapes
 

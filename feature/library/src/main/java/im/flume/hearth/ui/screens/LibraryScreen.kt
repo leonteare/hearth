@@ -21,11 +21,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.LibraryOrder
-import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.data.YourLibrary
-import im.flume.hearth.spoken.SpokenLists
-import im.flume.hearth.sync.SyncState
+import im.flume.hearth.domain.music.LibraryOrder
+import im.flume.hearth.domain.music.PlaylistRules
+import im.flume.hearth.domain.music.YourLibrary
+import im.flume.hearth.domain.spoken.SpokenLists
+import im.flume.hearth.domain.music.sync.SyncState
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.LocalTabRequests
 import im.flume.hearth.core.ui.components.PageHeader

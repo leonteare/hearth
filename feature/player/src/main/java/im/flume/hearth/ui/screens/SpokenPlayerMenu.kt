@@ -14,9 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.LocalBookIds
+import im.flume.hearth.domain.spoken.LocalBookIds
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MenuItem

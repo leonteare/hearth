@@ -30,11 +30,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.spoken.BookCandidate
-import im.flume.hearth.spoken.BookMatch
+import im.flume.hearth.domain.spoken.BookCandidate
+import im.flume.hearth.domain.spoken.BookMatch
 import im.flume.hearth.core.data.spoken.LocalBookEntity
 import im.flume.hearth.core.data.spoken.LocalMatchState
-import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MediaRow

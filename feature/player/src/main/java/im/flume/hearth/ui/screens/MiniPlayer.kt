@@ -37,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.components.CoverPrefetcher
 import im.flume.hearth.core.ui.components.PlayPauseIcon

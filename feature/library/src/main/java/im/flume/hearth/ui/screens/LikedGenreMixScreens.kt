@@ -22,11 +22,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.Mix
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.Mix
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongOrder
-import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.domain.music.SongOrder
+import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.ui.components.EmptyState
 import im.flume.hearth.core.ui.components.LoadingPage
 import im.flume.hearth.core.ui.components.MixCover

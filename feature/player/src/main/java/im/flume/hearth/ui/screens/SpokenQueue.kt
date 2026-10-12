@@ -29,7 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.SpokenLists
+import im.flume.hearth.domain.spoken.SpokenLists
 import im.flume.hearth.core.ui.components.playerBackdrop
 import im.flume.hearth.core.ui.components.rememberCoverColor
 import im.flume.hearth.core.ui.theme.HearthTheme

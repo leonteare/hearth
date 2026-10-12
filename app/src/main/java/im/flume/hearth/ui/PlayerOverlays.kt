@@ -29,7 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.ui.screens.NowPlayingScreen
 import im.flume.hearth.ui.screens.QueueScreen

@@ -28,7 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.update.UpdateState
+import im.flume.hearth.domain.update.UpdateState
 import im.flume.hearth.core.ui.components.BannerCard
 import im.flume.hearth.core.ui.theme.HearthTheme
 

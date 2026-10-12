@@ -13,7 +13,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import im.flume.hearth.core.common.R
 import im.flume.hearth.core.common.crashLoggingHandler
-import im.flume.hearth.spoken.SpokenSpeed
+import im.flume.hearth.domain.spoken.SpokenSpeed
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 import kotlinx.coroutines.CoroutineScope

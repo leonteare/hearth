@@ -36,12 +36,12 @@ import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.network.AbsPodcastSearchResult
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.spoken.BookRow
-import im.flume.hearth.spoken.DirectoryState
+import im.flume.hearth.domain.spoken.DirectoryState
 import im.flume.hearth.core.data.spoken.EpisodeRow
 import im.flume.hearth.core.data.spoken.PodcastEntity
-import im.flume.hearth.spoken.SpokenDiscovery
+import im.flume.hearth.domain.spoken.SpokenDiscovery
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.CoverArt
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MediaRow

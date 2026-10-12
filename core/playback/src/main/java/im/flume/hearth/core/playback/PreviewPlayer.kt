@@ -14,7 +14,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import im.flume.hearth.core.network.TidalTrack
 import im.flume.hearth.core.network.TidarrClient
-import im.flume.hearth.data.PreviewWindow
+import im.flume.hearth.domain.music.PreviewWindow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

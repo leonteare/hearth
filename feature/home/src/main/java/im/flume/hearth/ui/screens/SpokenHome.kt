@@ -20,11 +20,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.AppContainer
-import im.flume.hearth.spoken.ContinueItem
+import im.flume.hearth.domain.spoken.ContinueItem
 import im.flume.hearth.core.data.spoken.EpisodeRow
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenFormat
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.ui.components.Actions
 import im.flume.hearth.core.ui.components.CoverArt
 import im.flume.hearth.core.ui.components.MediaCard

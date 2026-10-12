@@ -5,7 +5,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.domain.SearchFilter
 import im.flume.hearth.core.data.SongEntity
 

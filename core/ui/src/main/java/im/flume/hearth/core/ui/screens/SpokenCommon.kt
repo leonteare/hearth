@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.text.HtmlCompat
 import im.flume.hearth.core.playback.AppContainer
 import im.flume.hearth.core.playback.SpokenNowPlaying
-import im.flume.hearth.spoken.LocalBookIds
+import im.flume.hearth.domain.spoken.LocalBookIds
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
 import im.flume.hearth.core.ui.components.Actions
 import im.flume.hearth.core.ui.components.BackButton

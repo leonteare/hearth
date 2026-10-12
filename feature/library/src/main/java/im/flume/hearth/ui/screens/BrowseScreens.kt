@@ -23,10 +23,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.AlbumEntity
 import im.flume.hearth.core.data.ArtistEntity
-import im.flume.hearth.data.LibraryOrder
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.LibraryOrder
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongOrder
+import im.flume.hearth.domain.music.SongOrder
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.SongRow
 import im.flume.hearth.core.ui.components.TopBar

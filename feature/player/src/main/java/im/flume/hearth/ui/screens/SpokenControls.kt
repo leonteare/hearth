@@ -39,8 +39,8 @@ import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.playback.SpokenNowPlaying
 import im.flume.hearth.core.data.spoken.ChapterEntity
-import im.flume.hearth.spoken.ChapterMarks
-import im.flume.hearth.spoken.SpokenFormat
+import im.flume.hearth.domain.spoken.ChapterMarks
+import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.BigPlayButton
 import im.flume.hearth.core.ui.components.PlayPauseIcon
 import im.flume.hearth.core.ui.components.PlayerSlider

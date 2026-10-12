@@ -8,7 +8,7 @@ import androidx.compose.runtime.withFrameNanos
 import im.flume.hearth.core.data.spoken.ChapterEntity
 import im.flume.hearth.core.data.spoken.LocalBookEntity
 import im.flume.hearth.core.data.spoken.LocalBookFileEntity
-import im.flume.hearth.spoken.LocalBookIds
+import im.flume.hearth.domain.spoken.LocalBookIds
 import im.flume.hearth.core.data.spoken.LocalBookProgressEntity
 import im.flume.hearth.core.data.spoken.LocalMatchState
 import im.flume.hearth.core.data.spoken.SpokenProgressEntity

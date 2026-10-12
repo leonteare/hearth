@@ -30,11 +30,11 @@ import im.flume.hearth.core.network.TidalArtistPage
 import im.flume.hearth.core.network.tidalImageUrl
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.AlbumEntity
-import im.flume.hearth.data.Availability
-import im.flume.hearth.data.PlaySource
+import im.flume.hearth.domain.music.Availability
+import im.flume.hearth.domain.music.PlaySource
 import im.flume.hearth.core.data.SearchIndex
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.SongItem
 import im.flume.hearth.core.ui.components.AvailabilityIcon
 import im.flume.hearth.core.ui.components.CoverArt
 import im.flume.hearth.core.ui.components.LoadingPage

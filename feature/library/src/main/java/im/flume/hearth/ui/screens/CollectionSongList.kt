@@ -11,7 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.SongItem
 import im.flume.hearth.core.ui.components.MissingSongRow
 import im.flume.hearth.core.ui.components.formatDuration
 import im.flume.hearth.core.ui.theme.HearthTheme

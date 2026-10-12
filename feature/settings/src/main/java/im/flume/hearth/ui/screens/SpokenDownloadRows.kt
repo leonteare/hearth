@@ -23,7 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.spoken.SpokenDownloadRow
 import im.flume.hearth.core.data.spoken.SpokenDownloadState
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MediaRow

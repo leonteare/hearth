@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.playback.QueueStore
-import im.flume.hearth.sync.SyncState
+import im.flume.hearth.domain.music.sync.SyncState
 import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import im.flume.hearth.core.ui.screens.UpdateSettingsRow

@@ -4,15 +4,15 @@ import im.flume.hearth.core.network.AbsPodcastSearchResult
 import im.flume.hearth.core.network.TidalSearchResults
 import im.flume.hearth.core.data.spoken.BookRow
 import im.flume.hearth.core.data.spoken.EpisodeRow
-import im.flume.hearth.spoken.FeedUrls
+import im.flume.hearth.domain.spoken.FeedUrls
 import im.flume.hearth.core.data.spoken.PodcastEntity
-import im.flume.hearth.spoken.SpokenSearchResults
+import im.flume.hearth.domain.spoken.SpokenSearchResults
 import im.flume.hearth.core.data.SearchIndex
 import im.flume.hearth.core.data.SearchMatch
-import im.flume.hearth.data.AlbumItem
-import im.flume.hearth.data.ArtistItem
-import im.flume.hearth.data.Availability
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.AlbumItem
+import im.flume.hearth.domain.music.ArtistItem
+import im.flume.hearth.domain.music.Availability
+import im.flume.hearth.domain.music.SongItem
 
 /** The chips above Search's results. Episodes count as podcasts. */
 enum class SearchFilter(val label: String) {

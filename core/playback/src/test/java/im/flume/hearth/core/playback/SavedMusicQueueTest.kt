@@ -2,8 +2,8 @@ package im.flume.hearth.core.playback
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import im.flume.hearth.playback.QueuePlanner
-import im.flume.hearth.playback.SavedQueue
+import im.flume.hearth.domain.music.playback.QueuePlanner
+import im.flume.hearth.domain.music.playback.SavedQueue
 
 /** "Play next" / "Add to queue" while a podcast or audiobook plays go into the music queue set aside for later. */
 class SavedMusicQueueTest {

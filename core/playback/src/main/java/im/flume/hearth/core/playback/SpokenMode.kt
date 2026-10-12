@@ -9,11 +9,11 @@ import androidx.media3.common.util.UnstableApi
 import im.flume.hearth.core.playback.PlaybackService.Companion.MAX_SPEED
 import im.flume.hearth.core.playback.PlaybackService.Companion.MIN_SPEED
 import im.flume.hearth.core.playback.PlaybackService.Companion.SLEEP_END_OF_CHAPTER
-import im.flume.hearth.spoken.LocalBookIds
-import im.flume.hearth.spoken.SpokenKey
+import im.flume.hearth.domain.spoken.LocalBookIds
+import im.flume.hearth.domain.spoken.SpokenKey
 import im.flume.hearth.core.data.spoken.SpokenPlayPrefEntity
-import im.flume.hearth.spoken.SpokenTimeline
-import im.flume.hearth.spoken.TimelineTrack
+import im.flume.hearth.domain.spoken.SpokenTimeline
+import im.flume.hearth.domain.spoken.TimelineTrack
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock

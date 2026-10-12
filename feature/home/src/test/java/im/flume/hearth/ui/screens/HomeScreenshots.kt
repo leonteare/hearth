@@ -2,7 +2,7 @@ package im.flume.hearth.ui.screens
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
-import im.flume.hearth.spoken.ContinueItem
+import im.flume.hearth.domain.spoken.ContinueItem
 import im.flume.hearth.core.testing.Samples
 import im.flume.hearth.core.testing.ScreenshotTest
 import im.flume.hearth.core.ui.components.LocalActions

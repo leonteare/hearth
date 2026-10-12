@@ -1,0 +1,133 @@
+package im.flume.hearth.domain.music
+
+import im.flume.hearth.core.network.LyricLine
+import im.flume.hearth.core.network.SubsonicClient
+import im.flume.hearth.core.common.SubsonicException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import im.flume.hearth.core.data.LyricsDao
+import im.flume.hearth.core.data.LyricsEntity
+import im.flume.hearth.core.data.SongEntity
+
+@Serializable
+data class Lyrics(
+    val synced: Boolean,
+    val lines: List<LyricLine>,
+    /** Bumped when how lyrics are stored changes; older synced copies are fetched again (see [CURRENT]). */
+    val version: Int = 0,
+) {
+    val isEmpty: Boolean get() = lines.none { it.value.isNotBlank() }
+
+    companion object {
+        /** 1: the server's offset is subtracted (earlier versions added it, so lyrics ran the wrong way). */
+        const val CURRENT = 1
+    }
+}
+
+/**
+ * Applies an OpenSubsonic lyrics offset. A positive offset means the lyrics should appear sooner,
+ * so it's subtracted from each start time (never going below zero).
+ */
+fun List<LyricLine>.withOffset(offsetMs: Long): List<LyricLine> =
+    if (offsetMs == 0L) this else map { it.copy(start = it.start?.let { s -> (s - offsetMs).coerceAtLeast(0) }) }
+
+/** A row on the lyrics screen: a sung line, or an instrumental break shown as animated dots. */
+data class LyricRow(val start: Long?, val end: Long?, val text: String, val isBreak: Boolean)
+
+/**
+ * Turns lyrics into display rows. For synced lyrics, an intro of [MIN_INTRO_MS] or more before the
+ * first line and every blank line become breaks that run until the next line starts.
+ */
+fun Lyrics.rows(): List<LyricRow> {
+    if (!synced) return lines.map { LyricRow(null, null, it.value, isBreak = false) }
+    val out = ArrayList<LyricRow>()
+    val firstStart = lines.firstOrNull { it.value.isNotBlank() }?.start
+    if (firstStart != null && firstStart >= MIN_INTRO_MS) out += LyricRow(0, firstStart, "", isBreak = true)
+    lines.forEachIndexed { i, line ->
+        val nextStart = lines.drop(i + 1).firstOrNull { it.start != null }?.start
+        if (line.value.isBlank()) {
+            val start = line.start
+            if (out.lastOrNull()?.isBreak != true && start != null) {
+                out += LyricRow(start, nextStart ?: (start + 5_000), "", isBreak = true)
+            }
+        } else {
+            out += LyricRow(line.start, nextStart, line.value, isBreak = false)
+        }
+    }
+    return out
+}
+
+/** Index of the row playing at [positionMs] (the last row that has started), or -1. */
+fun List<LyricRow>.currentIndex(positionMs: Long): Int {
+    var idx = -1
+    for (i in indices) {
+        val s = this[i].start ?: return -1
+        if (s <= positionMs) idx = i else break
+    }
+    return idx
+}
+
+const val MIN_INTRO_MS = 3_000L
+
+/**
+ * Lyrics from Navidrome (embedded tags or .lrc / .txt files next to the music), kept in Room so
+ * they also work offline. A confirmed "no lyrics" is remembered for a week so we don't keep asking;
+ * a failed request isn't remembered at all.
+ */
+class LyricsRepository(private val api: SubsonicClient, private val dao: LyricsDao) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    /** Null means unknown (offline and never fetched). */
+    suspend fun get(song: SongEntity, online: Boolean): Lyrics? {
+        val cached = dao.get(song.id)?.let { e ->
+            runCatching { json.decodeFromString(Lyrics.serializer(), e.json) }.getOrNull()?.let { it to e.fetchedAt }
+        }
+        if (cached != null) {
+            val (lyrics, at) = cached
+            val age = System.currentTimeMillis() - at
+            val stale = age > (if (lyrics.isEmpty) WEEK else MONTH) ||
+                (lyrics.synced && lyrics.version < Lyrics.CURRENT) // saved with the offset applied the wrong way
+            if (!stale || !online) return lyrics
+        }
+        if (!online) return null
+        return runCatching { fetch(song) }.getOrNull()?.also { store(song.id, it) } ?: cached?.first
+    }
+
+    suspend fun prefetch(song: SongEntity) {
+        if (dao.get(song.id) != null) return
+        runCatching { fetch(song) }.getOrNull()?.let { store(song.id, it) }
+    }
+
+    /**
+     * Throws when the server couldn't be asked properly (network, server error), so nothing gets
+     * cached and the next look tries again. Only a clear "no lyrics" answer comes back as empty.
+     */
+    private suspend fun fetch(song: SongEntity): Lyrics {
+        val structured = answeredOrNull { api.lyricsBySongId(song.id) }.orEmpty()
+            .filter { l -> l.line.any { it.value.isNotBlank() } }
+        val best = structured.firstOrNull { it.synced } ?: structured.firstOrNull()
+        if (best != null) {
+            val lines = if (best.synced) best.line.withOffset(best.offset) else best.line
+            return Lyrics(best.synced, lines, Lyrics.CURRENT)
+        }
+        val plain = answeredOrNull { api.lyricsByName(song.artist, song.title) }
+        return Lyrics(false, plain?.lines()?.map { LyricLine(null, it) }.orEmpty())
+    }
+
+    /** Null when the server answered with an API error or 404 (e.g. it lacks that call); rethrows anything else. */
+    private suspend fun <T> answeredOrNull(call: suspend () -> T): T? =
+        try {
+            call()
+        } catch (e: SubsonicException) {
+            if (e.code in 0..99 || e.code == 404) null else throw e
+        }
+
+    private suspend fun store(songId: String, lyrics: Lyrics) {
+        dao.put(LyricsEntity(songId, json.encodeToString(Lyrics.serializer(), lyrics), System.currentTimeMillis()))
+    }
+
+    companion object {
+        private const val WEEK = 7 * 24 * 60 * 60 * 1000L
+        private const val MONTH = 30 * 24 * 60 * 60 * 1000L
+    }
+}

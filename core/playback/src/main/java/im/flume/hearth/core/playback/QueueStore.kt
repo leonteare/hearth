@@ -16,7 +16,7 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.atomic.AtomicReference
-import im.flume.hearth.playback.SavedQueue
+import im.flume.hearth.domain.music.playback.SavedQueue
 
 const val EXTRA_MANUAL = "manual"
 const val EXTRA_ALBUM_ID = "albumId"

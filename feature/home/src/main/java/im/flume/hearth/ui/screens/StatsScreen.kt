@@ -35,11 +35,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.Ranked
-import im.flume.hearth.data.Stats
-import im.flume.hearth.data.StatsCalculator
-import im.flume.hearth.data.StatsPeriod
+import im.flume.hearth.domain.music.PlaySource
+import im.flume.hearth.domain.music.Ranked
+import im.flume.hearth.domain.music.Stats
+import im.flume.hearth.domain.music.StatsCalculator
+import im.flume.hearth.domain.music.StatsPeriod
 import im.flume.hearth.core.ui.components.CoverGradientHeader
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.SectionHeader

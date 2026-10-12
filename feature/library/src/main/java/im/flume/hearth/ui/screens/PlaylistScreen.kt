@@ -9,11 +9,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
-import im.flume.hearth.data.PlaySource
-import im.flume.hearth.data.PlaylistEdits
-import im.flume.hearth.data.PlaylistRules
-import im.flume.hearth.data.ServerMixes
-import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.domain.music.PlaySource
+import im.flume.hearth.domain.music.PlaylistEdits
+import im.flume.hearth.domain.music.PlaylistRules
+import im.flume.hearth.domain.music.ServerMixes
+import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.ui.components.EmptyState
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.theme.HearthTheme

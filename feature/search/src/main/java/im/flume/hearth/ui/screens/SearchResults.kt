@@ -28,13 +28,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import im.flume.hearth.data.AlbumItem
-import im.flume.hearth.data.ArtistItem
+import im.flume.hearth.domain.music.AlbumItem
+import im.flume.hearth.domain.music.ArtistItem
 import im.flume.hearth.core.data.GenreCount
 import im.flume.hearth.core.domain.SearchFilter
 import im.flume.hearth.core.domain.SearchHit
 import im.flume.hearth.core.data.SearchIndex
-import im.flume.hearth.data.SongItem
+import im.flume.hearth.domain.music.SongItem
 import im.flume.hearth.core.data.spoken.PodcastEntity
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MissingAlbumRow

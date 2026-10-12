@@ -8,7 +8,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import im.flume.hearth.playback.SavedQueue
+import im.flume.hearth.domain.music.playback.SavedQueue
 
 class QueueSavesTest {
     @get:Rule val tmp = TemporaryFolder()

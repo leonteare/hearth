@@ -5,7 +5,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import im.flume.hearth.download.DownloadRepository
+import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.ui.components.formatBytes
 import im.flume.hearth.core.ui.components.plural
 import im.flume.hearth.core.ui.theme.HearthTheme

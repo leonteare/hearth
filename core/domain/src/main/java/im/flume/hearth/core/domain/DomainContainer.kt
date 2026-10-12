@@ -2,14 +2,14 @@ package im.flume.hearth.core.domain
 
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
-import im.flume.hearth.MusicContainer
-import im.flume.hearth.MusicContainerOwner
-import im.flume.hearth.RequestsContainer
-import im.flume.hearth.RequestsContainerOwner
-import im.flume.hearth.SpokenContainer
-import im.flume.hearth.SpokenContainerOwner
-import im.flume.hearth.UpdateContainer
-import im.flume.hearth.UpdateContainerOwner
+import im.flume.hearth.domain.music.MusicContainer
+import im.flume.hearth.domain.music.MusicContainerOwner
+import im.flume.hearth.domain.requests.RequestsContainer
+import im.flume.hearth.domain.requests.RequestsContainerOwner
+import im.flume.hearth.domain.spoken.SpokenContainer
+import im.flume.hearth.domain.spoken.SpokenContainerOwner
+import im.flume.hearth.domain.update.UpdateContainer
+import im.flume.hearth.domain.update.UpdateContainerOwner
 
 /**
  * The app's singletons below the player. HearthApp builds the one real container by hand (no DI

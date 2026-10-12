@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.DownloadState
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlaybackService
 import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions

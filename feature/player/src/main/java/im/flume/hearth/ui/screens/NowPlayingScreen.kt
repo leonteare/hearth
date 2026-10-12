@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.data.SongEntity
-import im.flume.hearth.data.Usage
+import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.components.CoverPrefetcher
 import im.flume.hearth.core.ui.components.PlayerCoverArt

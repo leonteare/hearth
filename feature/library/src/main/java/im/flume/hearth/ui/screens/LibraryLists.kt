@@ -30,8 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import im.flume.hearth.core.data.AlbumEntity
 import im.flume.hearth.core.data.ArtistEntity
-import im.flume.hearth.data.PlaylistItem
-import im.flume.hearth.data.PlaylistRules
+import im.flume.hearth.domain.music.PlaylistItem
+import im.flume.hearth.domain.music.PlaylistRules
 import im.flume.hearth.core.domain.SearchFilter
 import im.flume.hearth.core.data.spoken.BookRow
 import im.flume.hearth.core.data.spoken.PodcastEntity
