@@ -35,52 +35,27 @@ import im.flume.hearth.core.ui.theme.HearthTheme
 import im.flume.hearth.core.ui.screens.LYRIC_GAPS
 import im.flume.hearth.core.ui.screens.LYRIC_SIZES
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceSettings() {
     val c = LocalContext.current.container
     val settings by c.session.settings.collectAsStateWithLifecycle()
 
     SettingsPage("Appearance") {
-        Section("Accent colour")
-        FlowRow(
-            Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.s),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            AccentChoices.forEach { (name, argb) ->
-                val selected = settings.accent == argb.toInt()
-                // The whole swatch + label is one 48dp+ radio target; TalkBack reads the colour name and whether it is selected.
-                Column(
-                    Modifier
-                        .clip(HearthTheme.shapes.card)
-                        .selectable(selected = selected, role = Role.RadioButton) {
-                            c.session.updateSettings { it.copy(accent = argb.toInt()) }
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(argb))
-                            .border(if (selected) 3.dp else 0.dp, HearthTheme.colors.text, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (selected) Icon(HearthTheme.icons.check, null, tint = HearthTheme.colors.onAccent)
-                    }
-                    Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) HearthTheme.colors.text else HearthTheme.colors.textSecondary)
-                }
-            }
-        }
+        Group("Accent colour", { AccentPicker(settings.accent) { v -> c.session.updateSettings { it.copy(accent = v) } } })
 
-        Section("Lyrics")
-        Choice("Text size", settings.lyricsSize, listOf(0 to "Small", 1 to "Medium", 2 to "Large", 3 to "Extra large")) { v ->
-            c.session.updateSettings { it.copy(lyricsSize = v) }
-        }
-        Choice("Line spacing", settings.lyricsSpacing, listOf(0 to "Compact", 1 to "Normal", 2 to "Relaxed")) { v ->
-            c.session.updateSettings { it.copy(lyricsSpacing = v) }
-        }
+        Group(
+            "Lyrics",
+            {
+                Choice("Text size", settings.lyricsSize, listOf(0 to "Small", 1 to "Medium", 2 to "Large", 3 to "Extra large")) { v ->
+                    c.session.updateSettings { it.copy(lyricsSize = v) }
+                }
+            },
+            {
+                Choice("Line spacing", settings.lyricsSpacing, listOf(0 to "Compact", 1 to "Normal", 2 to "Relaxed")) { v ->
+                    c.session.updateSettings { it.copy(lyricsSpacing = v) }
+                }
+            },
+        )
         // Live preview of the lyric style.
         val size = LYRIC_SIZES.getOrElse(settings.lyricsSize) { 22 }.sp
         val gap = LYRIC_GAPS.getOrElse(settings.lyricsSpacing) { 8 }.dp
@@ -89,6 +64,40 @@ fun AppearanceSettings() {
         ) {
             listOf("Here's how your lyrics" to 0.45f, "will look while a song" to 1f, "is playing" to 0.35f).forEach { (line, alpha) ->
                 Text(line, fontSize = size, lineHeight = size * 1.25f, fontWeight = FontWeight.Bold, color = HearthTheme.colors.onCover.copy(alpha = alpha), modifier = Modifier.padding(vertical = gap))
+            }
+        }
+    }
+}
+
+/** The accent swatches, as one block inside the "Accent colour" card. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccentPicker(accent: Int, onPick: (Int) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.m, vertical = HearthTheme.spacing.m),
+        horizontalArrangement = Arrangement.spacedBy(HearthTheme.spacing.m),
+        verticalArrangement = Arrangement.spacedBy(HearthTheme.spacing.m),
+    ) {
+        AccentChoices.forEach { (name, argb) ->
+            val selected = accent == argb.toInt()
+            // The whole swatch + label is one 48dp+ radio target; TalkBack reads the colour name and whether it is selected.
+            Column(
+                Modifier
+                    .clip(HearthTheme.shapes.card)
+                    .selectable(selected = selected, role = Role.RadioButton) { onPick(argb.toInt()) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(argb))
+                        .border(if (selected) 3.dp else 0.dp, HearthTheme.colors.text, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) Icon(HearthTheme.icons.check, null, tint = HearthTheme.colors.onAccent)
+                }
+                Text(name, style = MaterialTheme.typography.labelMedium, color = if (selected) HearthTheme.colors.text else HearthTheme.colors.textSecondary)
             }
         }
     }
