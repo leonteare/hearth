@@ -204,6 +204,10 @@ data class HearthSpacing(
     val cardWidth: Dp = 140.dp,
     /** Top padding of a tab page's title (below the status bar). */
     val pageTitleTop: Dp = 12.dp,
+    /** The round account picture at the top of Settings. */
+    val avatar: Dp = 64.dp,
+    /** Vertical padding of a row inside a settings card. */
+    val settingsRowV: Dp = 14.dp,
 )
 
 /** Corner shapes by role; defaults are [HearthShapes]. */
