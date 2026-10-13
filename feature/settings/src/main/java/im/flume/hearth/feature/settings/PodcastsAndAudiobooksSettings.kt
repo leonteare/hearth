@@ -44,14 +44,19 @@ internal fun PodcastsAndAudiobooksStorage() {
     val spokenSettings by c.spoken.settings.collectAsStateWithLifecycle()
     val spokenBytes by remember { c.spoken.downloads.totalBytes }.collectAsStateWithLifecycle(0L)
 
-    Section("Podcasts & audiobooks")
-    if (spokenBytes > 0) Info("Downloaded to this phone", formatBytes(spokenBytes))
-    if (account != null) {
-        Toggle("Download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Played episodes are removed from this phone.") { v ->
-            c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
-            if (v) scope.launch { c.spoken.refresh(force = true) }
+    val rows = buildList<@Composable () -> Unit> {
+        if (spokenBytes > 0) add { Info("Downloaded to this phone", formatBytes(spokenBytes)) }
+        if (account != null) {
+            add {
+                Toggle("Download new episodes on Wi-Fi", spokenSettings.autoDownloadOnWifi, "The newest 3 unplayed episodes of shows you follow. Played episodes are removed from this phone.") { v ->
+                    c.spoken.store.updateSettings { it.copy(autoDownloadOnWifi = v) }
+                    if (v) scope.launch { c.spoken.refresh(force = true) }
+                }
+            }
         }
     }
+    // Signed out and nothing downloaded: no heading over an empty card, just the folders group below.
+    if (rows.isNotEmpty()) Group("Podcasts & audiobooks", *rows.toTypedArray())
     PhoneAudiobookFolders()
 }
 
@@ -70,46 +75,56 @@ internal fun PodcastsAndAudiobooksAccount() {
     var result by remember { mutableStateOf<String?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
 
-    Section("Podcasts & audiobooks")
     val a = account
     val syncing by c.spoken.syncing.collectAsStateWithLifecycle()
     if (a != null && !a.needsSignIn) {
-        Info("Signed in as ${a.username}", a.serverUrl.removePrefix("https://").removePrefix("http://"))
-        Row(Modifier.padding(horizontal = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(enabled = !syncing, onClick = { scope.launch { c.spoken.refresh(force = true) } }) {
-                Text(if (syncing) "Refreshing…" else "Refresh now")
-            }
-            TextButton(
-                enabled = !busy,
-                onClick = {
-                    busy = true; result = null
-                    scope.launch {
-                        val error = c.spoken.testConnection()
-                        result = if (error == null) "Connected" else "Failed: $error"
-                        busy = false
+        Group(
+            "Podcasts & audiobooks",
+            { Info("Signed in as ${a.username}", a.serverUrl.removePrefix("https://").removePrefix("http://")) },
+            {
+                Row(Modifier.padding(horizontal = HearthTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(enabled = !syncing, onClick = { scope.launch { c.spoken.refresh(force = true) } }) {
+                        Text(if (syncing) "Refreshing…" else "Refresh now")
                     }
-                },
-            ) { Text(if (busy) "Testing…" else "Test connection") }
-            TextButton(onClick = { confirmSignOut = true }) { Text("Sign out", color = HearthTheme.colors.destructive) }
-        }
+                    TextButton(
+                        enabled = !busy,
+                        onClick = {
+                            busy = true; result = null
+                            scope.launch {
+                                val error = c.spoken.testConnection()
+                                result = if (error == null) "Connected" else "Failed: $error"
+                                busy = false
+                            }
+                        },
+                    ) { Text(if (busy) "Testing…" else "Test connection") }
+                    TextButton(onClick = { confirmSignOut = true }) { Text("Sign out", color = HearthTheme.colors.destructive) }
+                }
+            },
+        )
     } else {
+        Group(
+            "Podcasts & audiobooks",
+            {
+                SpokenSignInForm(Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.l)) {
+                    actions.showMessage("Signed in. Your podcasts and audiobooks are on their way")
+                }
+            },
+        )
         Text(
             if (a?.needsSignIn == true) "Your sign-in for podcasts & audiobooks expired. Sign in again; nothing on this phone is lost."
             // The one place the server software is named, so you know which login it wants.
             else "Sign in with your Audiobookshelf account to listen to podcasts and audiobooks. Each of you has your own, so progress and followed shows are yours.",
-            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
+            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.s),
         )
-        SpokenSignInForm(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) {
-            actions.showMessage("Signed in. Your podcasts and audiobooks are on their way")
-        }
     }
     (result ?: syncError?.takeIf { a != null && !a.needsSignIn }?.let { "Failed to refresh: $it" })?.let {
         Text(
             it, color = if (it.startsWith("Failed")) HearthTheme.colors.destructive else MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.s),
         )
     }
-
 
     if (confirmSignOut) {
         AlertDialog(

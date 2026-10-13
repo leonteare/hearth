@@ -1,6 +1,7 @@
 // Settings for getting music you don't have: the Tidarr address and key, a connection test, and showing it in Search.
 package im.flume.hearth.feature.settings
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -58,47 +59,57 @@ internal fun GetMusicSettings() {
         scope.launch { withContext(Dispatchers.IO) { c.requests.setApiKey(key) } }
     }
 
-    Section("Get music you don't have")
+    Group(
+        "Get music you don't have",
+        {
+            Column(Modifier.fillMaxWidth().padding(vertical = HearthTheme.spacing.s)) {
+                OutlinedTextField(
+                    value = url, onValueChange = { url = it; result = null },
+                    label = { Text("Tidarr address") }, singleLine = true,
+                    placeholder = { Text(Settings.DEFAULT_TIDARR_URL) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
+                )
+                OutlinedTextField(
+                    value = key, onValueChange = { key = it; result = null },
+                    label = { Text("API key (optional)") }, singleLine = true, enabled = keyLoaded,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
+                )
+                Row(Modifier.padding(horizontal = HearthTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { save(); actions.showMessage("Tidarr settings saved") }, enabled = dirty) { Text("Save") }
+                    TextButton(
+                        enabled = !testing && url.isNotBlank(),
+                        onClick = {
+                            testing = true; result = null
+                            scope.launch {
+                                val error = c.requests.testConnection(url, key)
+                                result = if (error == null) "Connected to Tidarr" else "Failed: $error"
+                                testing = false
+                                if (error == null && dirty) save()
+                            }
+                        },
+                    ) { Text(if (testing) "Testing…" else "Test connection") }
+                }
+                result?.let {
+                    Text(
+                        it, color = if (it.startsWith("Failed")) HearthTheme.colors.destructive else MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
+                    )
+                }
+            }
+        },
+        {
+            Toggle("Show music you don't have in Search and artist pages", settings.tidalInSearch, "Shown dimmed, after your own music") { v ->
+                c.session.updateSettings { it.copy(tidalInSearch = v) }
+            }
+        },
+    )
     Text(
         "Search and artist pages can show music that isn't on your server yet. Tap a song to hear a preview; tap ♡ and Tidarr fetches it onto your server, then it's added to your library and downloaded to this phone.",
-        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
+        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.s),
     )
-    OutlinedTextField(
-        value = url, onValueChange = { url = it; result = null },
-        label = { Text("Tidarr address") }, singleLine = true,
-        placeholder = { Text(Settings.DEFAULT_TIDARR_URL) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
-    )
-    OutlinedTextField(
-        value = key, onValueChange = { key = it; result = null },
-        label = { Text("API key (optional)") }, singleLine = true, enabled = keyLoaded,
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
-    )
-    Row(Modifier.padding(horizontal = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { save(); actions.showMessage("Tidarr settings saved") }, enabled = dirty) { Text("Save") }
-        TextButton(
-            enabled = !testing && url.isNotBlank(),
-            onClick = {
-                testing = true; result = null
-                scope.launch {
-                    val error = c.requests.testConnection(url, key)
-                    result = if (error == null) "Connected to Tidarr" else "Failed: $error"
-                    testing = false
-                    if (error == null && dirty) save()
-                }
-            },
-        ) { Text(if (testing) "Testing…" else "Test connection") }
-    }
-    result?.let {
-        Text(
-            it, color = if (it.startsWith("Failed")) HearthTheme.colors.destructive else MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
-        )
-    }
-    Toggle("Show music you don't have in Search and artist pages", settings.tidalInSearch, "Shown dimmed, after your own music") { v ->
-        c.session.updateSettings { it.copy(tidalInSearch = v) }
-    }
 }

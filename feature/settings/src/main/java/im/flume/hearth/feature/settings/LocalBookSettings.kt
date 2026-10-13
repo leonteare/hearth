@@ -47,39 +47,45 @@ fun PhoneAudiobookFolders() {
         }
     }
 
-    Text(
-        "Audiobooks on this phone",
-        style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.gutter),
-    )
+    // One card: a row per folder, then the row of buttons that adds and rescans them.
+    val rows = buildList<@Composable () -> Unit> {
+        folders.forEach { f ->
+            add {
+                MediaRow(
+                    f.name, null, onClick = null,
+                    cover = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(HearthTheme.icons.folder, null, tint = HearthTheme.colors.textSecondary) } },
+                    trailing = { TextButton(onClick = { confirmRemove = f.uri }) { Text("Remove", color = HearthTheme.colors.destructive) } },
+                )
+            }
+        }
+        add {
+            Row(Modifier.padding(horizontal = HearthTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { runCatching { picker.launch(null) }.onFailure { actions.showMessage("This phone has no folder picker") } }) {
+                    Text(if (folders.isEmpty()) "Add a folder on this phone" else "Add another folder")
+                }
+                if (folders.isNotEmpty()) {
+                    TextButton(enabled = !scanning, onClick = {
+                        scope.launch {
+                            val n = local.rescan()
+                            actions.showMessage("${plural(n, "audiobook")} on this phone")
+                        }
+                    }) { Text(if (scanning) "Scanning…" else "Rescan") }
+                }
+            }
+        }
+    }
+    Group("Audiobooks on this phone", *rows.toTypedArray())
     Text(
         if (folders.isEmpty()) "Pick a folder of audiobooks on this phone to listen to them here. Each sub-folder is one book; a single file (like an .m4b) is a book on its own."
         else "${plural(books.size, "book")} found. Each sub-folder is one book. You can add any of them to the server from its page.",
-        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter, vertical = HearthTheme.spacing.xs),
+        color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.s),
     )
-    folders.forEach { f ->
-        MediaRow(
-            f.name, null, onClick = null,
-            cover = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(HearthTheme.icons.folder, null, tint = HearthTheme.colors.textSecondary) } },
-            trailing = { TextButton(onClick = { confirmRemove = f.uri }) { Text("Remove", color = HearthTheme.colors.destructive) } },
-        )
-    }
-    Row(Modifier.padding(horizontal = HearthTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { runCatching { picker.launch(null) }.onFailure { actions.showMessage("This phone has no folder picker") } }) {
-            Text(if (folders.isEmpty()) "Add a folder on this phone" else "Add another folder")
-        }
-        if (folders.isNotEmpty()) {
-            TextButton(enabled = !scanning, onClick = {
-                scope.launch {
-                    val n = local.rescan()
-                    actions.showMessage("${plural(n, "audiobook")} on this phone")
-                }
-            }) { Text(if (scanning) "Scanning…" else "Rescan") }
-        }
-    }
     problem?.let {
-        Text(it, color = HearthTheme.colors.destructive, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter))
+        Text(
+            it, color = HearthTheme.colors.destructive, style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = HearthTheme.spacing.gutter, end = HearthTheme.spacing.gutter, top = HearthTheme.spacing.s),
+        )
     }
 
     confirmRemove?.let { uri ->
