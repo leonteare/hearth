@@ -46,13 +46,17 @@ sealed interface UpdateState {
  * PackageInstaller; Android asks for one confirmation tap (and may skip it on later updates, once
  * Hearth is the app that installed itself).
  */
-class Updater(private val context: Context, private val http: OkHttpClient, private val scope: CoroutineScope) {
+class Updater(
+    private val context: Context,
+    private val http: OkHttpClient,
+    private val scope: CoroutineScope,
+    /** Pinned by screenshot tests, which would otherwise change their picture at every release. */
+    val currentVersion: String = BuildConfig.VERSION_NAME,
+) {
     private val prefs = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
-
-    val currentVersion: String get() = BuildConfig.VERSION_NAME
 
     /**
      * Asks GitHub at most every [CHECK_INTERVAL] unless [force]d. In between, a fresh start shows the

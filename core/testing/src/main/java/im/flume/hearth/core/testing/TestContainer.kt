@@ -59,7 +59,8 @@ class TestContainer(private val context: Context) : AppContainer {
     override val usage by lazy { Usage(context) }
     override val sync by lazy { LibrarySync(api, db, session, onSynced = { _, _ -> }) }
     override val spoken by lazy { SpokenRepository(context, db, http, session, network, appScope) }
-    override val updater by lazy { Updater(context, http, appScope) }
+    // A fixed version: the settings page shows it, and a screenshot must not change at every release.
+    override val updater by lazy { Updater(context, http, appScope, currentVersion = "2.0.0") }
     override val requests by lazy { RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope) }
     override val pendingRoute = MutableStateFlow<String?>(null)
     override val mainActivity: Class<out Activity> = Activity::class.java
