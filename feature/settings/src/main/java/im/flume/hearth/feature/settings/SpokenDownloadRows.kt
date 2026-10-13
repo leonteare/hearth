@@ -28,7 +28,6 @@ import im.flume.hearth.core.ui.components.ActionSheet
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.MediaRow
 import im.flume.hearth.core.ui.components.MenuItem
-import im.flume.hearth.core.ui.components.SectionHeader
 import im.flume.hearth.core.ui.components.formatBytes
 import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -46,7 +45,7 @@ internal fun LazyListScope.spokenSection(
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     if (rows.isEmpty()) return
-    item(key = "$key-head") { SectionHeader(title, trailing = trailing) }
+    item(key = "$key-head") { DownloadsHeader(title, trailing = trailing) }
     spokenRows(key, rows)
 }
 

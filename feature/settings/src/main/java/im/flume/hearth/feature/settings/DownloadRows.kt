@@ -1,7 +1,9 @@
-// Rows on the Downloads page: music coming to the server, a song waiting to download, and the small grey notes.
+// Rows on the Downloads page: its small-caps headings, music coming to the server, a song waiting to download, and the small grey notes.
 package im.flume.hearth.feature.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,9 +17,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.network.TidalType
 import im.flume.hearth.core.playback.container
@@ -38,6 +45,36 @@ import im.flume.hearth.core.ui.theme.HearthTheme
 import im.flume.hearth.core.ui.theme.NotOnServerAlpha
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+
+/** Headings are small, so a little tracking keeps them readable (as in Settings' groups). */
+private val HeaderTracking = 0.8.sp
+
+/**
+ * A heading over a run of download rows, in the same quiet small-caps style as the groups in Settings,
+ * with room for a button (such as "Try again") on the right.
+ */
+@Composable
+internal fun DownloadsHeader(title: String, trailing: (@Composable RowScope.() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(
+            start = HearthTheme.spacing.gutter + HearthTheme.spacing.xs,
+            end = if (trailing != null) HearthTheme.spacing.xs else HearthTheme.spacing.gutter,
+            top = HearthTheme.spacing.xl,
+            bottom = HearthTheme.spacing.s,
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title.uppercase(),
+            color = HearthTheme.colors.textSecondary,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = HeaderTracking,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        trailing?.invoke(this)
+    }
+}
 
 /** Something on its way to the server: where it is, and ⋯ to try again or cancel. */
 @Composable

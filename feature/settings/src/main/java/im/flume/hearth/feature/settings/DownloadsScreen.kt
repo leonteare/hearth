@@ -30,7 +30,6 @@ import im.flume.hearth.core.ui.components.BannerCard
 import im.flume.hearth.core.ui.components.EmptyState
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.LocalRowContext
-import im.flume.hearth.core.ui.components.SectionHeader
 import im.flume.hearth.core.ui.components.SongRow
 import im.flume.hearth.core.ui.components.TopBar
 import im.flume.hearth.core.ui.components.formatBytes
@@ -107,7 +106,7 @@ fun DownloadsScreen() {
         TopBar("Downloads")
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.xl)) {
             if (coming.isNotEmpty()) {
-                item(key = "c-head") { SectionHeader("Coming to your server") }
+                item(key = "c-head") { DownloadsHeader("Coming to your server") }
                 items(coming, key = { "c:${it.type}:${it.tidalId}" }) { r -> ComingRow(r, Modifier.animateItem()) }
             }
             if (pending.isEmpty() && coming.isEmpty() && spokenActive.isEmpty()) {
@@ -157,12 +156,12 @@ fun DownloadsScreen() {
                     )
                 }
                 if (downloading.isNotEmpty() || spokenDownloading.isNotEmpty()) {
-                    item(key = "d-head") { SectionHeader("Downloading") }
+                    item(key = "d-head") { DownloadsHeader("Downloading") }
                     items(downloading, key = { "d:${it.id}" }) { song -> PendingSongRow(song, { play(downloading, song) }, Modifier.animateItem()) }
                     spokenRows("sd", spokenDownloading)
                 }
                 if (queued.isNotEmpty() || spokenQueued.isNotEmpty()) {
-                    item(key = "q-head") { SectionHeader("Up next") }
+                    item(key = "q-head") { DownloadsHeader("Up next") }
                     val shown = queued.take(SECTION_LIMIT)
                     items(shown, key = { "q:${it.id}" }) { song -> PendingSongRow(song, { play(shown, song) }, Modifier.animateItem()) }
                     if (queued.size > SECTION_LIMIT) {
@@ -174,7 +173,7 @@ fun DownloadsScreen() {
                     spokenSection("sf", "Couldn't download", spokenFailed) { TextButton(onClick = { c.spoken.downloads.retryFailed() }) { Text("Try again") } }
                 } else {
                     item(key = "f-head") {
-                        SectionHeader("Couldn't download") {
+                        DownloadsHeader("Couldn't download") {
                             if (!storageFull) TextButton(onClick = { c.downloads.retryFailed() }) { Text("Try again") }
                         }
                         // Storage and backoff problems are already explained in the status card.
@@ -211,6 +210,6 @@ fun DownloadsScreen() {
 
 private fun LazyListScope.finishedSection(finished: List<SongEntity>, onPlay: (SongEntity) -> Unit) {
     if (finished.isEmpty()) return
-    item(key = "done-head") { SectionHeader("Finished") }
+    item(key = "done-head") { DownloadsHeader("Finished") }
     items(finished, key = { "done:${it.id}" }) { song -> Column(Modifier.animateItem()) { SongRow(song, onClick = { onPlay(song) }) } }
 }
