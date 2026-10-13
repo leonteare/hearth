@@ -87,7 +87,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
                 }
             },
         )
-        PageNote("Uses the loudness info in your music files so songs play at a similar volume. Per album keeps the intended differences between songs on an album.")
+        Note("Uses the loudness info in your music files so songs play at a similar volume. Per album keeps the intended differences between songs on an album.")
         Group(
             "",
             {
@@ -107,7 +107,7 @@ fun GeneralSettings(showSpokenAccount: Boolean = false) {
             { Choice("Quality on Wi-Fi", settings.wifiBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(wifiBitrate = v) } } },
             { Choice("Quality on mobile data", settings.mobileBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(mobileBitrate = v) } } },
         )
-        PageNote("Lower qualities are converted on the server, so seeking within a song that isn't cached yet can be slower.")
+        Note("Lower qualities are converted on the server, so seeking within a song that isn't cached yet can be slower.")
 
         // Tucked away and closed: only of interest when deciding what to keep in the app.
         val aboutRows = buildList<@Composable () -> Unit> {
@@ -162,17 +162,3 @@ private fun UsageCounts(counts: List<Pair<String, Int>>) {
     }
 }
 
-/** A quiet note under a card, explaining the setting above it. */
-@Composable
-private fun PageNote(text: String) {
-    Text(
-        text,
-        color = HearthTheme.colors.textSecondary,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(
-            start = HearthTheme.spacing.gutter + HearthTheme.spacing.xs,
-            end = HearthTheme.spacing.gutter,
-            top = HearthTheme.spacing.s,
-        ),
-    )
-}

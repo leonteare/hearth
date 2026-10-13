@@ -98,6 +98,21 @@ internal fun Group(title: String = "", vararg rows: @Composable () -> Unit) {
     }
 }
 
+/** The sentence under a card that explains what the rows above it do. */
+@Composable
+internal fun Note(text: String) {
+    Text(
+        text,
+        color = HearthTheme.colors.textSecondary,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(
+            start = HearthTheme.spacing.gutter + HearthTheme.spacing.xs,
+            end = HearthTheme.spacing.gutter,
+            top = HearthTheme.spacing.s,
+        ),
+    )
+}
+
 /** Who you are signed in as, at the top of Settings: initial, name, and where the music comes from. */
 @Composable
 internal fun ProfileHeader(name: String, subtitle: String) {

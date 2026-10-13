@@ -14,15 +14,20 @@ import org.junit.Test
 /** Settings rows and the Downloads page. */
 class SettingsScreenshots : ScreenshotTest() {
     @Test
-    fun `settings rows, a section of each kind`() = snapScreen("settings_rows") {
+    fun `settings rows, a group of each kind`() = snapScreen("settings_rows") {
         SettingsPage("Settings") {
-            Section("Playback")
-            Toggle("Gapless playback", true, subtitle = "No silence between songs on an album") {}
-            Toggle("Normalise volume", false) {}
-            Choice("Streaming quality", 320, BITRATES) {}
-            Section("About")
-            Info("Version", "2.19.1")
-            Clickable("Sign out", "Downloads stay on this phone") {}
+            Group(
+                "Playback",
+                { Toggle("Gapless playback", true, subtitle = "No silence between songs on an album") {} },
+                { Toggle("Normalise volume", false) {} },
+                { Choice("Streaming quality", 320, BITRATES) {} },
+            )
+            Note("Lower qualities are converted on the server, so seeking can be slower.")
+            Group(
+                "About",
+                { Info("Version", "2.19.1") },
+                { Clickable("Sign out", "Downloads stay on this phone") {} },
+            )
         }
     }
 

@@ -84,7 +84,7 @@ fun StorageSettings() {
                 }
             },
         )
-        PageNote("Cache size changes apply after the app restarts.")
+        Note("Cache size changes apply after the app restarts.")
 
         PodcastsAndAudiobooksStorage()
 
@@ -106,17 +106,3 @@ fun StorageSettings() {
     }
 }
 
-/** A quiet note under a card, explaining the setting above it. */
-@Composable
-private fun PageNote(text: String) {
-    Text(
-        text,
-        color = HearthTheme.colors.textSecondary,
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(
-            start = HearthTheme.spacing.gutter + HearthTheme.spacing.xs,
-            end = HearthTheme.spacing.gutter,
-            top = HearthTheme.spacing.s,
-        ),
-    )
-}
