@@ -40,42 +40,51 @@ fun StorageSettings() {
     var confirmRemoveAll by remember { mutableStateOf(false) }
 
     SettingsPage("Storage") {
-        Section("Downloads")
-        Clickable(
-            "Downloads",
-            listOfNotNull(
-                "${formatBytes(downloadedBytes + spokenDownloadedBytes)} used",
-                "${counts.left} left to download".takeIf { counts.left > 0 },
-                "${counts.failed} couldn't download".takeIf { counts.failed > 0 },
-            ).joinToString(" · "),
-        ) { actions.open("downloads") }
-        Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } }
-        Choice("Downloads at once", settings.parallelDownloads, PARALLEL) { v ->
-            c.session.updateSettings { it.copy(parallelDownloads = v) }
-        }
-        Toggle("Download on Wi-Fi only", settings.wifiOnlyDownloads) { v ->
-            c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
-            c.downloads.schedule()
-        }
-        if (downloadedBytes > 0) {
-            Clickable("Remove all downloaded music", color = HearthTheme.colors.destructive) { confirmRemoveAll = true }
-        }
-
-        Section("Streaming cache")
-        Choice("Cache size", settings.cacheSizeMb, CACHE_SIZES) { v -> c.session.updateSettings { it.copy(cacheSizeMb = v) } }
-        Clickable(
-            title = "Clear streaming cache",
-            subtitle = if (cacheCleared) "Cleared" else "Recently played songs kept for instant replay. Downloads aren't affected.",
-        ) {
-            scope.launch {
-                withContext(Dispatchers.IO) { c.mediaCache.keys.toList().forEach { c.mediaCache.removeResource(it) } }
-                cacheCleared = true
+        val downloadRows = buildList<@Composable () -> Unit> {
+            add {
+                Clickable(
+                    "Downloads",
+                    listOfNotNull(
+                        "${formatBytes(downloadedBytes + spokenDownloadedBytes)} used",
+                        "${counts.left} left to download".takeIf { counts.left > 0 },
+                        "${counts.failed} couldn't download".takeIf { counts.failed > 0 },
+                    ).joinToString(" · "),
+                ) { actions.open("downloads") }
+            }
+            add { Choice("Download quality", settings.downloadBitrate, BITRATES) { v -> c.session.updateSettings { it.copy(downloadBitrate = v) } } }
+            add {
+                Choice("Downloads at once", settings.parallelDownloads, PARALLEL) { v ->
+                    c.session.updateSettings { it.copy(parallelDownloads = v) }
+                }
+            }
+            add {
+                Toggle("Download on Wi-Fi only", settings.wifiOnlyDownloads) { v ->
+                    c.session.updateSettings { it.copy(wifiOnlyDownloads = v) }
+                    c.downloads.schedule()
+                }
+            }
+            if (downloadedBytes > 0) {
+                add { Clickable("Remove all downloaded music", color = HearthTheme.colors.destructive) { confirmRemoveAll = true } }
             }
         }
-        Text(
-            "Cache size changes apply after the app restarts.",
-            color = HearthTheme.colors.textSecondary, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = HearthTheme.spacing.gutter),
+        Group("Downloads", *downloadRows.toTypedArray())
+
+        Group(
+            "Streaming cache",
+            { Choice("Cache size", settings.cacheSizeMb, CACHE_SIZES) { v -> c.session.updateSettings { it.copy(cacheSizeMb = v) } } },
+            {
+                Clickable(
+                    title = "Clear streaming cache",
+                    subtitle = if (cacheCleared) "Cleared" else "Recently played songs kept for instant replay. Downloads aren't affected.",
+                ) {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { c.mediaCache.keys.toList().forEach { c.mediaCache.removeResource(it) } }
+                        cacheCleared = true
+                    }
+                }
+            },
         )
+        PageNote("Cache size changes apply after the app restarts.")
 
         PodcastsAndAudiobooksStorage()
 
@@ -95,4 +104,19 @@ fun StorageSettings() {
             dismissButton = { TextButton(onClick = { confirmRemoveAll = false }) { Text("Cancel") } },
         )
     }
+}
+
+/** A quiet note under a card, explaining the setting above it. */
+@Composable
+private fun PageNote(text: String) {
+    Text(
+        text,
+        color = HearthTheme.colors.textSecondary,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(
+            start = HearthTheme.spacing.gutter + HearthTheme.spacing.xs,
+            end = HearthTheme.spacing.gutter,
+            top = HearthTheme.spacing.s,
+        ),
+    )
 }
