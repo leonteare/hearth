@@ -7,6 +7,7 @@ import im.flume.hearth.core.network.SubsonicClient
 import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.core.data.NetworkMonitor
 import im.flume.hearth.core.data.SessionStore
+import im.flume.hearth.domain.music.download.CoverStore
 import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.domain.music.sync.LibrarySync
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,7 @@ interface MusicContainer {
     val api: SubsonicClient
     val network: NetworkMonitor
     val downloads: DownloadRepository
+    val covers: CoverStore
     val nativeApi: NavidromeNativeApi
     val library: LibraryRepository
     val lyrics: LyricsRepository

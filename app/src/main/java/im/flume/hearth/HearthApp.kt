@@ -20,6 +20,7 @@ import im.flume.hearth.domain.music.MixRepository
 import im.flume.hearth.core.data.NetworkMonitor
 import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.domain.music.Usage
+import im.flume.hearth.domain.music.download.CoverStore
 import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.playback.CoverCacheKeys
 import im.flume.hearth.core.playback.PlayerConnection
@@ -101,9 +102,17 @@ class HearthContainer(context: Context) : AppContainer {
     override val api = SubsonicClient(http) { session.credentials.value }
     override val network = NetworkMonitor(context, api, session, appScope)
     override val downloads = DownloadRepository(context, db, session, appScope)
+    override val covers = CoverStore(File(context.filesDir, "covers"), api, http, appScope) {
+        // The same rule downloads follow: don't spend mobile data on artwork if the user said Wi-Fi only.
+        !session.settings.value.wifiOnlyDownloads || network.onWifi()
+    }
     override val nativeApi = NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
     override val library = LibraryRepository(db, api, downloads, session, nativeApi)
-    init { downloads.onUserDownload = { ids -> library.keepMixSongs(ids) } }
+    init {
+        downloads.onUserDownload = { ids -> library.keepMixSongs(ids) }
+        downloads.onDownloadsRemoved = { covers.sweep(db.downloads().downloadedCoverArt()) }
+        appScope.launch { covers.backfill(db.downloads().downloadedCoverArt()) }
+    }
     override val lyrics = LyricsRepository(api, db.lyrics())
     override val mixes = MixRepository(context, db, api, session)
     override val usage = Usage(context)

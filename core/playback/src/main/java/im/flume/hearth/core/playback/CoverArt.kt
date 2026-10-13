@@ -86,6 +86,8 @@ class CoverBitmapLoader(
     private val scope: CoroutineScope,
     /** Cover URL for an Audiobookshelf item (`abs-cover://item/{id}`). */
     private val absCoverUrl: (String) -> String? = { null },
+    /** A cover saved beside the downloads, preferred over the server so it works offline. */
+    private val savedCover: (String) -> String? = { null },
 ) : BitmapLoader {
     private val decoder = DataSourceBitmapLoader(context)
 
@@ -97,9 +99,11 @@ class CoverBitmapLoader(
         // Only our own artwork: never fetch arbitrary URIs a controller might hand us.
         val url = SpokenMedia.coverItemId(uri)?.let { absCoverUrl(it) ?: return Futures.immediateFailedFuture(IOException("Not signed in")) } ?: run {
             val id = CoverArt.idFrom(uri) ?: return Futures.immediateFailedFuture(IOException("Unsupported artwork URI"))
-            // Same 1000 px file the full player shows, so it comes from the cover cache (and works offline);
-            // it's decoded smaller below.
-            api.coverArtUrl(id, 1000) ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
+            // Same 1000 px picture the full player shows, so it comes from the cover cache; a downloaded
+            // song's own saved file is used first, which is what makes artwork work with no server.
+            savedCover(id)
+                ?: api.coverArtUrl(id, 1000)
+                ?: return Futures.immediateFailedFuture(IOException("Not logged in"))
         }
         val future = SettableFuture.create<Bitmap>()
         scope.launch {

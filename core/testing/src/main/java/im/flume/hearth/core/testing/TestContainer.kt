@@ -21,6 +21,7 @@ import im.flume.hearth.domain.music.MixRepository
 import im.flume.hearth.core.data.NetworkMonitor
 import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.domain.music.Usage
+import im.flume.hearth.domain.music.download.CoverStore
 import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.playback.PlayerConnection
 import im.flume.hearth.core.playback.PreviewPlayer
@@ -52,6 +53,7 @@ class TestContainer(private val context: Context) : AppContainer {
     override val api by lazy { SubsonicClient(http) { session.credentials.value } }
     override val network by lazy { NetworkMonitor(context, api, session, appScope) }
     override val downloads by lazy { DownloadRepository(context, db, session, appScope) }
+    override val covers by lazy { CoverStore(File(context.filesDir, "covers"), api, http, appScope) }
     override val nativeApi by lazy { NavidromeNativeApi(http, { session.credentials.value }, { null }) }
     override val library by lazy { LibraryRepository(db, api, downloads, session, nativeApi) }
     override val lyrics by lazy { LyricsRepository(api, db.lyrics()) }

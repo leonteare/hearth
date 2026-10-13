@@ -22,6 +22,8 @@ interface DownloadDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertIgnore(items: List<DownloadEntity>)
     @Query("DELETE FROM downloads WHERE songId IN (:ids)") suspend fun delete(ids: List<String>)
     @Query("SELECT EXISTS(SELECT 1 FROM downloads WHERE state = 'QUEUED')") suspend fun hasQueued(): Boolean
+    @Query("SELECT DISTINCT s.coverArt FROM songs s JOIN downloads d ON d.songId = s.id WHERE s.coverArt IS NOT NULL")
+    suspend fun downloadedCoverArt(): List<String>
     @Query("UPDATE downloads SET state = 'QUEUED' WHERE state = 'FAILED'") suspend fun requeueFailed()
     @Query("UPDATE downloads SET state = 'QUEUED' WHERE state = 'FAILED' AND songId IN (:ids)") suspend fun requeueFailed(ids: List<String>)
     /** Only safe when no download lane is running: otherwise two lanes could fetch the same song. */

@@ -132,7 +132,9 @@ internal class AppActions(
         closeOverlays()
         nav.navigate(route)
     }
-    override fun coverUrl(coverArt: String?, size: Int) = c.api.coverArtUrl(coverArt, size)
+    // A saved cover wins: downloaded music keeps its picture with no server and an emptied image cache.
+    override fun coverUrl(coverArt: String?, size: Int): String? =
+        c.covers.fileFor(coverArt)?.let { "file://${it.path}" } ?: c.api.coverArtUrl(coverArt, size)
 
     /** True while the "New playlist" name dialog (from Your Library) is open. */
     val creatingPlaylist = mutableStateOf(false)

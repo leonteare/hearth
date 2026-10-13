@@ -104,7 +104,15 @@ class PlaybackService : MediaSessionService() {
             .setCallback(SessionCallback(this))
             .setSessionActivity(openApp)
             // Artwork URIs are token-free hearth-cover:// / abs-cover:// links; this resolves them in the app.
-            .setBitmapLoader(CoverBitmapLoader(this, c.api, scope) { id -> c.spoken.coverUrl(id, 1000) })
+            .setBitmapLoader(
+                CoverBitmapLoader(
+                    this,
+                    c.api,
+                    scope,
+                    absCoverUrl = { id -> c.spoken.coverUrl(id, 1000) },
+                    savedCover = { id -> c.covers.fileFor(id)?.let { "file://${it.path}" } },
+                )
+            )
             .build()
 
         setMediaNotificationProvider(

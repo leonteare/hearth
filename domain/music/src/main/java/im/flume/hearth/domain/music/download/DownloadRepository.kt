@@ -225,7 +225,11 @@ class DownloadRepository(
         cancelled.addAll(songIds)
         songIds.chunked(500).forEach { dao.delete(it) }
         songIds.forEach { id -> active.remove(id)?.cancel(); done.remove(id); File(dir, id).delete() }
+        onDownloadsRemoved()
     }
+
+    /** Set by the container: throws away cover art no download needs any more. */
+    var onDownloadsRemoved: suspend () -> Unit = {}
 
     /** Downloading an album or playlist (again) brings back songs of it the user had removed one by one. */
     fun pinAndDownload(kind: String, id: String, songs: List<SongEntity>) = scope.launch {

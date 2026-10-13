@@ -158,7 +158,13 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
                     else { file.delete(); repo.cancelled.remove(next.songId) }
                 }
                 file != null -> {
-                    runCatching { c.db.library().song(next.songId)?.let { c.lyrics.prefetch(it) } }
+                    runCatching {
+                        c.db.library().song(next.songId)?.let { song ->
+                            c.lyrics.prefetch(song)
+                            // The art too, so a downloaded album still has its picture with no server.
+                            c.covers.save(song.coverArt)
+                        }
+                    }
                     failuresInRow.set(0)
                     repo.reportError(null)
                     runCatching { setForeground(foregroundInfo(completed.incrementAndGet())) }
