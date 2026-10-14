@@ -3,9 +3,13 @@ package im.flume.hearth.domain.music.sync
 import im.flume.hearth.core.network.SongDto
 import im.flume.hearth.core.network.SubsonicClient
 import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.LikeKind
 import im.flume.hearth.core.data.PlaylistSongEntity
 import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.core.data.toEntity
+import im.flume.hearth.domain.music.LikeOutboxPlan
+import im.flume.hearth.domain.music.PendingLike
+import im.flume.hearth.domain.music.toPending
 import im.flume.hearth.core.common.scrubSecrets
 import im.flume.hearth.core.common.userMessage
 import java.net.UnknownHostException
@@ -74,7 +78,12 @@ class LibrarySync(
         if (mutex.isLocked) return
         mutex.withLock {
             val starred = runCatching { api.starred() }.getOrNull() ?: return
-            db.library().applyStars(starred.album.map { it.id }, starred.artist.map { it.id })
+            // A like still waiting to be pushed was made after this answer, so it wins over it.
+            val pending = db.likeOutbox().all().map { it.toPending() }
+            db.library().applyStars(
+                LikeOutboxPlan.merge(starred.album.map { it.id }, pending, LikeKind.ALBUM),
+                LikeOutboxPlan.merge(starred.artist.map { it.id }, pending, LikeKind.ARTIST),
+            )
         }
     }
 
@@ -120,6 +129,8 @@ class LibrarySync(
             val starred = runCatching { api.starred() }.getOrNull()
             val starredAlbums = starred?.album?.mapTo(HashSet()) { it.id }
             val starredArtists = starred?.artist?.mapTo(HashSet()) { it.id }
+            // Likes still waiting to be pushed are newer than anything the server just said.
+            val pending = db.likeOutbox().all().map { it.toPending() }
             val playlists = api.playlists()
             val playlistSongs = playlists.flatMap { pl ->
                 api.playlist(pl.id)?.entry.orEmpty().mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
@@ -127,9 +138,15 @@ class LibrarySync(
             val remoteIds = playlists.mapTo(HashSet()) { it.id }
             val removedSongs = songsOf(db.library().playlistsOnce().map { it.id }.filter { it !in remoteIds })
             db.library().replaceLibrary(
-                songs = songs.map { it.toEntity() },
-                albums = albums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
-                artists = artists.map { a -> a.toEntity().let { e -> if (starredArtists == null) e else e.copy(starred = a.id in starredArtists) } },
+                songs = keepPending(songs.map { it.toEntity() }, pending, LikeKind.SONG, { it.id }) { s, liked -> s.copy(starred = liked) },
+                albums = keepPending(
+                    albums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
+                    pending, LikeKind.ALBUM, { it.id },
+                ) { a, liked -> a.copy(starred = liked) },
+                artists = keepPending(
+                    artists.map { a -> a.toEntity().let { e -> if (starredArtists == null) e else e.copy(starred = a.id in starredArtists) } },
+                    pending, LikeKind.ARTIST, { it.id },
+                ) { a, liked -> a.copy(starred = liked) },
                 playlists = playlists.map { it.toEntity() },
                 playlistSongs = playlistSongs,
             )
@@ -148,6 +165,21 @@ class LibrarySync(
             }.let { scrubSecrets(it) } // URLs can carry the login token
             _state.value = SyncState.Failed(message)
         }
+    }
+
+    /**
+     * Rows the server has just described, with any like that hasn't reached it yet put back: the
+     * listener tapped after the server's answer was true, so a sync must not undo it.
+     */
+    private fun <T> keepPending(
+        rows: List<T>,
+        pending: List<PendingLike>,
+        kind: LikeKind,
+        id: (T) -> String,
+        liked: (T, Boolean) -> T,
+    ): List<T> {
+        val mine = LikeOutboxPlan.likedByIds(pending, kind)
+        return if (mine.isEmpty()) rows else rows.map { row -> mine[id(row)]?.let { liked(row, it) } ?: row }
     }
 
     private suspend fun fetchAllSongs(): List<SongDto> {

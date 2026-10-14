@@ -28,6 +28,7 @@ interface MusicContainer {
     val covers: CoverStore
     val nativeApi: NavidromeNativeApi
     val library: LibraryRepository
+    val likeOutbox: LikeOutbox
     val lyrics: LyricsRepository
     val mixes: MixRepository
     val usage: Usage

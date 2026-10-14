@@ -15,6 +15,7 @@ import im.flume.hearth.core.network.NavidromeNativeApi
 import im.flume.hearth.core.network.SubsonicClient
 import im.flume.hearth.core.data.AppDatabase
 import im.flume.hearth.domain.music.LibraryRepository
+import im.flume.hearth.domain.music.LikeOutbox
 import im.flume.hearth.domain.music.LyricsRepository
 import im.flume.hearth.domain.music.MixRepository
 import im.flume.hearth.core.data.NetworkMonitor
@@ -107,7 +108,8 @@ class HearthContainer(context: Context) : AppContainer {
         !session.settings.value.wifiOnlyDownloads || network.onWifi()
     }
     override val nativeApi = NavidromeNativeApi(http, { session.credentials.value }, { session.vault.read() })
-    override val library = LibraryRepository(db, api, downloads, session, nativeApi)
+    override val likeOutbox = LikeOutbox(db, api, network, session, appScope)
+    override val library = LibraryRepository(db, api, downloads, session, nativeApi, likeOutbox)
     init {
         downloads.onUserDownload = { ids -> library.keepMixSongs(ids) }
         downloads.onDownloadsRemoved = { covers.sweep(db.downloads().downloadedCoverArt()) }
@@ -134,6 +136,7 @@ class HearthContainer(context: Context) : AppContainer {
         appScope.launch(Dispatchers.Main) {
             session.settings.collect { accentState.value = Color(it.accent) }
         }
+        likeOutbox.start()
         saveDownloadedAlbumsOnce()
         requests.start()
         spoken.start()

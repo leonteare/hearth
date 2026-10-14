@@ -163,6 +163,21 @@ class MigrationTest {
         tables.filter { it != "local_books" }.forEach { assertEquals(it, createSql(10, it), createSql(11, it)) }
     }
 
+    @Test
+    fun `migration 11 to 12 creates exactly the like outbox table`() {
+        val v11 = entities(11).map { it["tableName"]!!.jsonPrimitive.content }.toSet()
+        val added = entities(12).filter { it["tableName"]!!.jsonPrimitive.content !in v11 }
+        val expected = added.flatMap { e ->
+            val table = e["tableName"]!!.jsonPrimitive.content
+            val index = e["indices"]?.jsonArray.orEmpty().map { it.jsonObject["createSql"]!!.jsonPrimitive.content }
+            (listOf(e["createSql"]!!.jsonPrimitive.content) + index).map { it.replace("`\${TABLE_NAME}`", "`$table`") }
+        }
+        assertEquals(expected.sorted(), MIGRATION_11_12_SQL.sorted())
+        assertEquals(setOf("like_outbox"), added.map { it["tableName"]!!.jsonPrimitive.content }.toSet())
+        // Every existing table is unchanged.
+        v11.forEach { assertEquals(it, createSql(11, it), createSql(12, it)) }
+    }
+
     /** The migrations, plus the database class that registers them and declares the version. */
     private val databaseSource by lazy {
         listOf("Migrations.kt", "AppDatabase.kt").joinToString("\n") {
