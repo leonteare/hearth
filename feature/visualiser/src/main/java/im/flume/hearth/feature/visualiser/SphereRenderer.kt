@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -19,9 +20,15 @@ import kotlin.math.sqrt
  * Sphere: a glowing ball bristling with a few hundred spikes, slowly turning in 3D. Every spike
  * belongs to a frequency (bass round the bottom, treble towards the top), so the spikes' peaks and
  * troughs draw the whole spectrum across the sphere. The ball swells on kicks; snares glint the tips.
+ *
+ * Paused, the spikes shrink back to stubs and the glints fade, but the ball carries on turning at
+ * its resting speed, so the screen still looks alive rather than frozen.
  */
 class SphereRenderer : VisualiserRenderer() {
     private val count = 420
+
+    /** The ball turns with or without music, so a paused visualiser keeps drawing (slowly). */
+    override val movesWhenPaused: Boolean get() = true
 
     // Unit directions spread evenly over the sphere (Fibonacci lattice), and each spike's band.
     private val dx = FloatArray(count)
@@ -84,7 +91,7 @@ class SphereRenderer : VisualiserRenderer() {
         val pulseTarget = a.kick * 0.9f + a.bassSlow * 0.35f
         pulse += (pulseTarget - pulse) * (1f - exp(-dt / if (pulseTarget > pulse) 0.03f else 0.22f))
         shimmer += (a.snare - shimmer) * (1f - exp(-dt / if (a.snare > shimmer) 0.02f else 0.18f))
-        yaw += dt * (0.18f + a.level * 0.35f)
+        yaw = SphereSpin.step(yaw, dt, a.level)
         val tilt = 0.42f + 0.06f * sin(f.time * 0.21f)
 
         val base = min(w, h) * 0.23f
@@ -162,5 +169,25 @@ class SphereRenderer : VisualiserRenderer() {
             val glint = ((len[i] - 0.35f) * 1.4f + shimmer * 0.6f).coerceIn(0f, 1f) * light
             drawCircle(Color.White, radius = stroke * (1.2f + shimmer), center = Offset(tx[i], ty[i]), alpha = glint * 0.7f, blendMode = BlendMode.Plus)
         }
+    }
+}
+
+/** How far the ball has turned: a gentle drift of its own, faster with the music. */
+internal object SphereSpin {
+    /** Radians a second with nothing playing: a full turn in about 35 seconds. */
+    const val REST = 0.18f
+
+    /** Extra radians a second at full level, on top of [REST]. */
+    const val WITH_MUSIC = 0.35f
+
+    private const val TURN = (2.0 * PI).toFloat()
+
+    /**
+     * The angle [dt] seconds on, kept inside one turn: it rotates whether or not there is any
+     * [level], and a visualiser left paused for hours would otherwise lose float precision.
+     */
+    fun step(yaw: Float, dt: Float, level: Float): Float {
+        val next = yaw + dt * (REST + level.coerceAtLeast(0f) * WITH_MUSIC)
+        return next - TURN * floor(next / TURN)
     }
 }

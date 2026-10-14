@@ -69,6 +69,12 @@ abstract class VisualiserRenderer {
     /** True for a style that draws the raw stereo samples, so the frame loop copies them only when needed. */
     open val usesStereo: Boolean get() = false
 
+    /**
+     * True for a style that still moves with no music — a slow turn or drift of its own. Paused,
+     * those keep drawing at a gentle idle frame rate instead of freezing on their last frame.
+     */
+    open val movesWhenPaused: Boolean get() = false
+
     abstract fun draw(scope: DrawScope, f: VisFrame)
 
     /** Frees bitmaps or shaders when the style is switched away from. */
