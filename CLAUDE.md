@@ -56,8 +56,8 @@ manifest). Sources sit in `src/main/java/<package path>/`, tests mirrored in `sr
 |---|---|
 | `:core:common` | Error logging, `scrubSecrets`/`userMessage`, API exceptions, `EXTRA_ROUTE` |
 | `:core:network` | Subsonic, Navidrome native, Audiobookshelf and Tidarr HTTP clients |
-| `:core:data` | Room (the only KSP module), DAOs, schemas, `SessionStore`/`PasswordVault`, `SearchIndex` |
-| `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning; `MusicContainer` |
+| `:core:data` | Room (the only KSP module), DAOs, schemas, `SessionStore`/`PasswordVault`, `SearchIndex`, the likes outbox |
+| `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning, likes made offline; `MusicContainer` |
 | `:domain:spoken` | Podcasts, Audiobookshelf books and books on the phone; `SpokenContainer` |
 | `:domain:requests` | Tidarr requests; `RequestsContainer` |
 | `:domain:update` | `Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
@@ -191,5 +191,9 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
 - Changing a systemd timer's `OnCalendar` with `Persistent=true` started a missed run immediately; check `list-timers` and stop it if unwanted.
 - A screenshot test of a database-backed page can fire before its rows load; wait for the data (see `SpokenPagesScreenshots`' `Settled`), do not re-record.
 - The rules in this file rotted until `check-structure.sh` existed: if a rule matters, check it.
+- The player's title and artist drifted apart because an accessibility change gave the artist its own 48dp touch
+  target; give a tight pair one shared target rather than one each.
+- A change the server refused used to be reverted on the phone, which looked like the app ignoring the tap. Keep the
+  user's change and queue it (`LikeOutbox`); only drop it if the server actually rejects it.
 - Linux draws text a shade differently from Windows, so CI saw a handful of changed pixels in screenshots that are
   identical to the eye; `ScreenshotTest`'s `OPTIONS` now allows a hundredth of a percent of pixels to differ.
