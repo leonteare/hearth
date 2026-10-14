@@ -44,6 +44,7 @@ import im.flume.hearth.domain.spoken.SpokenFormat
 import im.flume.hearth.core.ui.components.BigPlayButton
 import im.flume.hearth.core.ui.components.PlayPauseIcon
 import im.flume.hearth.core.ui.components.PlayerSlider
+import im.flume.hearth.core.ui.components.PlayerTimes
 import im.flume.hearth.core.ui.components.formatDuration
 import im.flume.hearth.core.ui.components.rememberSeekState
 import im.flume.hearth.core.ui.theme.HearthTheme
@@ -134,13 +135,9 @@ internal fun SpokenControls(
         onSeek = { player.seekSpoken((it * totalMs).toLong()) },
         ticks = ticks,
     )
-    Row {
-        Text(formatDuration(shownMs / 1000), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-        Spacer(Modifier.weight(1f))
-        // Time left at the chosen speed, like other podcast apps.
-        val leftSec = ((totalMs - shownMs).coerceAtLeast(0) / 1000.0 / spoken.speed.coerceAtLeast(0.1f)).toLong()
-        Text("−" + formatDuration(leftSec), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-    }
+    // Time left at the chosen speed, like other podcast apps.
+    val leftSec = ((totalMs - shownMs).coerceAtLeast(0) / 1000.0 / spoken.speed.coerceAtLeast(0.1f)).toLong()
+    PlayerTimes(formatDuration(shownMs / 1000), "−" + formatDuration(leftSec))
 
     Row(Modifier.fillMaxWidth().padding(vertical = spacing.m), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         TextButton(onClick = onSpeed, modifier = Modifier.size(width = 64.dp, height = 48.dp), contentPadding = PaddingValues(0.dp)) {

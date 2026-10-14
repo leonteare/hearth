@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +32,7 @@ import im.flume.hearth.core.playback.PlayerUiState
 import im.flume.hearth.core.ui.components.BigPlayButton
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.PlayerSlider
+import im.flume.hearth.core.ui.components.PlayerTimes
 import im.flume.hearth.core.ui.components.formatDuration
 import im.flume.hearth.core.ui.components.rememberSeekState
 import im.flume.hearth.core.ui.theme.HearthTheme
@@ -58,17 +60,19 @@ internal fun PlayerControls(
     val icons = HearthTheme.icons
     val spacing = HearthTheme.spacing
 
+    // Title and artist read as one block, as in the spoken player: the whole pair is the tap target.
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(meta.title?.toString().orEmpty(), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Box(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .clickable(enabled = song?.artistId != null, role = Role.Button, onClickLabel = "Go to artist") {
-                        onClose(); song?.artistId?.let(actions::openArtist)
-                    },
-                contentAlignment = Alignment.CenterStart,
-            ) {
+        Box(
+            Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .clickable(enabled = song?.artistId != null, role = Role.Button, onClickLabel = "Go to artist") {
+                    onClose(); song?.artistId?.let(actions::openArtist)
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Column {
+                Text(meta.title?.toString().orEmpty(), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     meta.artist?.toString().orEmpty(),
                     color = colors.textSecondary,
@@ -86,16 +90,16 @@ internal fun PlayerControls(
     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
 
     val duration = state.durationMs.coerceAtLeast(1)
+    Spacer(Modifier.height(spacing.s))
     PlayerSlider(
         fraction = pos.toFloat() / duration,
         seek = seek,
         onSeek = { player.seekTo((it * duration).toLong()) },
     )
-    Row {
-        Text(formatDuration((if (seek.dragging) (seek.value * duration).toLong() else pos) / 1000), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-        Spacer(Modifier.weight(1f))
-        Text(formatDuration(state.durationMs / 1000), style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-    }
+    PlayerTimes(
+        formatDuration((if (seek.dragging) (seek.value * duration).toLong() else pos) / 1000),
+        formatDuration(state.durationMs / 1000),
+    )
 
     Row(Modifier.fillMaxWidth().padding(vertical = spacing.m), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         IconButton(onClick = { player.toggleShuffle() }) {
