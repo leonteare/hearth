@@ -208,6 +208,13 @@ data class HearthSpacing(
     val avatar: Dp = 64.dp,
     /** Vertical padding of a row inside a settings card. */
     val settingsRowV: Dp = 14.dp,
+    /** Thickness of the player's seek bar. */
+    val seekTrack: Dp = 4.dp,
+    /** The round grab handle on the seek bar, and the size it grows to while you drag it. */
+    val seekThumb: Dp = 10.dp,
+    val seekThumbDragging: Dp = 16.dp,
+    /** Height of the seek bar's invisible touch area, so a thin bar is still easy to grab. */
+    val seekTouch: Dp = 32.dp,
 )
 
 /** Corner shapes by role; defaults are [HearthShapes]. */
