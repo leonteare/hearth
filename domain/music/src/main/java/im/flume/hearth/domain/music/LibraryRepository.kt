@@ -15,6 +15,7 @@ import im.flume.hearth.domain.music.download.DownloadRepository
 import kotlinx.coroutines.withContext
 import im.flume.hearth.core.data.AlbumEntity
 import im.flume.hearth.core.data.AppDatabase
+import im.flume.hearth.core.data.LikeKind
 import im.flume.hearth.core.data.PlaylistSongEntity
 import im.flume.hearth.core.data.SearchIndex
 import im.flume.hearth.core.data.SessionStore
@@ -27,6 +28,7 @@ class LibraryRepository(
     private val downloads: DownloadRepository,
     private val session: SessionStore,
     private val native: NavidromeNativeApi,
+    private val likes: LikeOutbox,
 ) {
     val dao = db.library()
 
@@ -111,25 +113,26 @@ class LibraryRepository(
         return ids.mapNotNull(byId::get)
     }
 
+    /**
+     * Likes or unlikes a song. The change sticks on the phone whether or not the server answers:
+     * [LikeOutbox] remembers it and tells the server as soon as it can be reached.
+     */
     suspend fun setStarred(songId: String, starred: Boolean) {
         dao.setStarred(songId, starred)
-        runCatching { if (starred) api.star(songId) else api.unstar(songId) }
-            .onFailure { dao.setStarred(songId, !starred); throw it }
+        likes.queue(LikeKind.SONG, songId, starred)
         if (starred) downloads.onLiked(songId)
     }
 
-    /** Saves an album to (or removes it from) Your Library. Updates the row first; reverts and throws on failure. */
+    /** Saves an album to (or removes it from) Your Library. Kept and queued like [setStarred]. */
     suspend fun setAlbumSaved(albumId: String, saved: Boolean) {
         dao.setAlbumStarred(albumId, saved)
-        runCatching { if (saved) api.starAlbum(albumId) else api.unstarAlbum(albumId) }
-            .onFailure { dao.setAlbumStarred(albumId, !saved); throw it }
+        likes.queue(LikeKind.ALBUM, albumId, saved)
     }
 
-    /** Follows or unfollows an artist. Same optimistic update and revert as [setAlbumSaved]. */
+    /** Follows or unfollows an artist. Kept and queued like [setStarred]. */
     suspend fun setArtistFollowed(artistId: String, followed: Boolean) {
         dao.setArtistStarred(artistId, followed)
-        runCatching { if (followed) api.starArtist(artistId) else api.unstarArtist(artistId) }
-            .onFailure { dao.setArtistStarred(artistId, !followed); throw it }
+        likes.queue(LikeKind.ARTIST, artistId, followed)
     }
 
     /**

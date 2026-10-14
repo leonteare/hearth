@@ -26,7 +26,7 @@ import im.flume.hearth.core.data.spoken.TrackEntity
         SongEntity::class, AlbumEntity::class, ArtistEntity::class, PlaylistEntity::class,
         PlaylistSongEntity::class, DownloadEntity::class, PinnedEntity::class,
         PlayHistoryEntity::class, PendingScrobbleEntity::class, LyricsEntity::class,
-        SongDownloadPrefEntity::class, RequestEntity::class,
+        SongDownloadPrefEntity::class, RequestEntity::class, LikeOutboxEntity::class,
         PodcastEntity::class, EpisodeEntity::class,
         BookEntity::class, TrackEntity::class,
         ChapterEntity::class, SpokenProgressEntity::class,
@@ -35,12 +35,13 @@ import im.flume.hearth.core.data.spoken.TrackEntity
         LocalBookEntity::class, LocalBookFileEntity::class,
         LocalBookProgressEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
+    abstract fun likeOutbox(): LikeOutboxDao
     abstract fun downloads(): DownloadDao
     abstract fun lyrics(): LyricsDao
     abstract fun requests(): RequestDao
@@ -51,7 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "hearth.db")
                 // No destructive fallback: a missing migration should fail loudly, not wipe downloads and history.
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .build()
     }
 }

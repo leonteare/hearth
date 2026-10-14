@@ -69,33 +69,29 @@ internal class AppActions(
         showUndo(if (songIds.size == 1) "Added to the queue" else "Added ${songIds.size} songs to the queue", long = false) { c.player.removeQueued(songIds) }
     }
 
+    // Likes stay on the phone and reach the server when they can, so there is nothing to report when it's away.
     override fun setStarred(songId: String, starred: Boolean) {
         haptic(if (starred) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
         scope.launch {
-            runCatching { c.library.setStarred(songId, starred) }
-                .onSuccess { if (!starred) showUndo("Removed from Liked Songs") { c.library.setStarred(songId, true) } }
-                .onFailure { showMessage(failed("Couldn't update Liked Songs", it)) }
+            c.library.setStarred(songId, starred)
+            if (!starred) showUndo("Removed from Liked Songs") { c.library.setStarred(songId, true) }
         }
     }
 
     override fun setAlbumSaved(albumId: String, saved: Boolean) {
         haptic(if (saved) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
         c.appScope.launch {
-            runCatching { c.library.setAlbumSaved(albumId, saved) }
-                .onSuccess {
-                    if (saved) showMessage("Saved to Your Library")
-                    else showUndo("Removed from Your Library") { c.library.setAlbumSaved(albumId, true) }
-                }
-                .onFailure { showMessage(failed("Couldn't update Your Library", it)) }
+            c.library.setAlbumSaved(albumId, saved)
+            if (saved) showMessage("Saved to Your Library")
+            else showUndo("Removed from Your Library") { c.library.setAlbumSaved(albumId, true) }
         }
     }
 
     override fun setArtistFollowed(artistId: String, followed: Boolean) {
         haptic(if (followed) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
         c.appScope.launch {
-            runCatching { c.library.setArtistFollowed(artistId, followed) }
-                .onSuccess { if (!followed) showUndo("Unfollowed") { c.library.setArtistFollowed(artistId, true) } }
-                .onFailure { showMessage(failed("Couldn't update who you follow", it)) }
+            c.library.setArtistFollowed(artistId, followed)
+            if (!followed) showUndo("Unfollowed") { c.library.setArtistFollowed(artistId, true) }
         }
     }
 

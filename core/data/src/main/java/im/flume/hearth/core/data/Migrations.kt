@@ -139,3 +139,17 @@ val MIGRATION_10_11_SQL = listOf(
     "ALTER TABLE local_books ADD COLUMN `matchCheckedAt` INTEGER NOT NULL DEFAULT 0",
     "UPDATE local_books SET fileTitle = title, fileAuthor = author",
 )
+
+/**
+ * Likes and unlikes waiting to reach the server, so one made with no connection isn't thrown away
+ * (new table only). Must match [LikeOutboxEntity] exactly.
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        MIGRATION_11_12_SQL.forEach(db::execSQL)
+    }
+}
+
+val MIGRATION_11_12_SQL = listOf(
+    "CREATE TABLE IF NOT EXISTS `like_outbox` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `liked` INTEGER NOT NULL, `changedAt` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))",
+)
