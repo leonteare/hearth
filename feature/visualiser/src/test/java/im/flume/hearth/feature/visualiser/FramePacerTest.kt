@@ -67,6 +67,45 @@ class FramePacerTest {
     }
 
     @Test
+    fun `a style that keeps moving idles instead of sleeping`() {
+        val pacer = FramePacer()
+        repeat(300) { assertFalse(pacer.sleep(1f / 60f, playing = false, still = true, keepsMoving = true)) }
+        assertTrue(pacer.isIdling)
+    }
+
+    @Test
+    fun `idling draws half as often`() {
+        val pacer = FramePacer()
+        repeat(120) { pacer.sleep(1f / 60f, playing = false, still = true, keepsMoving = true) }
+        var drawn = 0
+        // A second of a 60 Hz screen's vsyncs, paused and idling.
+        for (i in 0 until 60) if (pacer.shouldDraw(1_000_000_000L + (i * 1e9 / 60.0).toLong())) drawn++
+        assertEquals(30, drawn)
+    }
+
+    @Test
+    fun `playing again goes back to the full frame rate`() {
+        val pacer = FramePacer()
+        repeat(120) { pacer.sleep(1f / 60f, playing = false, still = true, keepsMoving = true) }
+        assertTrue(pacer.isIdling)
+        assertFalse(pacer.sleep(1f / 60f, playing = true, still = false, keepsMoving = true))
+        assertFalse(pacer.isIdling)
+        var drawn = 0
+        for (i in 0 until 60) if (pacer.shouldDraw(1_000_000_000L + (i * 1e9 / 60.0).toLong())) drawn++
+        assertEquals(60, drawn)
+    }
+
+    @Test
+    fun `a still style still sleeps, and waking ends any idle`() {
+        val pacer = FramePacer()
+        repeat(59) { assertFalse(pacer.sleep(1f / 60f, playing = false, still = true, keepsMoving = false)) }
+        assertTrue(pacer.sleep(1f / 60f + 0.001f, playing = false, still = true, keepsMoving = false))
+        assertFalse(pacer.isIdling)
+        pacer.wake()
+        assertFalse(pacer.isIdling)
+    }
+
+    @Test
     fun `after waking the next frame is drawn straight away`() {
         val pacer = FramePacer()
         pacer.shouldDraw(1_000_000_000L)

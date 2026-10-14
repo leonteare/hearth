@@ -77,7 +77,9 @@ import androidx.compose.runtime.setValue
  * Full-screen music visualiser over Now Playing. Tap for controls (they hide after 3 s), swipe
  * sideways to change style. Audio analysis and drawing run only while this is on screen and the
  * app is in the foreground; the system bars are hidden meanwhile, and the screen kept on while
- * music plays. Paused, it stops drawing once the picture has settled, and the screen may sleep.
+ * music plays. Paused, it stops drawing once the picture has settled, and the screen may sleep —
+ * unless the style keeps moving with no music (Sphere's slow turn), which carries on at a gentle
+ * idle frame rate.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,8 +166,10 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                         }
                         frame.positionMs = c.player.positionMs
                         frame.palette.step(dt)
-                        // Running late for a couple of seconds (outside a crossfade): draw less.
-                        slowFor = if (dt > 1f / 42f && outgoing == null) slowFor + dt else max(0f, slowFor - dt * 0.5f)
+                        // Running late for a couple of seconds (outside a crossfade, and not the
+                        // deliberately slow paused idle): draw less.
+                        val late = dt > 1f / 42f && outgoing == null && !pacer.isIdling
+                        slowFor = if (late) slowFor + dt else max(0f, slowFor - dt * 0.5f)
                         if (slowFor > 2f) {
                             slowFor = 0f
                             val r = renderer(style)
@@ -173,7 +177,8 @@ fun VisualiserScreen(state: PlayerUiState, onClose: () -> Unit) {
                         }
                         tick = now
                         val still = outgoing == null && frame.palette.settled && FramePacer.isQuiet(frame.audio)
-                        if (pacer.sleep(dt, playing, still)) {
+                        // A style that moves on its own (Sphere) idles slowly instead of stopping.
+                        if (pacer.sleep(dt, playing, still, renderer(style).movesWhenPaused)) {
                             asleep = true
                             sleptStyle = style
                             sleptPalette = paletteChanges
