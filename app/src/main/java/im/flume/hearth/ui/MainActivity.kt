@@ -4,7 +4,6 @@ import im.flume.hearth.core.common.EXTRA_ROUTE
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import android.view.KeyEvent
 import android.util.Base64
 import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
@@ -23,35 +22,9 @@ import im.flume.hearth.core.ui.theme.HearthTheme
 import kotlinx.coroutines.launch
 import im.flume.hearth.feature.settings.LoginScreen
 
-/** How much one press of a volume key moves a speaker, out of 100. */
-private const val VOLUME_STEP = 4
-
 class MainActivity : ComponentActivity() {
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
-
-    /**
-     * The volume keys belong to whatever is making the sound. While a speaker has it, this phone has no
-     * sound to turn up, so they move the speaker instead.
-     */
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val step = when (keyCode) {
-            KeyEvent.KEYCODE_VOLUME_UP -> VOLUME_STEP
-            KeyEvent.KEYCODE_VOLUME_DOWN -> -VOLUME_STEP
-            else -> return super.onKeyDown(keyCode, event)
-        }
-        val sonos = container.sonos
-        val now = sonos.volumeNow()
-        if (now < 0) return super.onKeyDown(keyCode, event)
-        sonos.setVolume(now + step)
-        return true
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        val ours = (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) &&
-            container.sonos.volumeNow() >= 0
-        return if (ours) true else super.onKeyUp(keyCode, event)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

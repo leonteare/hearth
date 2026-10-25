@@ -77,7 +77,13 @@ class PlayerConnection(private val context: Context) {
     internal var remote: RemoteTransport? = null
 
     /** What the speaker is doing, laid over the phone's state in [refresh]; null when the phone has the sound. */
-    @Volatile private var remoteNow: RemoteOutput? = null
+    private val remoteNow = MutableStateFlow<RemoteOutput?>(null)
+
+    /**
+     * The same thing as a flow, for listeners that must not count as one of the [observers] - the media session's
+     * volume (see [RemoteVolumePlayer]), which has to follow the speaker with no screen on show at all.
+     */
+    internal val outputNow: StateFlow<RemoteOutput?> = remoteNow.asStateFlow()
 
     private val _playing = MutableStateFlow(false)
 
@@ -114,7 +120,7 @@ class PlayerConnection(private val context: Context) {
 
     /** Called by [SonosOutput] when the speaker has something new to say (or has handed the sound back). */
     internal fun onRemote(now: RemoteOutput?) {
-        remoteNow = now
+        remoteNow.value = now
         main.post { refresh() }
     }
 
@@ -146,7 +152,7 @@ class PlayerConnection(private val context: Context) {
     private fun refresh() {
         val c = controller ?: run {
             // Not connected to the service (nothing has played yet): there is still a speaker to show.
-            _state.value = PlayerUiState().withRemote(remoteNow)
+            _state.value = PlayerUiState().withRemote(remoteNow.value)
             _playing.value = _state.value.isPlaying
             return
         }
@@ -174,7 +180,7 @@ class PlayerConnection(private val context: Context) {
                     canGoBackToMusic = extras.getBoolean(PlaybackService.EXTRA_HAS_MUSIC_QUEUE),
                 )
             },
-        ).withRemote(remoteNow)
+        ).withRemote(remoteNow.value)
         _playing.value = _state.value.isPlaying
     }
 

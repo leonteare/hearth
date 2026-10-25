@@ -35,7 +35,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * player holds. This file is the lifecycle and wiring; the behaviour lives in extensions and helpers
  * beside it: [buildPlayer] (PlayerSetup.kt), QueueEdits.kt, SpokenMode.kt, StreamCaching.kt,
  * QueuePersistence.kt, PlaybackRecovery.kt, SleepTimer.kt, VolumeLevelling.kt, SessionExtras.kt,
- * [SessionCallback], [PlayerListener] and [SpokenAwarePlayer].
+ * [SessionCallback], [PlayerListener], [SpokenAwarePlayer] and [RemoteVolumePlayer].
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
@@ -100,7 +100,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, c.mainActivity).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, SpokenAwarePlayer(this, player))
+        session = MediaSession.Builder(this, RemoteVolumePlayer(this, SpokenAwarePlayer(this, player)))
             .setCallback(SessionCallback(this))
             .setSessionActivity(openApp)
             // Artwork URIs are token-free hearth-cover:// / abs-cover:// links; this resolves them in the app.
