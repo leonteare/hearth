@@ -22,8 +22,9 @@ import kotlinx.coroutines.launch
  *
  *     adb shell dpm set-device-owner im.flume.hearth/.ui.KioskAdminReceiver
  *
- * From then on Hearth is the home screen, the lock screen never shows, and the app stays pinned: no home,
- * recents or notification shade. Volume and the power button keep working. Kids mode comes on with it
+ * From then on Hearth is the home screen and stays pinned: no home, recents or notification shade, just the
+ * clock and battery in the status bar and the phone's own lock screen (if one is set) on wake. Volume and the
+ * power button keep working. Kids mode comes on with it
  * (`Settings.kidsMode`): no podcasts, no music that isn't on the server, a PIN in front of Settings
  * ([KioskGate]) and a "Who's listening" tab to switch between the family's logins ([ProfilesScreen]).
  *
@@ -62,12 +63,18 @@ object Kiosk {
         }
         dpm.addPersistentPreferredActivity(admin, homeFilter, home)
 
-        // Stay pinned, with only the power menu left of the system UI; the keyguard is skipped even if a lock is set.
+        // Stay pinned. Of the system UI only the power menu, the status bar's clock and battery, and the
+        // phone's own lock screen remain (set a PIN and fingerprints in Phone settings; none set means no lock).
         dpm.setLockTaskPackages(admin, (listOf(context.packageName) + allowedPackages).toTypedArray())
         if (Build.VERSION.SDK_INT >= 28) {
-            dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+            dpm.setLockTaskFeatures(
+                admin,
+                DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS or
+                    DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
+                    DevicePolicyManager.LOCK_TASK_FEATURE_KEYGUARD,
+            )
         }
-        dpm.setKeyguardDisabled(admin, true)
+        dpm.setKeyguardDisabled(admin, false)
 
         // The notification permission prompt would be the first thing on screen; the owner may grant it itself.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -107,14 +114,21 @@ object Kiosk {
 
     /**
      * Signs [creds] in instead of whoever is listening now. Signing out first clears the old account's
-     * stars and invites, so the new person's likes and playlists come down with a fresh sync.
+     * stars and invites, so the new person's likes and playlists come down with a fresh sync. Audiobooks
+     * follow: the Audiobookshelf login kept for this profile (if any) replaces the current one.
      */
-    fun switchTo(c: AppContainer, creds: Credentials) {
+    fun switchTo(context: Context, creds: Credentials) {
+        val c: AppContainer = context.container
+        val abs = profiles(context).absLogin(creds)
         c.player.stopAndClear()
         c.session.logout()
         c.session.saveCredentials(creds)
         c.appScope.launch {
             runCatching { c.sync.fullSync(runCatching { c.api.scanStatus()?.lastScan }.getOrNull()) }
+        }
+        c.appScope.launch {
+            runCatching { c.spoken.signOut() }
+            if (abs != null) runCatching { c.spoken.signIn(abs.serverUrl, abs.username, abs.password) }
         }
     }
 }

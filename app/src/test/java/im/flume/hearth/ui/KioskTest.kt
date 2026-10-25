@@ -36,6 +36,13 @@ class KioskTest {
     }
 
     @Test
+    fun `a person is the same whatever the capitals in their name`() {
+        assertEquals(Profiles.key(alice), Profiles.key(alice.copy(username = "ALICE", token = "other")))
+        assertTrue(Profiles.same(alice, alice.copy(username = "Alice")))
+        assertFalse(Profiles.same(alice, alice.copy(serverUrl = "https://elsewhere")))
+    }
+
+    @Test
     fun `names start with a capital`() {
         assertEquals("Alice", Profiles.displayName("alice"))
     }

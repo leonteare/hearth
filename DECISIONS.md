@@ -76,4 +76,9 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
   (`:app` `Kiosk`) is the kids' wall player: Hearth is its home screen and stays pinned, `Settings.kidsMode` is forced
   on (no podcasts, no music that isn't on the server, Settings behind a PIN) and a fourth tab switches between the
   family's saved Navidrome logins (`Profiles`). Switching is a sign-out and sign-in, so the new person gets a fresh
-  sync of their own stars and playlists. Nothing in the regular app can turn any of this on.
+  sync of their own stars and playlists; the Audiobookshelf login kept for the profile is signed in the same way.
+  Nothing in the regular app can turn any of this on.
+- **What the kids can't hear is a playlist, not a tag** (2.27.0). The library has no explicit tags, so the parents
+  curate: any public playlist whose comment holds `[hearth-not-for-kids]` (`KidsFilter`; the homelab made one called
+  "Not for kids") is a block list, and in kids mode its songs never enter the index. Adding a song from a parent's
+  phone is the whole workflow; the kiosk re-syncs when the list changes.

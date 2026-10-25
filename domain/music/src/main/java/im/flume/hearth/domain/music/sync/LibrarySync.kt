@@ -7,6 +7,7 @@ import im.flume.hearth.core.data.LikeKind
 import im.flume.hearth.core.data.PlaylistSongEntity
 import im.flume.hearth.core.data.SessionStore
 import im.flume.hearth.core.data.toEntity
+import im.flume.hearth.domain.music.KidsFilter
 import im.flume.hearth.domain.music.LikeOutboxPlan
 import im.flume.hearth.domain.music.PendingLike
 import im.flume.hearth.domain.music.toPending
@@ -93,22 +94,30 @@ class LibrarySync(
      */
     suspend fun refreshPlaylists() {
         if (mutex.isLocked) return
-        mutex.withLock {
+        val blockListChanged = mutex.withLock {
             val remote = runCatching { api.playlists() }.getOrNull() ?: return
             val local = db.library().playlistsOnce().associateBy { it.id }
             val entities = remote.map { it.toEntity() }
+            val kids = session.settings.value.kidsMode
             val changed = HashMap<String, List<PlaylistSongEntity>>()
+            var blockListChanged = false
             for (pl in entities) {
                 val old = local[pl.id]
                 if (old != null && old.changed == pl.changed && old.songCount == pl.songCount) continue
                 val songs = runCatching { api.playlist(pl.id) }.getOrNull() ?: continue
-                changed[pl.id] = songs.entry.mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
+                // Kids mode never lists a "Not for kids" list's songs; a changed one means a full sync (below).
+                val blockList = kids && KidsFilter.isBlockList(pl.comment)
+                if (blockList) blockListChanged = true
+                changed[pl.id] = if (blockList) emptyList() else songs.entry.mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
             }
             val removed = local.keys - remote.mapTo(HashSet()) { it.id }
+            if (kids && removed.any { KidsFilter.isBlockList(local[it]?.comment) }) blockListChanged = true
             val removedSongs = songsOf(removed)
             db.library().applyPlaylists(entities, changed, removed.toList())
             if (changed.isNotEmpty() || removed.isNotEmpty()) onSynced(removedSongs, false)
+            blockListChanged
         }
+        if (blockListChanged) fullSync(session.lastScan)
     }
 
     suspend fun fullSync(lastScan: String? = null) = mutex.withLock {
@@ -132,15 +141,25 @@ class LibrarySync(
             // Likes still waiting to be pushed are newer than anything the server just said.
             val pending = db.likeOutbox().all().map { it.toPending() }
             val playlists = api.playlists()
+            val entries = playlists.associate { pl -> pl.id to api.playlist(pl.id)?.entry.orEmpty().map { it.id } }
+            // Kids mode: songs on the parents' "Not for kids" lists stay out of everything (KidsFilter).
+            val blocked = if (session.settings.value.kidsMode) {
+                KidsFilter.blocked(playlists.filter { KidsFilter.isBlockList(it.comment) }.map { entries.getValue(it.id) })
+            } else emptySet()
+            val keptSongs = if (blocked.isEmpty()) songs else songs.filterNot { it.id in blocked }
+            val keptAlbums = if (blocked.isEmpty()) albums else {
+                val ids = KidsFilter.keptAlbumIds(keptSongs.map { it.albumId })
+                albums.filter { it.id in ids }
+            }
             val playlistSongs = playlists.flatMap { pl ->
-                api.playlist(pl.id)?.entry.orEmpty().mapIndexed { i, s -> PlaylistSongEntity(pl.id, i, s.id) }
+                entries.getValue(pl.id).filterNot { it in blocked }.mapIndexed { i, id -> PlaylistSongEntity(pl.id, i, id) }
             }
             val remoteIds = playlists.mapTo(HashSet()) { it.id }
             val removedSongs = songsOf(db.library().playlistsOnce().map { it.id }.filter { it !in remoteIds })
             db.library().replaceLibrary(
-                songs = keepPending(songs.map { it.toEntity() }, pending, LikeKind.SONG, { it.id }) { s, liked -> s.copy(starred = liked) },
+                songs = keepPending(keptSongs.map { it.toEntity() }, pending, LikeKind.SONG, { it.id }) { s, liked -> s.copy(starred = liked) },
                 albums = keepPending(
-                    albums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
+                    keptAlbums.map { a -> a.toEntity().let { e -> if (starredAlbums == null) e else e.copy(starred = a.id in starredAlbums) } },
                     pending, LikeKind.ALBUM, { it.id },
                 ) { a, liked -> a.copy(starred = liked) },
                 artists = keepPending(
