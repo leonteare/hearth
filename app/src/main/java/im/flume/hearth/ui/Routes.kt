@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import im.flume.hearth.core.ui.components.screen
 import im.flume.hearth.feature.home.homeRoutes
 import im.flume.hearth.feature.library.libraryRoutes
 import im.flume.hearth.feature.search.searchRoutes
@@ -55,5 +56,7 @@ internal fun AppNavHost(nav: NavHostController, modifier: Modifier) {
         libraryRoutes()
         spokenRoutes()
         settingsRoutes()
+        // Kiosk phones only (the tab is hidden elsewhere, see NavBar.tabs).
+        screen("profiles") { ProfilesScreen() }
     }
 }

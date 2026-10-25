@@ -32,15 +32,21 @@ object LibraryTabs {
     /** Music's second row, in the order it shows. */
     val musicTabs = LibraryTab.entries.filter { it.section == LibrarySection.MUSIC }
 
+    /** The top row. Kids mode (a kiosk phone) has no Podcasts. */
+    fun sections(podcasts: Boolean): List<LibrarySection> =
+        if (podcasts) LibrarySection.entries else LibrarySection.entries.filter { it != LibrarySection.PODCASTS }
+
     /**
      * Where a request from elsewhere in the app (e.g. Home's Podcasts tile) should land: a tab name
-     * ("PODCASTS", "ARTISTS") or a section name ("MUSIC"). Anything unknown leaves you where you are.
+     * ("PODCASTS", "ARTISTS") or a section name ("MUSIC"). Anything unknown, or Podcasts when they are
+     * hidden, leaves you where you are.
      */
-    fun open(from: LibraryPlace, request: String): LibraryPlace {
+    fun open(from: LibraryPlace, request: String, podcasts: Boolean = true): LibraryPlace {
         val name = request.trim().uppercase()
-        LibraryTab.entries.firstOrNull { it.name == name }?.let { return goTo(from, it) }
-        LibrarySection.entries.firstOrNull { it.name == name }?.let { return from.copy(section = it) }
-        return from
+        val target = LibraryTab.entries.firstOrNull { it.name == name }?.let { goTo(from, it) }
+            ?: LibrarySection.entries.firstOrNull { it.name == name }?.let { from.copy(section = it) }
+            ?: return from
+        return if (!podcasts && target.section == LibrarySection.PODCASTS) from else target
     }
 
     /** Shows [tab], remembering it as Music's sub-tab when it's one of Music's lists. */

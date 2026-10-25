@@ -93,6 +93,10 @@ internal fun searchHint(filter: SearchFilter, spoken: Boolean): String = when (f
  * enough to fit a 360dp phone without scrolling, so every filter is always one tap away.
  */
 @Composable
-internal fun SearchFilterChips(selected: SearchFilter, onSelect: (SearchFilter) -> Unit) {
-    EqualWidthChips(SearchFilter.entries, selected, { it.label }, MaterialTheme.typography.labelSmall, minHeight = 32.dp, onSelect)
+internal fun SearchFilterChips(selected: SearchFilter, podcasts: Boolean = true, onSelect: (SearchFilter) -> Unit) {
+    EqualWidthChips(searchFilters(podcasts), selected, { it.label }, MaterialTheme.typography.labelSmall, minHeight = 32.dp, onSelect)
 }
+
+/** The filters on offer: Podcasts drops out in kids mode (a kiosk phone). */
+internal fun searchFilters(podcasts: Boolean): List<SearchFilter> =
+    if (podcasts) SearchFilter.entries else SearchFilter.entries.filter { it != SearchFilter.PODCASTS }

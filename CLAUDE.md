@@ -72,7 +72,7 @@ manifest). Sources sit in `src/main/java/<package path>/`, tests mirrored in `sr
 | `:feature:visualiser` | The full-screen visualiser: styles, renderers, controls. No routes: `:app` draws it |
 | `:feature:spoken` | Podcast show pages, book pages, phone-book pages |
 | `:feature:settings` | Settings pages, Downloads, login |
-| `:app` | `HearthApp` (`HearthContainer`), `MainActivity`, `AppRoot`, `Routes`, `AppActions`, `NavBar`, `PlayerOverlays` |
+| `:app` | `HearthApp` (`HearthContainer`), `MainActivity`, `AppRoot`, `Routes`, `AppActions`, `NavBar`, `PlayerOverlays`; kiosk mode (`Kiosk`, `ProfilesScreen`, `KioskGate`) |
 
 Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files.
 **When you add, move or split a file, update that README** (and this table if a module's one-line summary changes).

@@ -63,4 +63,16 @@ class LibraryTabsTest {
     fun `music's second row is playlists artists albums`() {
         assertEquals(listOf(LibraryTab.PLAYLISTS, LibraryTab.ARTISTS, LibraryTab.ALBUMS), LibraryTabs.musicTabs)
     }
+
+    @Test
+    fun `kids mode drops podcasts from the top row`() {
+        assertEquals(listOf(LibrarySection.MUSIC, LibrarySection.AUDIOBOOKS), LibraryTabs.sections(podcasts = false))
+        assertEquals(LibrarySection.entries.toList(), LibraryTabs.sections(podcasts = true))
+    }
+
+    @Test
+    fun `a podcasts request is ignored when podcasts are hidden`() {
+        assertEquals(start, LibraryTabs.open(start, "PODCASTS", podcasts = false))
+        assertEquals(LibraryTab.AUDIOBOOKS, LibraryTabs.open(start, "AUDIOBOOKS", podcasts = false).tab)
+    }
 }

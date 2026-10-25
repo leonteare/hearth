@@ -81,6 +81,8 @@ fun HomeScreen() {
     val serverMixes = remember(playlistItems) { ServerMixes.mine(playlistItems) }
     // Podcasts and audiobooks, once signed in: what you're part-way through, and new episodes of shows you follow.
     val spokenAccount by c.spoken.account.collectAsStateWithLifecycle()
+    // Kids mode (a kiosk phone): no podcasts anywhere on Home.
+    val kids = c.session.settings.collectAsStateWithLifecycle().value.kidsMode
     val continueListening by remember { c.spoken.continueListening(12) }.collectAsStateWithLifecycle(emptyList())
     val latestEpisodes by remember { c.spoken.latestEpisodes(50) }.collectAsStateWithLifecycle(emptyList())
     val newEpisodes = remember(latestEpisodes) { SpokenLists.newEpisodes(latestEpisodes, 5) }
@@ -131,15 +133,16 @@ fun HomeScreen() {
                 listOf(
                     QuickTile("Shuffle my library", HearthTheme.icons.shuffle, accent) { actions.play(PlaySource.MyLibrary, shuffle = true) },
                     QuickTile("Liked Songs", HearthTheme.icons.likeOn, HearthTheme.colors.liked) { actions.open("liked") },
-                    QuickTile("Podcasts", HearthTheme.icons.podcast, HearthTheme.colors.podcasts) { actions.openLibraryTab("PODCASTS") },
+                    if (kids) QuickTile("Playlists", HearthTheme.icons.queue, HearthTheme.colors.podcasts) { actions.openLibraryTab("PLAYLISTS") }
+                    else QuickTile("Podcasts", HearthTheme.icons.podcast, HearthTheme.colors.podcasts) { actions.openLibraryTab("PODCASTS") },
                     QuickTile("Audiobooks", HearthTheme.icons.audiobook, HearthTheme.colors.audiobooks) { actions.openLibraryTab("AUDIOBOOKS") },
                 )
             )
         }
 
         if (spokenAccount != null) {
-            continueListeningSection(continueListening, c, actions)
-            newEpisodesSection(newEpisodes)
+            continueListeningSection(if (kids) continueListening.filter { it.isBook } else continueListening, c, actions)
+            if (!kids) newEpisodesSection(newEpisodes)
         }
 
         items(StatsPeriod.current(), key = { "stats:${it.key}" }) { StatsCard(it) }

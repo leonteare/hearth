@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.core.ui.theme.HearthColors
@@ -38,8 +39,11 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(dark) { applySystemBars(dark) }
                 Surface(color = HearthTheme.colors.background, contentColor = HearthTheme.colors.text) {
                     val creds by container.session.credentials.collectAsStateWithLifecycle()
+                    // A kiosk phone remembers every login as a profile to switch back to (ProfilesScreen).
+                    val kiosk = remember { Kiosk.isOwner(this@MainActivity) }
+                    if (kiosk) LaunchedEffect(creds) { creds?.let { Kiosk.profiles(this@MainActivity).record(it) } }
                     if (creds == null) {
-                        LoginScreen()
+                        if (kiosk) KioskLogin() else LoginScreen()
                     } else {
                         AppRoot()
                     }
@@ -66,6 +70,11 @@ class MainActivity : ComponentActivity() {
 
     /** A notification asked to open a page (see [EXTRA_ROUTE]). */
     private fun takeRoute(intent: android.content.Intent?) {
+        // `adb shell am start -n im.flume.hearth/.ui.MainActivity --es kiosk_pin 2580` sets or replaces the kiosk PIN.
+        intent?.getStringExtra("kiosk_pin")?.let {
+            intent.removeExtra("kiosk_pin")
+            if (Kiosk.isOwner(this)) KioskAccess.setPin(this, it)
+        }
         val route = intent?.getStringExtra(EXTRA_ROUTE) ?: return
         intent.removeExtra(EXTRA_ROUTE)
         container.pendingRoute.value = route

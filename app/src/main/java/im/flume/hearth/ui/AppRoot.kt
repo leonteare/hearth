@@ -116,6 +116,9 @@ fun AppRoot() {
     // A red dot on Your Library while a playlist invite is waiting for an answer.
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
     val badged = if (PlaylistRules.pendingInvites(playlistItems).isNotEmpty()) "library" else null
+    // Kids mode (a kiosk phone) adds the "Who's listening" tab.
+    val settings by c.session.settings.collectAsStateWithLifecycle()
+    val tabs = tabs(settings.kidsMode)
 
     val searchFocus = remember { SearchFocusRequest() }
     val onTabClick: (String) -> Unit = { dest ->
@@ -160,14 +163,14 @@ fun AppRoot() {
     ) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
-                if (landscape) SideRail(currentTab, badged, onTabClick)
+                if (landscape) SideRail(tabs, currentTab, badged, onTabClick)
                 Scaffold(
                     modifier = if (landscape) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End)) else Modifier,
                     containerColor = HearthTheme.colors.background,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
                         AppBottomBar(
-                            playerState, landscape, currentTab, badged, onTabClick,
+                            playerState, landscape, tabs, currentTab, badged, onTabClick,
                             onOpenPlayer = { nowPlayingOpen = true },
                             onHeight = { bottomBarPx = it },
                         )
@@ -179,6 +182,7 @@ fun AppRoot() {
 
             GetMusicSheets(getMusic)
             PlaylistDialogs(actions)
+            KioskGate(actions.settingsGate.value, onDismiss = { actions.settingsGate.value = false }, onHearthSettings = { actions.openSettingsUnlocked() })
 
             PlayerOverlays(
                 playerState, nowPlayingOpen, queueOpen, visualiserOpen,

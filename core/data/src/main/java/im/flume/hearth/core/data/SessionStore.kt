@@ -35,9 +35,14 @@ data class Settings(
     val tidalInSearch: Boolean = true,
     /** Last visualiser style picked (see VisualiserStyle ids). */
     val visualiserStyle: String = "memory-card",
+    /**
+     * Kids mode, forced on by a kiosk phone (see :app Kiosk): no podcasts, no music that isn't on the
+     * server, and Settings behind a PIN. Never on in the regular app.
+     */
+    val kidsMode: Boolean = false,
 ) {
-    /** Music not on the server is shown when switched on and Tidarr has an address. */
-    val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank()
+    /** Music not on the server is shown when switched on, Tidarr has an address, and this isn't a kids' phone. */
+    val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank() && !kidsMode
 
     companion object {
         const val DEFAULT_TIDARR_URL = "https://tidal.home"
@@ -156,6 +161,7 @@ class SessionStore(context: Context) {
         tidarrUrl = prefs.getString("tidarrUrl", Settings.DEFAULT_TIDARR_URL).orEmpty(),
         tidalInSearch = prefs.getBoolean("tidalInSearch", true),
         visualiserStyle = prefs.getString("visualiserStyle", "memory-card").orEmpty(),
+        kidsMode = prefs.getBoolean("kidsMode", false),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -177,6 +183,7 @@ class SessionStore(context: Context) {
             putString("tidarrUrl", s.tidarrUrl)
             putBoolean("tidalInSearch", s.tidalInSearch)
             putString("visualiserStyle", s.visualiserStyle)
+            putBoolean("kidsMode", s.kidsMode)
         }
         _settings.value = s
     }

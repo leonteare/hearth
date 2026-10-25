@@ -102,6 +102,9 @@ fun SearchScreen() {
     // Music that isn't on the server is fetched separately, so the library's results never wait on it,
     // then ranked into the same list. If it can't be reached, it just isn't shown.
     val settings by c.session.settings.collectAsStateWithLifecycle()
+    // Kids mode (a kiosk phone): books only from the spoken catalogue, and no podcast directory.
+    val kids = settings.kidsMode
+    LaunchedEffect(kids) { if (kids && filter == SearchFilter.PODCASTS) filter = SearchFilter.ALL }
     val online by c.network.isOnline.collectAsStateWithLifecycle()
     var remote by remember { mutableStateOf<TidalSearchResults?>(null) }
     // Open the connection as soon as Search opens, so the first search doesn't pay for it.
@@ -130,19 +133,20 @@ fun SearchScreen() {
     val spokenBooks by remember { c.spoken.books() }.collectAsStateWithLifecycle(emptyList())
     var spokenEpisodes by remember { mutableStateOf<List<EpisodeRow>?>(null) }
     var spoken by remember { mutableStateOf(SpokenSearchResults()) }
-    LaunchedEffect(query, spokenAccount != null, spokenPodcasts, spokenBooks) {
+    LaunchedEffect(query, spokenAccount != null, spokenPodcasts, spokenBooks, kids) {
         val q = query.trim()
         if (spokenAccount == null || q.isEmpty()) { spoken = SpokenSearchResults(); return@LaunchedEffect }
         delay(120)
-        val episodes = spokenEpisodes ?: c.spoken.allEpisodes().also { spokenEpisodes = it }
-        spoken = withContext(Dispatchers.Default) { SpokenSearch.search(q, spokenPodcasts, episodes, spokenBooks) }
+        val podcasts = if (kids) emptyList() else spokenPodcasts
+        val episodes = if (kids) emptyList() else spokenEpisodes ?: c.spoken.allEpisodes().also { spokenEpisodes = it }
+        spoken = withContext(Dispatchers.Default) { SpokenSearch.search(q, podcasts, episodes, spokenBooks) }
     }
     // Podcasts that aren't on the server yet, from the podcast directory (online only, after a pause in typing).
     var directory by remember { mutableStateOf<List<AbsPodcastSearchResult>>(emptyList()) }
     var directoryLoading by remember { mutableStateOf(false) }
-    LaunchedEffect(query, spokenAccount != null) {
+    LaunchedEffect(query, spokenAccount != null, kids) {
         val q = query.trim()
-        if (spokenAccount == null || q.length < 3 || c.network.cannotStream) { directory = emptyList(); directoryLoading = false; return@LaunchedEffect }
+        if (spokenAccount == null || kids || q.length < 3 || c.network.cannotStream) { directory = emptyList(); directoryLoading = false; return@LaunchedEffect }
         delay(450)
         directoryLoading = true
         directory = try {
@@ -183,11 +187,11 @@ fun SearchScreen() {
         SearchField(
             query = query,
             onQueryChange = { query = it },
-            hint = searchHint(filter, spokenAccount != null),
+            hint = searchHint(filter, spokenAccount != null && !kids),
             focus = focus,
             onSearch = { saveRecent(query) },
         )
-        SearchFilterChips(filter) { filter = it }
+        SearchFilterChips(filter, podcasts = !kids) { filter = it }
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = HearthTheme.spacing.s)) {
             if (query.isBlank()) {

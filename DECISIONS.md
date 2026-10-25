@@ -72,3 +72,8 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **The visualiser is its own module** `:feature:visualiser` (2.21.0), not a package inside `:feature:player`. The two
   never depend on each other: the player hands out an "open the visualiser" callback and `:app` draws the overlay. The
   audio tap stays in `:core:playback`.
+- **Kiosk and kids mode are keyed off device-owner state** (2.26.0). A phone that makes Hearth its device owner
+  (`:app` `Kiosk`) is the kids' wall player: Hearth is its home screen and stays pinned, `Settings.kidsMode` is forced
+  on (no podcasts, no music that isn't on the server, Settings behind a PIN) and a fourth tab switches between the
+  family's saved Navidrome logins (`Profiles`). Switching is a sign-out and sign-in, so the new person gets a fresh
+  sync of their own stars and playlists. Nothing in the regular app can turn any of this on.

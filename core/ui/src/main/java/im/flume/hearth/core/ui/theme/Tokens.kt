@@ -4,6 +4,7 @@ package im.flume.hearth.core.ui.theme
 
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
@@ -333,6 +334,9 @@ data class HearthIcons(
     // Filled variants of info and download (banners, menu items that want the solid glyph)
     val infoFilled: ImageVector = Icons.Filled.Info,
     val downloadFilled: ImageVector = Icons.Filled.Download,
+
+    // Kiosk phones: the "Who's listening" tab
+    val profiles: ImageVector = Icons.Filled.Face,
 )
 
 val LocalHearthColors = staticCompositionLocalOf { HearthColors() }

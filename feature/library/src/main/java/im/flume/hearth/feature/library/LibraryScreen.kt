@@ -55,12 +55,15 @@ fun LibraryScreen() {
         sortPrefs.edit().putString("place", LibraryTabs.save(next)).apply()
     }
     val tab = place.tab
+    // Kids mode (a kiosk phone) hides Podcasts; a saved podcasts place falls back to Music.
+    val kids = c.session.settings.collectAsStateWithLifecycle().value.kidsMode
+    LaunchedEffect(kids) { if (kids && place.section == LibrarySection.PODCASTS) goTo(place.copy(section = LibrarySection.MUSIC)) }
     // Opened on a given tab (Home's Podcasts and Audiobooks tiles).
     val tabRequests = LocalTabRequests.current
     LaunchedEffect(tabRequests.libraryTab) {
         val wanted = tabRequests.libraryTab ?: return@LaunchedEffect
         tabRequests.libraryTab = null
-        goTo(LibraryTabs.open(place, wanted))
+        goTo(LibraryTabs.open(place, wanted, podcasts = !kids))
     }
     var addPodcastsOpen by remember { mutableStateOf(false) }
     val playlistItems by remember { c.library.playlistItems }.collectAsStateWithLifecycle(emptyList())
@@ -115,7 +118,7 @@ fun LibraryScreen() {
 
     Column(Modifier.fillMaxSize()) {
         PageHeader("Your Library")
-        EqualWidthChips(LibrarySection.entries, place.section, { it.label }, MaterialTheme.typography.labelLarge, minHeight = 36.dp) {
+        EqualWidthChips(LibraryTabs.sections(!kids), place.section, { it.label }, MaterialTheme.typography.labelLarge, minHeight = 36.dp) {
             goTo(place.copy(section = it))
         }
         LibraryControls(

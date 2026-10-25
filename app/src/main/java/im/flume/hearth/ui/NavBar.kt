@@ -30,12 +30,21 @@ import im.flume.hearth.core.ui.theme.HearthIcons
 import im.flume.hearth.core.ui.theme.HearthTheme
 
 /** Route, label and the tab's icon slot (read from the theme when drawn, so a skin can swap it). */
-internal val TABS: List<Triple<String, String, (HearthIcons) -> ImageVector>> = listOf(
+internal typealias Tab = Triple<String, String, (HearthIcons) -> ImageVector>
+
+internal val TABS: List<Tab> = listOf(
     Triple("home", "Home", HearthIcons::home),
     Triple("search", "Search", HearthIcons::search),
     Triple("library", "Your Library", HearthIcons::library),
 )
-internal val TAB_ROUTES = TABS.map { it.first }
+
+/** The fourth tab on a kiosk phone: the profile picker (ProfilesScreen). */
+private val PROFILES_TAB: Tab = Triple("profiles", "Who's listening", HearthIcons::profiles)
+
+/** The tabs this phone shows: the usual three, plus profiles in kids mode. */
+internal fun tabs(kids: Boolean): List<Tab> = if (kids) TABS + PROFILES_TAB else TABS
+
+internal val TAB_ROUTES = (TABS + PROFILES_TAB).map { it.first }
 
 /**
  * Everything pinned to the bottom of the page: the preview bar, the mini player and (in portrait) the tabs.
@@ -45,6 +54,7 @@ internal val TAB_ROUTES = TABS.map { it.first }
 internal fun AppBottomBar(
     playerState: PlayerUiState,
     landscape: Boolean,
+    tabs: List<Tab>,
     currentTab: String,
     badged: String?,
     onTabClick: (String) -> Unit,
@@ -57,7 +67,7 @@ internal fun AppBottomBar(
     ) {
         PreviewBar()
         if (playerState.current != null) MiniPlayer(playerState, onOpen = onOpenPlayer)
-        if (!landscape) BottomBar(currentTab, badged, onTabClick)
+        if (!landscape) BottomBar(tabs, currentTab, badged, onTabClick)
     }
 }
 
@@ -70,9 +80,9 @@ private fun TabIcon(icon: ImageVector, dot: Boolean) {
 }
 
 @Composable
-private fun BottomBar(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
+private fun BottomBar(tabs: List<Tab>, currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
     NavigationBar(containerColor = HearthTheme.colors.navBar) {
-        TABS.forEach { (dest, label, icon) ->
+        tabs.forEach { (dest, label, icon) ->
             NavigationBarItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },
@@ -91,10 +101,10 @@ private fun BottomBar(currentTab: String, badged: String?, onTabClick: (String) 
 }
 
 @Composable
-internal fun SideRail(currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
+internal fun SideRail(tabs: List<Tab>, currentTab: String, badged: String?, onTabClick: (String) -> Unit) {
     NavigationRail(containerColor = HearthTheme.colors.navBar) {
         Spacer(Modifier.weight(1f))
-        TABS.forEach { (dest, label, icon) ->
+        tabs.forEach { (dest, label, icon) ->
             NavigationRailItem(
                 selected = currentTab == dest,
                 onClick = { onTabClick(dest) },

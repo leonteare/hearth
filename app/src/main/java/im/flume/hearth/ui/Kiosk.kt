@@ -1,5 +1,5 @@
-// Kiosk mode: on a phone that made Hearth its device owner (a wall-mounted player), Hearth becomes the home
-// screen, pins itself to the screen and keeps the lock screen out of the way.
+// Kiosk mode: on a phone that made Hearth its device owner (a wall-mounted player for the kids), Hearth becomes
+// the home screen, pins itself to the screen, keeps the lock screen out of the way and turns on kids mode.
 package im.flume.hearth.ui
 
 import android.Manifest
@@ -12,16 +12,23 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import im.flume.hearth.core.network.Credentials
+import im.flume.hearth.core.playback.AppContainer
+import im.flume.hearth.core.playback.container
+import kotlinx.coroutines.launch
 
 /**
- * Set-up is a one-off over USB, on a freshly reset phone with no accounts on it, after signing in to Hearth:
+ * Set-up is a one-off over USB, on a freshly reset phone with no accounts on it:
  *
  *     adb shell dpm set-device-owner im.flume.hearth/.ui.KioskAdminReceiver
  *
  * From then on Hearth is the home screen, the lock screen never shows, and the app stays pinned: no home,
- * recents or notification shade. Volume and the power button keep working. To unpin for a moment from a PC
- * run `adb shell am task lock stop`; to undo completely, factory reset. Phones that are not the owner see
- * nothing of this.
+ * recents or notification shade. Volume and the power button keep working. Kids mode comes on with it
+ * (`Settings.kidsMode`): no podcasts, no music that isn't on the server, a PIN in front of Settings
+ * ([KioskGate]) and a "Who's listening" tab to switch between the family's logins ([ProfilesScreen]).
+ *
+ * To unpin for a moment from a PC run `adb shell am task lock stop`; the PIN dialog's "Phone settings" does
+ * the same from the phone. To undo completely, factory reset. Phones that are not the owner see nothing of this.
  */
 object Kiosk {
 
@@ -31,6 +38,9 @@ object Kiosk {
         "com.google.android.packageinstaller",
         "com.android.settings",
     )
+
+    @Volatile
+    private var profileStore: KioskProfileStore? = null
 
     fun isOwner(context: Context): Boolean =
         context.getSystemService(DevicePolicyManager::class.java).isDeviceOwnerApp(context.packageName)
@@ -66,6 +76,10 @@ object Kiosk {
                 DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED,
             )
         }
+
+        // Kids mode stays on for as long as this phone is a kiosk.
+        val session = context.container.session
+        if (!session.settings.value.kidsMode) session.updateSettings { it.copy(kidsMode = true) }
     }
 
     /** Pins the activity to the screen when this phone is a kiosk and it is not pinned already. */
@@ -73,6 +87,25 @@ object Kiosk {
         if (!isOwner(activity)) return
         val am = activity.getSystemService(ActivityManager::class.java)
         if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) activity.startLockTask()
+    }
+
+    /** The family's saved logins on this phone. */
+    fun profiles(context: Context): KioskProfileStore =
+        profileStore ?: synchronized(this) {
+            profileStore ?: KioskProfileStore(context.applicationContext).also { profileStore = it }
+        }
+
+    /**
+     * Signs [creds] in instead of whoever is listening now. Signing out first clears the old account's
+     * stars and invites, so the new person's likes and playlists come down with a fresh sync.
+     */
+    fun switchTo(c: AppContainer, creds: Credentials) {
+        c.player.stopAndClear()
+        c.session.logout()
+        c.session.saveCredentials(creds)
+        c.appScope.launch {
+            runCatching { c.sync.fullSync(runCatching { c.api.scanStatus()?.lastScan }.getOrNull()) }
+        }
     }
 }
 

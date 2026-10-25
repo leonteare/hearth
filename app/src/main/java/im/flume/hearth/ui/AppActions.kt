@@ -121,6 +121,12 @@ internal class AppActions(
     override fun openPlaylist(id: String) { closeOverlays(); nav.navigate("playlist/${Uri.encode(id)}") }
     override fun openGenre(name: String) { closeOverlays(); nav.navigate("genre/${Uri.encode(name)}") }
     override fun open(route: String) {
+        // On a kiosk phone Settings is for grown-ups: the PIN dialog (KioskGate) opens it once the PIN is right.
+        if (route == "settings" && c.session.settings.value.kidsMode) {
+            closeOverlays()
+            settingsGate.value = true
+            return
+        }
         when {
             route.startsWith("mix/") -> c.usage.track(Usage.MIX)
             route.startsWith("stats/") -> c.usage.track(Usage.STATS)
@@ -131,6 +137,13 @@ internal class AppActions(
     // A saved cover wins: downloaded music keeps its picture with no server and an emptied image cache.
     override fun coverUrl(coverArt: String?, size: Int): String? =
         c.covers.fileFor(coverArt)?.let { "file://${it.path}" } ?: c.api.coverArtUrl(coverArt, size)
+
+    /** True while the kiosk PIN dialog in front of Settings is open. */
+    val settingsGate = mutableStateOf(false)
+    fun openSettingsUnlocked() {
+        settingsGate.value = false
+        nav.navigate("settings")
+    }
 
     /** True while the "New playlist" name dialog (from Your Library) is open. */
     val creatingPlaylist = mutableStateOf(false)
