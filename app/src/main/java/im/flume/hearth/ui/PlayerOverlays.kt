@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import im.flume.hearth.core.network.SonosSpeaker
 import im.flume.hearth.core.playback.AudioOutput
+import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.PlaybackOutputUi
 import im.flume.hearth.core.ui.components.SpeakerSheet
 import im.flume.hearth.feature.player.NowPlayingScreen
@@ -68,6 +70,16 @@ internal fun PlayerOverlays(
     val speakers by c.sonos.speakers.collectAsStateWithLifecycle()
     val searching by c.sonos.searching.collectAsStateWithLifecycle()
     val output = playerState.output
+    val actions = LocalActions.current
+
+    // A speaker that refuses or cannot be reached used to fail in silence: the tap simply did nothing.
+    val speakerError by c.sonos.error.collectAsStateWithLifecycle()
+    LaunchedEffect(speakerError) {
+        speakerError?.let {
+            actions.showMessage(it)
+            c.sonos.clearError()
+        }
+    }
 
     AnimatedVisibility(
         visible = nowPlayingOpen && playerState.current != null,
@@ -106,8 +118,17 @@ internal fun PlayerOverlays(
         volume = playerState.outputVolume.takeIf { it >= 0 && output !is AudioOutput.Phone },
         onVolume = c.sonos::setVolume,
         onChoose = { id ->
-            if (id == PHONE_OUTPUT) c.sonos.backToPhone()
-            else speakers.firstOrNull { it.uuid == id }?.let(c.sonos::chooseSpeaker)
+            if (id == PHONE_OUTPUT) {
+                c.sonos.backToPhone()
+            } else {
+                speakers.firstOrNull { it.uuid == id }?.let { speaker ->
+                    c.sonos.chooseSpeaker(speaker)
+                    // With nothing playing there is nothing to hand over, so say so rather than looking broken.
+                    if (playerState.current == null) {
+                        actions.showMessage("Playing on ${speaker.roomName}. Start something and it will play there.")
+                    }
+                }
+            }
         },
         onRefresh = c.sonos::findSpeakers,
         onDismiss = { speakersOpen = false },
