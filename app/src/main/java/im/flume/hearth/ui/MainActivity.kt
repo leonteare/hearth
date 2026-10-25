@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Kiosk.configure(this)
         // Before the first frame, so content is laid out edge to edge from the start.
         applySystemBars(HearthColors().isDark)
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Kiosk.pin(this)
         container.updater.resumeAfterPermission()
     }
 

@@ -32,6 +32,31 @@
             </intent-filter>
         </activity>
 
+        <!-- Kiosk mode (ui/Kiosk.kt). The home-screen alias stays off until a phone makes Hearth its owner. -->
+        <activity-alias
+            android:name=".ui.KioskHome"
+            android:targetActivity=".ui.MainActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
+        <receiver
+            android:name=".ui.KioskAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".core.playback.PlaybackService"
             android:exported="true"
