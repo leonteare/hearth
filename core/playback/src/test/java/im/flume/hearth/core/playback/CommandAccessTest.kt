@@ -6,6 +6,7 @@ import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_REMOVE
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SKIP_BACK
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SKIP_FORWARD
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SLEEP
+import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_STOP_LOCAL
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_TOGGLE_SHUFFLE
 import im.flume.hearth.core.playback.PlaybackService.Companion.CUSTOM_COMMANDS
 import org.junit.Assert.assertFalse
@@ -27,7 +28,7 @@ class CommandAccessTest {
 
     @Test
     fun `other apps can't change the queue or set the sleep timer`() {
-        listOf(CMD_PLAY_SOURCE, CMD_REMOVE, CMD_SLEEP, "hearth.SOMETHING_NEW").forEach {
+        listOf(CMD_PLAY_SOURCE, CMD_REMOVE, CMD_SLEEP, CMD_STOP_LOCAL, "hearth.SOMETHING_NEW").forEach {
             assertFalse(it, CommandAccess.allowed(fromThisApp = false, it))
         }
     }
