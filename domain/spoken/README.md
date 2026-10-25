@@ -3,6 +3,7 @@
 Podcasts and audiobooks, both the Audiobookshelf ones and books on the phone.
 
 - `SpokenRepository` (facade), `SpokenSync` and `SpokenSyncWorker`, `SpokenFollows`, `SpokenAdd` (feeds, OPML), `SpokenMapping`, `SpokenProgress`, `SpokenDownloads`, `SpokenPresentation`, `ShowFeed`/`ShowFeeds`.
+- `SonosSpokenFile` — the file and cover URLs a Sonos speaker fetches (`/abs` on the plain-HTTP host, token in the query string).
 - `SpokenLogic` — the pure parts: `ProgressMerge`, `OutboxPlan`, `FollowTags` (the `hearth-follower:<user>` and `hearth-unfollowed:<ms>` tags the homelab's `podcast-cleanup.sh` reads).
 - Phone books: `LocalBooks`, `LocalBookScanner`, `LocalBookUpload` and its worker, `LocalBookChapters`, `LocalBookLogic`, `LocalBookDetails`, `BookMatch`, `EmbeddedChapters`.
 - `SpokenContainer`.

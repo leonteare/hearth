@@ -16,6 +16,9 @@ interface AppContainer : DomainContainer {
     val player: PlayerConnection
     val queueInfo: MutableStateFlow<QueueInfo>
 
+    /** Where the sound comes out: this phone, or a Sonos speaker that has been handed the queue. */
+    val sonos: SonosOutput
+
     /** 30 second previews of music that isn't on the server; separate from the main player. */
     val preview: PreviewPlayer
 

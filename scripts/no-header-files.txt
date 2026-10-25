@@ -16,7 +16,6 @@ core/data/src/main/java/im/flume/hearth/core/data/LyricsDao.kt
 core/data/src/main/java/im/flume/hearth/core/data/NetworkMonitor.kt
 core/data/src/main/java/im/flume/hearth/core/data/PasswordVault.kt
 core/data/src/main/java/im/flume/hearth/core/data/SearchIndex.kt
-core/data/src/main/java/im/flume/hearth/core/data/SessionStore.kt
 core/data/src/main/java/im/flume/hearth/core/data/spoken/AbsAccountStore.kt
 core/data/src/main/java/im/flume/hearth/core/data/spoken/LocalBookEntities.kt
 core/data/src/main/java/im/flume/hearth/core/data/spoken/LocalBookMerge.kt

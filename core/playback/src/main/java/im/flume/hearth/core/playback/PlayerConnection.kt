@@ -38,6 +38,10 @@ data class PlayerUiState(
     val error: String? = null,
     /** Set while a podcast episode or audiobook is loaded instead of music. */
     val spoken: SpokenNowPlaying? = null,
+    /** Where the sound is coming out: this phone unless a Sonos speaker was chosen. */
+    val output: AudioOutput = AudioOutput.Phone,
+    /** The chosen speaker's volume, 0..100, or -1 on this phone, where Android owns the volume. */
+    val outputVolume: Int = -1,
 )
 
 /**
@@ -69,7 +73,47 @@ class PlayerConnection(private val context: Context) {
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
-    val positionMs: Long get() = controller?.currentPosition ?: 0
+    /** Set by [SonosOutput]: while it is active, transport commands and the position come from a speaker. */
+    internal var remote: RemoteTransport? = null
+
+    /** What the speaker is doing, laid over the phone's state in [refresh]; null when the phone has the sound. */
+    @Volatile private var remoteNow: RemoteOutput? = null
+
+    private val _playing = MutableStateFlow(false)
+
+    /**
+     * Just "is something playing", for listeners that run all the time. Collect this and not [state]:
+     * [observers] counts whoever is collecting [state] to decide whether a speaker is worth asking, and a
+     * listener that never lets go would have a phone in a pocket polling a speaker all day.
+     */
+    internal val playing: StateFlow<Boolean> = _playing.asStateFlow()
+
+    /**
+     * How many screens are collecting [state]. The player screens use `collectAsStateWithLifecycle`, so
+     * this falls to zero when the app goes to the background - which is when a speaker stops being asked.
+     */
+    internal val observers: StateFlow<Int> get() = _state.subscriptionCount
+
+    val positionMs: Long get() = speaking()?.positionMs ?: localPositionMs
+
+    /** Where this phone's own player is, whatever a speaker might be doing. */
+    internal val localPositionMs: Long get() = controller?.currentPosition ?: 0
+
+    /** The speaker holding the sound, or null when that is this phone. */
+    private fun speaking(): RemoteTransport? = remote?.takeIf { it.active }
+
+    /** Runs [onSpeaker] in place of the phone when a speaker has the sound; true when it did. */
+    private inline fun toSpeaker(onSpeaker: RemoteTransport.() -> Unit): Boolean {
+        val r = speaking() ?: return false
+        r.onSpeaker()
+        return true
+    }
+
+    /** Called by [SonosOutput] when the speaker has something new to say (or has handed the sound back). */
+    internal fun onRemote(now: RemoteOutput?) {
+        remoteNow = now
+        main.post { refresh() }
+    }
 
     fun connect() {
         if (future != null) return
@@ -97,7 +141,12 @@ class PlayerConnection(private val context: Context) {
     }
 
     private fun refresh() {
-        val c = controller ?: return
+        val c = controller ?: run {
+            // Not connected to the service (nothing has played yet): there is still a speaker to show.
+            _state.value = PlayerUiState().withRemote(remoteNow)
+            _playing.value = _state.value.isPlaying
+            return
+        }
         val extras = c.sessionExtras
         val count = c.mediaItemCount
         _state.value = PlayerUiState(
@@ -122,7 +171,8 @@ class PlayerConnection(private val context: Context) {
                     canGoBackToMusic = extras.getBoolean(PlaybackService.EXTRA_HAS_MUSIC_QUEUE),
                 )
             },
-        )
+        ).withRemote(remoteNow)
+        _playing.value = _state.value.isPlaying
     }
 
     /**
@@ -150,11 +200,14 @@ class PlayerConnection(private val context: Context) {
             val start = source.songIds.indexOf(startSongId).coerceAtLeast(0)
             source.copy(songIds = source.songIds.drop(start).take(MAX_IDS_PER_COMMAND))
         }
+        val was = QueueShape.of(_state.value)
         send(PlaybackService.CMD_PLAY_SOURCE, Bundle().apply {
             putBundle(PlaybackService.ARG_SOURCE, safe.toBundle())
             putString(PlaybackService.ARG_START_ID, startSongId)
             putBoolean(PlaybackService.ARG_SHUFFLE, shuffle)
         })
+        // A speaker has the sound: the new queue is built here and then handed straight over.
+        speaking()?.requeue(was)
     }
 
     /** Sent in chunks so a big selection can't exceed the Binder limit; the service applies them in order. */
@@ -213,11 +266,15 @@ class PlayerConnection(private val context: Context) {
     /** Plays an audiobook (all its files as one timeline); [startSec] e.g. a chapter's start. */
     fun playBook(libraryItemId: String, startSec: Double? = null) = playSpoken(libraryItemId, null, startSec)
 
-    private fun playSpoken(libraryItemId: String, episodeId: String?, startSec: Double?) = send(PlaybackService.CMD_PLAY_SPOKEN, Bundle().apply {
-        putString(PlaybackService.ARG_ITEM_ID, libraryItemId)
-        putString(PlaybackService.ARG_EPISODE_ID, episodeId)
-        startSec?.let { putDouble(PlaybackService.ARG_START_SEC, it) }
-    })
+    private fun playSpoken(libraryItemId: String, episodeId: String?, startSec: Double?) {
+        val was = QueueShape.of(_state.value)
+        send(PlaybackService.CMD_PLAY_SPOKEN, Bundle().apply {
+            putString(PlaybackService.ARG_ITEM_ID, libraryItemId)
+            putString(PlaybackService.ARG_EPISODE_ID, episodeId)
+            startSec?.let { putDouble(PlaybackService.ARG_START_SEC, it) }
+        })
+        speaking()?.requeue(was)
+    }
 
     fun skipBack() = send(PlaybackService.CMD_SKIP_BACK, Bundle.EMPTY)
 
@@ -230,7 +287,11 @@ class PlayerConnection(private val context: Context) {
     fun setSpeed(speed: Float) = send(PlaybackService.CMD_SET_SPEED, Bundle().apply { putFloat(PlaybackService.ARG_SPEED, speed) })
 
     /** Leaves spoken word and brings back the music queue that was playing before. */
-    fun backToMusic() = send(PlaybackService.CMD_BACK_TO_MUSIC, Bundle.EMPTY)
+    fun backToMusic() {
+        val was = QueueShape.of(_state.value)
+        send(PlaybackService.CMD_BACK_TO_MUSIC, Bundle.EMPTY)
+        speaking()?.requeue(was)
+    }
 
     /** Sleep timer that pauses at the end of the current chapter (spoken word). */
     fun sleepAtEndOfChapter() = setSleepTimer(PlaybackService.SLEEP_END_OF_CHAPTER)
@@ -247,6 +308,7 @@ class PlayerConnection(private val context: Context) {
     fun toggleShuffle() = send(PlaybackService.CMD_TOGGLE_SHUFFLE, Bundle.EMPTY)
 
     fun playPause() {
+        if (toSpeaker { playPause() }) return
         val c = controller ?: return
         if (c.isPlaying) c.pause() else {
             if (c.playbackState == Player.STATE_IDLE) c.prepare()
@@ -254,16 +316,50 @@ class PlayerConnection(private val context: Context) {
         }
     }
 
-    fun pause() = withController { it.pause() }
-
-    fun resume() = withController {
-        if (it.playbackState == Player.STATE_IDLE) it.prepare()
-        it.play()
+    fun pause() {
+        if (toSpeaker { pause() }) return
+        withController { it.pause() }
     }
 
-    fun next() = controller?.seekToNext()
-    fun previous() = controller?.seekToPrevious()
-    fun seekTo(ms: Long) = controller?.seekTo(ms)
+    fun resume() {
+        if (toSpeaker { resume() }) return
+        withController {
+            if (it.playbackState == Player.STATE_IDLE) it.prepare()
+            it.play()
+        }
+    }
+
+    fun next() {
+        if (toSpeaker { next() }) return
+        controller?.seekToNext()
+    }
+
+    fun previous() {
+        if (toSpeaker { previous() }) return
+        controller?.seekToPrevious()
+    }
+
+    fun seekTo(ms: Long) {
+        if (toSpeaker { seekTo(ms) }) return
+        controller?.seekTo(ms)
+    }
+
+    /**
+     * Hands the sound to a speaker: this phone stops and lets go of the audio focus, so nothing here
+     * claims to be playing, but the queue stays put ready for [resumeAt].
+     */
+    internal fun stopKeepingQueue() = withController {
+        it.pause()
+        it.stop()
+    }
+
+    /** Takes the sound back: carries on from [index] in the queue, [positionMs] into that song. */
+    internal fun resumeAt(index: Int, positionMs: Long) = withController {
+        if (it.mediaItemCount == 0) return@withController
+        it.seekTo(index.coerceIn(0, it.mediaItemCount - 1), positionMs.coerceAtLeast(0))
+        it.prepare()
+        it.play()
+    }
 
     fun cycleRepeat() {
         val c = controller ?: return
