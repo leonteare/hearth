@@ -24,3 +24,27 @@ class AbsHttpException(val code: Int, val body: String) : AbsException("The podc
 class AbsAuthException(message: String) : AbsException(message)
 
 class TidarrException(message: String) : IOException(message)
+
+/** Something went wrong talking to a Sonos speaker on the network. */
+open class SonosException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+/**
+ * The speaker understood the request and refused it: UPnP answers a bad action with HTTP 500 and an
+ * error code in the body, so [errorCode] is what actually went wrong (714 means it didn't recognise the
+ * audio type, which is what you get when a stream URL is sent without any metadata describing it).
+ */
+class SonosUpnpException(val errorCode: Int, val description: String) :
+    SonosException(sonosFaultMessage(errorCode, description))
+
+/** Plain words for the UPnP error codes a speaker actually sends back. */
+private fun sonosFaultMessage(code: Int, description: String): String = when (code) {
+    402 -> "The speaker didn't understand that request (error 402)"
+    701 -> "The speaker can't do that just now (error 701)"
+    711 -> "The speaker wouldn't jump to that spot in the track (error 711)"
+    714 -> "The speaker didn't recognise that audio (error 714)"
+    718 -> "The speaker has nothing loaded to play (error 718)"
+    else -> {
+        val detail = description.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
+        "The speaker turned that down (error $code$detail)"
+    }
+}
