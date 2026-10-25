@@ -104,6 +104,12 @@ object SonosPlan {
      * Which song in the phone's queue the speaker has loaded, or -1 when it can't be told: we never gave it
      * a queue, it hasn't answered yet, or somebody started something else on it from the Sonos app.
      */
+    /** Which track of the speaker's queue holds the phone's [queueIndex], counting from 1; 0 if it isn't there. */
+    fun trackNumber(sent: SonosHandover?, queueIndex: Int): Int {
+        val at = sent?.queueIndexes?.indexOf(queueIndex) ?: -1
+        return if (at < 0) 0 else at + 1
+    }
+
     fun trackIndex(sent: SonosHandover?, trackUri: String?): Int {
         if (sent == null || trackUri.isNullOrBlank()) return -1
         val at = sent.tracks.indexOfFirst { it.url == trackUri }
@@ -157,6 +163,9 @@ internal interface RemoteTransport {
     fun next()
     fun previous()
     fun seekTo(ms: Long)
+
+    /** Play the song at [queueIndex] of the phone's queue; false when the speaker hasn't been sent it. */
+    fun skipTo(queueIndex: Int): Boolean
 
     /** The phone was told to play something new: whatever queue it ends up with belongs on the speaker. */
     fun requeue(was: QueueShape)

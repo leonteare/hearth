@@ -53,7 +53,7 @@ class SonosSessionTest {
     )
 
     @Test
-    fun `the queue is emptied, filled in order, started and seeked to where the phone was`() = runTest {
+    fun `the song you were on starts first and the rest of the queue follows it`() = runTest {
         repeat(6) { ok() }
 
         session.handOver(SonosPlan.handover(listOf(track(1), track(2)), currentIndex = 0, positionMs = 65_000))
@@ -64,14 +64,16 @@ class SonosSessionTest {
         assertTrue(enqueued(firstBody).endsWith("id=1&u=leon&t=abc"))
         // The metadata rides along with it, or the speaker answers 714 instead of playing.
         assertTrue(metadata(firstBody).contains("<dc:title>Song 1</dc:title>"))
-        val (secondAction, secondBody) = next()
-        assertEquals("AddURIToQueue", secondAction)
-        assertTrue(enqueued(secondBody).endsWith("id=2&u=leon&t=abc"))
+        // Playing starts before the rest of the queue is sent: a song is its own request, so sending two
+        // hundred of them first left nineteen seconds of silence after the tap.
         val (startAction, startBody) = next()
         assertEquals("SetAVTransportURI", startAction)
         assertEquals("x-rincon-queue:RINCON_1#0", SonosXml.unescape(SonosXml.tagText(startBody, "CurrentURI")!!))
         assertEquals("Play", next().first)
         assertEquals("0:01:05", SonosXml.tagText(next().second, "Target"))
+        val (restAction, restBody) = next()
+        assertEquals("AddURIToQueue", restAction)
+        assertTrue(enqueued(restBody).endsWith("id=2&u=leon&t=abc"))
     }
 
     @Test

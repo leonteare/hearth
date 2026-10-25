@@ -11,12 +11,14 @@ import im.flume.hearth.core.network.SonosSpeaker
 import im.flume.hearth.core.network.SonosTransportState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -118,8 +120,9 @@ class SonosOutput(
     private suspend fun handOver(chosen: AudioOutput.Sonos) {
         val base = session.settings.value.sonosBaseUrl
         val state = player.state.value
-        // The phone's own position, not the one a speaker may have been reporting a moment ago.
-        val from = player.localPositionMs
+        // The phone's own position, not the one a speaker may have been reporting a moment ago. Media3's
+        // controller may only be touched from the main thread, and this runs on the app scope.
+        val from = withContext(Dispatchers.Main) { player.localPositionMs }
         val plan = SonosPlan.handover(
             state.queue.map { it.item.toSonosTrack(base, session.credentials.value, absToken()) },
             state.currentIndex,
@@ -307,6 +310,14 @@ class SonosOutput(
 
     override fun previous() = command(SonosTransportState.TRANSITIONING) { it.previous() }
 
+    override fun skipTo(queueIndex: Int): Boolean {
+        val number = SonosPlan.trackNumber(sent, queueIndex)
+        // The speaker only has the songs from where the hand-over started; anything else stays the phone's job.
+        if (number <= 0) return false
+        command(SonosTransportState.TRANSITIONING) { it.playTrack(number) }
+        return true
+    }
+
     override fun seekTo(ms: Long) {
         val to = ms.coerceAtLeast(0)
         // Show the new place at once; the speaker's next answer confirms or corrects it.
@@ -316,7 +327,10 @@ class SonosOutput(
         command(null) { it.seekTo(to) }
     }
 
-    /** The speaker's own volume, 0..100 (the phone's volume buttons don't reach it). */
+    /** The speaker's volume as last seen, or -1 when the sound is on this phone or it hasn't answered yet. */
+    fun volumeNow(): Int = if (_output.value is AudioOutput.Sonos) volume else -1
+
+    /** The speaker's own volume, 0..100. */
     fun setVolume(level: Int) {
         volume = level.coerceIn(0, 100)
         publish()

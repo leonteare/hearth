@@ -96,7 +96,10 @@ class PlayerConnection(private val context: Context) {
 
     val positionMs: Long get() = speaking()?.positionMs ?: localPositionMs
 
-    /** Where this phone's own player is, whatever a speaker might be doing. */
+    /**
+     * Where this phone's own player is, whatever a speaker might be doing. **Main thread only**: unlike
+     * [withController] this reads the controller directly, and Media3 throws from any other thread.
+     */
     internal val localPositionMs: Long get() = controller?.currentPosition ?: 0
 
     /** The speaker holding the sound, or null when that is this phone. */
@@ -232,7 +235,11 @@ class PlayerConnection(private val context: Context) {
     /** Swipe right: this entry plays straight after the current song, as a hand-queued song. */
     fun moveToNext(e: QueueEntry) = send(PlaybackService.CMD_MOVE_NEXT, entryArgs(e))
 
-    fun skipTo(e: QueueEntry) = send(PlaybackService.CMD_SKIP_TO, entryArgs(e))
+    /** Tapping a song in the queue: the speaker plays it when it has it, otherwise this phone does. */
+    fun skipTo(e: QueueEntry) {
+        if (speaking()?.skipTo(e.index) == true) return
+        send(PlaybackService.CMD_SKIP_TO, entryArgs(e))
+    }
 
     fun remove(e: QueueEntry) = send(PlaybackService.CMD_REMOVE, entryArgs(e))
 

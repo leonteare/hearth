@@ -96,6 +96,12 @@ class SonosClient(http: OkHttpClient, host: String) {
     }
 
     /** Empties the speaker's queue. */
+    /** Plays track [number] of the speaker's queue, counting from 1, the way its own app's queue does. */
+    suspend fun playTrack(number: Int) {
+        transport("Seek", "Unit" to "TRACK_NR", "Target" to number.coerceAtLeast(1).toString())
+        play()
+    }
+
     suspend fun clearQueue() {
         transport("RemoveAllTracksFromQueue")
     }
