@@ -31,10 +31,22 @@ import androidx.compose.ui.platform.LocalDensity
 import im.flume.hearth.core.playback.container
 import im.flume.hearth.domain.music.Usage
 import im.flume.hearth.core.playback.PlayerUiState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import im.flume.hearth.core.network.SonosSpeaker
+import im.flume.hearth.core.playback.AudioOutput
+import im.flume.hearth.core.ui.components.PlaybackOutputUi
+import im.flume.hearth.core.ui.components.SpeakerSheet
 import im.flume.hearth.feature.player.NowPlayingScreen
 import im.flume.hearth.feature.player.QueueScreen
 import im.flume.hearth.feature.visualiser.VisualiserScreen
 import im.flume.hearth.core.ui.theme.HearthTheme
+
+/** The "This phone" row's id in the speaker sheet; a real speaker's id is its Sonos uuid. */
+private const val PHONE_OUTPUT = "phone"
 
 /**
  * Now Playing slides up over the pages; the queue and the visualiser open above it. The open flags stay
@@ -52,6 +64,10 @@ internal fun PlayerOverlays(
 ) {
     val c = LocalContext.current.container
     val ease = FastOutSlowInEasing
+    var speakersOpen by remember { mutableStateOf(false) }
+    val speakers by c.sonos.speakers.collectAsStateWithLifecycle()
+    val searching by c.sonos.searching.collectAsStateWithLifecycle()
+    val output = playerState.output
 
     AnimatedVisibility(
         visible = nowPlayingOpen && playerState.current != null,
@@ -64,8 +80,38 @@ internal fun PlayerOverlays(
             onClose = onCloseNowPlaying,
             onOpenQueue = { c.usage.track(Usage.QUEUE); onQueueOpen(true) },
             onOpenVisualiser = { c.usage.track(Usage.VISUALISER); onVisualiserOpen(true) },
+            speakerName = output.roomName,
+            onOpenSpeakers = {
+                speakersOpen = true
+                c.sonos.findSpeakers()
+            },
         )
     }
+
+    SpeakerSheet(
+        open = speakersOpen,
+        outputs = buildList {
+            add(PlaybackOutputUi(PHONE_OUTPUT, "This phone", isPhone = true, isActive = output is AudioOutput.Phone))
+            speakers.forEach { speaker: SonosSpeaker ->
+                add(
+                    PlaybackOutputUi(
+                        id = speaker.uuid,
+                        name = speaker.roomName,
+                        isActive = (output as? AudioOutput.Sonos)?.uuid == speaker.uuid,
+                    )
+                )
+            }
+        },
+        searching = searching,
+        volume = playerState.outputVolume.takeIf { it >= 0 && output !is AudioOutput.Phone },
+        onVolume = c.sonos::setVolume,
+        onChoose = { id ->
+            if (id == PHONE_OUTPUT) c.sonos.backToPhone()
+            else speakers.firstOrNull { it.uuid == id }?.let(c.sonos::chooseSpeaker)
+        },
+        onRefresh = c.sonos::findSpeakers,
+        onDismiss = { speakersOpen = false },
+    )
 
     AnimatedVisibility(
         visible = queueOpen && nowPlayingOpen && playerState.current != null,
