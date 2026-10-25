@@ -1,3 +1,5 @@
+// The login and the app's settings, kept in private app storage: the Subsonic credentials, the encrypted
+// password vault, and the Settings every screen reads.
 package im.flume.hearth.core.data
 
 import android.content.Context
@@ -40,12 +42,26 @@ data class Settings(
      * server, and Settings behind a PIN. Never on in the regular app.
      */
     val kidsMode: Boolean = false,
+    /**
+     * The Sonos speaker the sound is being sent to: its own identifier, the room it's in, and the address
+     * its control calls go to. Blank means this phone, which is the normal case.
+     */
+    val sonosUuid: String = "",
+    val sonosRoom: String = "",
+    val sonosHost: String = "",
+    /**
+     * Where a speaker fetches audio from. A speaker cannot be taught to trust the home server's own
+     * certificate authority, so the homelab serves this plain-HTTP host on the LAN instead: Navidrome at
+     * the root, Audiobookshelf under `/abs`.
+     */
+    val sonosBaseUrl: String = DEFAULT_SONOS_URL,
 ) {
     /** Music not on the server is shown when switched on, Tidarr has an address, and this isn't a kids' phone. */
     val tidalSearchEnabled: Boolean get() = tidalInSearch && tidarrUrl.isNotBlank() && !kidsMode
 
     companion object {
         const val DEFAULT_TIDARR_URL = "https://tidal.home"
+        const val DEFAULT_SONOS_URL = "http://sonos.home"
     }
 }
 
@@ -162,6 +178,10 @@ class SessionStore(context: Context) {
         tidalInSearch = prefs.getBoolean("tidalInSearch", true),
         visualiserStyle = prefs.getString("visualiserStyle", "memory-card").orEmpty(),
         kidsMode = prefs.getBoolean("kidsMode", false),
+        sonosUuid = prefs.getString("sonosUuid", "").orEmpty(),
+        sonosRoom = prefs.getString("sonosRoom", "").orEmpty(),
+        sonosHost = prefs.getString("sonosHost", "").orEmpty(),
+        sonosBaseUrl = prefs.getString("sonosBaseUrl", Settings.DEFAULT_SONOS_URL).orEmpty(),
     )
 
     fun updateSettings(transform: (Settings) -> Settings) {
@@ -184,6 +204,10 @@ class SessionStore(context: Context) {
             putBoolean("tidalInSearch", s.tidalInSearch)
             putString("visualiserStyle", s.visualiserStyle)
             putBoolean("kidsMode", s.kidsMode)
+            putString("sonosUuid", s.sonosUuid)
+            putString("sonosRoom", s.sonosRoom)
+            putString("sonosHost", s.sonosHost)
+            putString("sonosBaseUrl", s.sonosBaseUrl)
         }
         _settings.value = s
     }

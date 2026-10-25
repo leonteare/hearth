@@ -27,6 +27,7 @@ import im.flume.hearth.domain.music.download.DownloadRepository
 import im.flume.hearth.core.playback.PlayerConnection
 import im.flume.hearth.core.playback.PreviewPlayer
 import im.flume.hearth.core.playback.QueueInfo
+import im.flume.hearth.core.playback.SonosOutput
 import im.flume.hearth.domain.requests.RequestsRepository
 import im.flume.hearth.domain.spoken.SpokenRepository
 import im.flume.hearth.domain.music.sync.LibrarySync
@@ -71,6 +72,8 @@ class TestContainer(private val context: Context) : AppContainer {
     override val player by lazy { PlayerConnection(context) }
     override val queueInfo = MutableStateFlow(QueueInfo())
     override val preview by lazy { PreviewPlayer(context, http, { requests.tidarr }, player, appScope) }
+    // No speaker chosen and nothing searched for, so screens render as a phone playing on its own.
+    override val sonos by lazy { SonosOutput(context, session, http, player, appScope) }
 
     @get:OptIn(UnstableApi::class)
     override val mediaCache: SimpleCache by lazy {

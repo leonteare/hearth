@@ -27,6 +27,7 @@ import im.flume.hearth.core.playback.CoverCacheKeys
 import im.flume.hearth.core.playback.PlayerConnection
 import im.flume.hearth.core.playback.PreviewPlayer
 import im.flume.hearth.core.playback.QueueInfo
+import im.flume.hearth.core.playback.SonosOutput
 import im.flume.hearth.domain.requests.RequestsRepository
 import im.flume.hearth.domain.spoken.SpokenRepository
 import im.flume.hearth.domain.music.sync.LibrarySync
@@ -127,6 +128,9 @@ class HearthContainer(context: Context) : AppContainer {
     override val requests = RequestsRepository(context, db, session, api, library, downloads, sync, http, appScope)
     /** 30 second previews of music that isn't on the server; separate from the main player. */
     override val preview = PreviewPlayer(context, http, { requests.tidarr }, player, appScope)
+    /** Sonos: the chosen speaker, the queue handed to it, and this phone as its remote control. */
+    override val sonos =
+        SonosOutput(context, session, http, player, appScope, absToken = { spoken.store.tokens()?.accessToken })
 
     /** A page to open, e.g. from a notification tap; AppRoot navigates there and clears it. */
     override val pendingRoute = MutableStateFlow<String?>(null)

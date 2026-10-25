@@ -66,10 +66,12 @@ class PreviewPlayer(
     init {
         // Starting the main player (a song tapped, headphones' play button) ends the preview.
         scope.launch(Dispatchers.Main) {
-            var wasPlaying = main.state.value.isPlaying
-            main.state.collect { s ->
-                if (s.isPlaying && !wasPlaying && _current.value != null) finish(resume = false)
-                wasPlaying = s.isPlaying
+            // `playing` rather than the whole state: this listener never stops, and collecting the state
+            // forever would keep a chosen Sonos speaker being asked what it's doing all day.
+            var wasPlaying = main.playing.value
+            main.playing.collect { isPlaying ->
+                if (isPlaying && !wasPlaying && _current.value != null) finish(resume = false)
+                wasPlaying = isPlaying
             }
         }
     }
