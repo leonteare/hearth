@@ -68,7 +68,16 @@ import im.flume.hearth.core.ui.screens.coverArt
 private const val NOW_PLAYING_COVER_SIZE = CoverSize.LARGE
 
 @Composable
-fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () -> Unit, onOpenVisualiser: () -> Unit) {
+fun NowPlayingScreen(
+    state: PlayerUiState,
+    onClose: () -> Unit,
+    onOpenQueue: () -> Unit,
+    onOpenVisualiser: () -> Unit,
+    /** The speaker the sound is coming out of, or null while it is playing on this phone. */
+    speakerName: String? = null,
+    /** Opens the speaker picker; null hides the button (see [PlayerControls]). */
+    onOpenSpeakers: (() -> Unit)? = null,
+) {
     state.spoken?.let { spoken ->
         if (state.current != null) SpokenNowPlayingScreen(state, spoken, onClose, onOpenQueue)
         return
@@ -139,12 +148,12 @@ fun NowPlayingScreen(state: PlayerUiState, onClose: () -> Unit, onOpenQueue: () 
                     artOrLyrics(Modifier.weight(1f).fillMaxHeight())
                     Spacer(Modifier.width(spacing.xxl))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
+                        PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser, speakerName, onOpenSpeakers)
                     }
                 }
             } else {
                 artOrLyrics(Modifier.weight(1f).fillMaxWidth().padding(vertical = spacing.l))
-                PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser)
+                PlayerControls(state, song, onClose, showLyrics, { showLyrics = !showLyrics }, onOpenQueue, onOpenVisualiser, speakerName, onOpenSpeakers)
                 Spacer(Modifier.height(spacing.s))
             }
         }

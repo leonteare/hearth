@@ -33,6 +33,8 @@ import im.flume.hearth.core.ui.components.BigPlayButton
 import im.flume.hearth.core.ui.components.LocalActions
 import im.flume.hearth.core.ui.components.PlayerSlider
 import im.flume.hearth.core.ui.components.PlayerTimes
+import im.flume.hearth.core.ui.components.PlayingOnLine
+import im.flume.hearth.core.ui.components.SpeakerButton
 import im.flume.hearth.core.ui.components.formatDuration
 import im.flume.hearth.core.ui.components.rememberSeekState
 import im.flume.hearth.core.ui.theme.HearthTheme
@@ -47,6 +49,10 @@ internal fun PlayerControls(
     onToggleLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenVisualiser: () -> Unit,
+    /** The speaker the sound is coming out of, or null while it is playing on this phone. */
+    speakerName: String? = null,
+    /** Opens the speaker picker. Null until a build knows how to reach other speakers: no button then. */
+    onOpenSpeakers: (() -> Unit)? = null,
 ) {
     val actions = LocalActions.current
     val accent = MaterialTheme.colorScheme.primary
@@ -87,6 +93,8 @@ internal fun PlayerControls(
         }
     }
 
+    PlayingOnLine(speakerName)
+
     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
 
     val duration = state.durationMs.coerceAtLeast(1)
@@ -122,11 +130,12 @@ internal fun PlayerControls(
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         val usage = LocalContext.current.container.usage
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { if (!showLyrics) usage.track(Usage.LYRICS); onToggleLyrics() }) {
                 Icon(if (showLyrics) icons.lyricsOn else icons.lyrics, if (showLyrics) "Hide lyrics" else "Show lyrics", tint = if (showLyrics) accent else colors.text)
             }
             IconButton(onClick = onOpenVisualiser) { Icon(icons.visualiser, "Visualiser") }
+            onOpenSpeakers?.let { SpeakerButton(speakerName, it) }
         }
         IconButton(onClick = onOpenQueue) { Icon(icons.queue, "Queue") }
     }
