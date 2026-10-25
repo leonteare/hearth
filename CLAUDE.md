@@ -62,8 +62,8 @@ manifest). Sources sit in `src/main/java/<package path>/`, tests mirrored in `sr
 | `:domain:requests` | Tidarr requests; `RequestsContainer` |
 | `:domain:update` | `Updater` (GitHub Releases; `UPDATE_REPO` in its BuildConfig); `UpdateContainer` |
 | `:core:domain` | Aggregator: `DomainContainer`, `SearchHits`, `LegacyWorkers` |
-| `:core:playback` | Media3 service and player, `AppContainer` + `Context.container`, visualiser audio tap |
-| `:core:ui` | `theme/` (`Tokens.kt`), `components/`, `screens/` (pieces two or more features share) |
+| `:core:playback` | Media3 service and player, `AppContainer` + `Context.container`, visualiser audio tap, the chosen output (phone or Sonos) and the queue hand-over |
+| `:core:ui` | `theme/` (`Tokens.kt`), `components/` (including the speaker picker), `screens/` (pieces two or more features share) |
 | `:core:testing` | Test-only: `Samples`, `HearthTestTheme`, `FakeActions`, `TestContainer`, `ScreenshotTest` |
 | `:feature:home` | Home, spoken home, stats |
 | `:feature:library` | Your Library, browse, album and artist pages, collections, playlists |
@@ -195,6 +195,11 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
   target; give a tight pair one shared target rather than one each.
 - A change the server refused used to be reverted on the phone, which looked like the app ignoring the tap. Keep the
   user's change and queue it (`LikeOutbox`); only drop it if the server actually rejects it.
+- `PreviewPlayer` collected the whole player state for ever, which would have kept a Sonos speaker polled
+  once a second with the phone in a pocket. Always-on listeners collect `PlayerConnection.playing`, never
+  `state`: that flow's subscriber count is what gates the polling.
+- A volume slider drawn with the stock Material slider looked nothing like the app's own seek bar; reuse
+  `PlayerSlider` for any thin bar.
 - A Sonos refuses a stream URL sent without DIDL-Lite metadata (UPnP 714). The metadata is escaped twice:
   once inside the DIDL document, once into the SOAP body. `SonosXml` keeps that pure and tested.
 - `userMessage` rewrites anything containing an HTTP status into "The server had a problem", so a typed

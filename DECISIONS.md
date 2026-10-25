@@ -94,3 +94,11 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **The whole queue goes to the speaker**, not one track at a time (`addToQueue` then `playQueue`). The
   speaker owns the queue, so skipping, gapless and carrying on all work with the phone locked, asleep or out
   of the house — which is the entire point of letting the speaker pull from the server.
+- **The chosen speaker lives in `Settings`** (SharedPreferences, no Room migration), so a restart stays
+  pointed at it and hands nothing over: the speaker is already playing.
+- **A speaker is only asked what it is doing while a player screen is watching.** `PlayerUiState`'s
+  subscriber count is the gate and collection is lifecycle-aware, so backgrounding the app stops the
+  polling; 1 s while playing, 5 s while stopped.
+- **A refusal is not silence.** A speaker that answers and refuses is shown to the user; one that cannot be
+  reached hands playback straight back to the phone, at once during a hand-over and after three missed
+  answers otherwise.
