@@ -4,6 +4,7 @@ import im.flume.hearth.core.common.EXTRA_ROUTE
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.util.Base64
 import android.graphics.Color as AndroidColor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -70,10 +71,16 @@ class MainActivity : ComponentActivity() {
 
     /** A notification asked to open a page (see [EXTRA_ROUTE]). */
     private fun takeRoute(intent: android.content.Intent?) {
-        // `adb shell am start -n im.flume.hearth/.ui.MainActivity --es kiosk_pin 2580` sets or replaces the kiosk PIN.
+        // Kiosk set-up over adb (ignored unless this phone is a kiosk):
+        //   am start -n im.flume.hearth/.ui.MainActivity --es kiosk_pin 2580          sets or replaces the PIN
+        //   am start -n im.flume.hearth/.ui.MainActivity --es kiosk_ca "$(base64 -w0 root.crt)"   trusts a home CA
         intent?.getStringExtra("kiosk_pin")?.let {
             intent.removeExtra("kiosk_pin")
             if (Kiosk.isOwner(this)) KioskAccess.setPin(this, it)
+        }
+        intent?.getStringExtra("kiosk_ca")?.let {
+            intent.removeExtra("kiosk_ca")
+            runCatching { Kiosk.installCa(this, String(Base64.decode(it, Base64.DEFAULT))) }
         }
         val route = intent?.getStringExtra(EXTRA_ROUTE) ?: return
         intent.removeExtra(EXTRA_ROUTE)

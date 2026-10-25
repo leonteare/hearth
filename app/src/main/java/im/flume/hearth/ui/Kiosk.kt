@@ -89,6 +89,16 @@ object Kiosk {
         if (am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_NONE) activity.startLockTask()
     }
 
+    /**
+     * Trusts a home server's own certificate authority ([pem], e.g. Caddy's local root), so https://music.home
+     * works without anyone tapping through Android's certificate installer. Only the owner may do this.
+     */
+    fun installCa(context: Context, pem: String): Boolean {
+        if (!isOwner(context)) return false
+        val dpm = context.getSystemService(DevicePolicyManager::class.java)
+        return dpm.installCaCert(ComponentName(context, KioskAdminReceiver::class.java), pem.toByteArray())
+    }
+
     /** The family's saved logins on this phone. */
     fun profiles(context: Context): KioskProfileStore =
         profileStore ?: synchronized(this) {
