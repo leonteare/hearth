@@ -55,7 +55,7 @@ manifest). Sources sit in `src/main/java/<package path>/`, tests mirrored in `sr
 | Module | Holds |
 |---|---|
 | `:core:common` | Error logging, `scrubSecrets`/`userMessage`, API exceptions, `EXTRA_ROUTE` |
-| `:core:network` | Subsonic, Navidrome native, Audiobookshelf and Tidarr HTTP clients |
+| `:core:network` | Subsonic, Navidrome native, Audiobookshelf, Tidarr, and Sonos (SSDP discovery, UPnP control) |
 | `:core:data` | Room (the only KSP module), DAOs, schemas, `SessionStore`/`PasswordVault`, `SearchIndex`, the likes outbox |
 | `:domain:music` | Library, sync, downloads, playlists, mixes, lyrics, stats, queue planning, likes made offline; `MusicContainer` |
 | `:domain:spoken` | Podcasts, Audiobookshelf books and books on the phone; `SpokenContainer` |
@@ -195,6 +195,10 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
   target; give a tight pair one shared target rather than one each.
 - A change the server refused used to be reverted on the phone, which looked like the app ignoring the tap. Keep the
   user's change and queue it (`LikeOutbox`); only drop it if the server actually rejects it.
+- A Sonos refuses a stream URL sent without DIDL-Lite metadata (UPnP 714). The metadata is escaped twice:
+  once inside the DIDL document, once into the SOAP body. `SonosXml` keeps that pure and tested.
+- `userMessage` rewrites anything containing an HTTP status into "The server had a problem", so a typed
+  refusal has to word itself without one.
 - `docker compose up -d <service>` does not reload a changed config file that is only mounted into the
   container: it sees no change to the service and leaves it running. Caddy then answers an unknown host on
   port 80 with an empty `200`, which reads as success if only the status code is checked. Restart, and check

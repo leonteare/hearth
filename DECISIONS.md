@@ -91,3 +91,6 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
 - **A Sonos needs DIDL-Lite metadata with every URI.** `SetAVTransportURI` with empty metadata is refused
   with UPnP error 714, because a Subsonic stream URL ends in `.view` and says nothing about its type. The
   metadata declares `audio/mpeg` (music, `format=mp3`) or `audio/mp4` (m4b audiobooks).
+- **The whole queue goes to the speaker**, not one track at a time (`addToQueue` then `playQueue`). The
+  speaker owns the queue, so skipping, gapless and carrying on all work with the phone locked, asleep or out
+  of the house — which is the entire point of letting the speaker pull from the server.
