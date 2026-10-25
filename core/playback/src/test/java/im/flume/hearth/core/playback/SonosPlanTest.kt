@@ -193,4 +193,15 @@ class SonosPlanTest {
         assertEquals("songs before the hand-over never went", 0, SonosPlan.trackNumber(sent, 0))
         assertEquals(0, SonosPlan.trackNumber(null, 1))
     }
+
+    @Test
+    fun `a track is recognised by its song id, not the whole URL`() {
+        val sent = SonosPlan.handover(listOf(track(1), track(2)), currentIndex = 0, positionMs = 0)
+        // The same song, asked for slightly differently: a speaker reporting this is still playing ours.
+        val sameSongOtherParams = "http://sonos.home/rest/stream.view?u=leon&id=1&format=mp3&extra=1"
+
+        assertFalse(SonosPlan.takenBySomeoneElse(sent, sameSongOtherParams, playing = true))
+        assertEquals(0, SonosPlan.trackIndex(sent, sameSongOtherParams))
+        assertTrue(SonosPlan.takenBySomeoneElse(sent, "http://sonos.home/rest/stream.view?id=someone-else", playing = true))
+    }
 }

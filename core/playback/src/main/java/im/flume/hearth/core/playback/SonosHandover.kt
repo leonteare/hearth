@@ -112,8 +112,17 @@ object SonosPlan {
      */
     fun takenBySomeoneElse(sent: SonosHandover?, trackUri: String?, playing: Boolean): Boolean {
         if (!playing || sent == null || trackUri.isNullOrBlank()) return false
-        return sent.tracks.none { it.url == trackUri }
+        val key = trackKey(trackUri)
+        return sent.tracks.none { trackKey(it.url) == key }
     }
+
+    /**
+     * What names a track whatever the speaker does to the URL around it: the song id it carries. Matching
+     * whole URLs was too brittle - one extra parameter and a phone decided a stranger had taken the
+     * speaker and quietly let go of it mid-queue.
+     */
+    fun trackKey(url: String): String =
+        url.substringAfter("id=", "").substringBefore('&').ifEmpty { url }
 
     /** Which track of the speaker's queue holds the phone's [queueIndex], counting from 1; 0 if it isn't there. */
     fun trackNumber(sent: SonosHandover?, queueIndex: Int): Int {
@@ -123,7 +132,8 @@ object SonosPlan {
 
     fun trackIndex(sent: SonosHandover?, trackUri: String?): Int {
         if (sent == null || trackUri.isNullOrBlank()) return -1
-        val at = sent.tracks.indexOfFirst { it.url == trackUri }
+        val key = trackKey(trackUri)
+        val at = sent.tracks.indexOfFirst { trackKey(it.url) == key }
         return if (at < 0 || at > sent.queueIndexes.lastIndex) -1 else sent.queueIndexes[at]
     }
 }

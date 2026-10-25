@@ -67,14 +67,27 @@ class SonosOutput(
     @Volatile private var look: SonosLook = noLook
     @Volatile private var lookAt: Long = 0
     private var volume: Int = -1
+
+    /** Consecutive answers naming a song this phone never sent; see [onLook]. */
+    private var strangers = 0
     private var failures = 0
+
+    /** Asks the speaker what it is doing while a player screen is watching. */
+    private val watch = SonosWatch(
+        scope = scope,
+        output = _output,
+        observers = player.observers,
+        look = { speaker, withVolume -> sessionFor(speaker).look(withVolume) },
+        onSeen = ::onLook,
+        onFailed = { e -> lock.withLock { fail(e, handingOver = false) } },
+    )
 
     init {
         // The phone is this speaker's remote from now on; `active` decides where a command goes.
         player.remote = this
         // A restart with a speaker still chosen hands nothing over: the speaker is already playing and the
         // phone simply picks the remote control back up.
-        scope.launch { watchWhileWatched() }
+        watch.start()
     }
 
     // ------------------------------------------------------------------ choosing where the sound goes
@@ -223,44 +236,12 @@ class SonosOutput(
 
     // ------------------------------------------------------------------ asking the speaker
 
-    /**
-     * Asks the speaker what it's doing, but only while a speaker holds the sound and a player screen is
-     * collecting the state. Nothing watching means nothing to show, and a phone in a pocket must not be
-     * woken once a second to find out.
-     */
-    private suspend fun watchWhileWatched() {
-        combine(_output, player.observers) { out, watchers -> out to watchers }
-            .collectLatest { (out, watchers) ->
-                val speaker = out as? AudioOutput.Sonos
-                if (speaker == null || !SonosPolling.shouldPoll(out, watchers)) return@collectLatest
-                watch(speaker)
-            }
-    }
-
-    private suspend fun watch(speaker: AudioOutput.Sonos) {
-        var round = 0
-        var state = SonosTransportState.UNKNOWN
-        while (true) {
-            state = try {
-                val seen = sessionFor(speaker).look(SonosPolling.volumeDue(round))
-                onLook(seen)
-                seen.state
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                lock.withLock { fail(e, handingOver = false) }
-                SonosTransportState.UNKNOWN
-            }
-            round++
-            // A stopped speaker is asked far less often: it has nothing to say until somebody acts.
-            delay(SonosPolling.delayMs(state))
-        }
-    }
-
     private fun onLook(seen: SonosLook) {
         failures = 0
         val playing = seen.state == SonosTransportState.PLAYING || seen.state == SonosTransportState.TRANSITIONING
         if (SonosPlan.takenBySomeoneElse(sent, seen.position.trackUri, playing)) {
+            // Twice running before letting go: one odd answer from a speaker is not someone taking it.
+            if (++strangers < STRANGERS_BEFORE_LETTING_GO) return
             // Someone else's Hearth handed it their own queue: let go quietly and leave it playing for them.
             val room = (_output.value as? AudioOutput.Sonos)?.room
             scope.launch {
@@ -271,6 +252,7 @@ class SonosOutput(
             }
             return
         }
+        strangers = 0
         look = seen
         lookAt = now()
         if (seen.volume >= 0) volume = seen.volume
@@ -398,3 +380,6 @@ class SonosOutput(
         const val QUEUE_WAIT_MS = 50L
     }
 }
+
+/** How many answers in a row must name a stranger's song before this phone gives the speaker up. */
+private const val STRANGERS_BEFORE_LETTING_GO = 2
