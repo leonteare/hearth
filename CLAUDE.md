@@ -195,5 +195,9 @@ Each module's own `README.md` (e.g. `feature/library/README.md`) lists its files
   target; give a tight pair one shared target rather than one each.
 - A change the server refused used to be reverted on the phone, which looked like the app ignoring the tap. Keep the
   user's change and queue it (`LikeOutbox`); only drop it if the server actually rejects it.
+- `docker compose up -d <service>` does not reload a changed config file that is only mounted into the
+  container: it sees no change to the service and leaves it running. Caddy then answers an unknown host on
+  port 80 with an empty `200`, which reads as success if only the status code is checked. Restart, and check
+  a response body.
 - Linux draws text a shade differently from Windows, so CI saw a handful of changed pixels in screenshots that are
   identical to the eye; `ScreenshotTest`'s `OPTIONS` now allows a hundredth of a percent of pixels to differ.

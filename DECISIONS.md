@@ -82,3 +82,12 @@ Settled choices, so agents don't re-derive or undo them. Add a line when you set
   curate: any public playlist whose comment holds `[hearth-not-for-kids]` (`KidsFilter`; the homelab made one called
   "Not for kids") is a block list, and in kids mode its songs never enter the index. Adding a song from a parent's
   phone is the whole workflow; the kiosk re-syncs when the list changes.
+- **Sonos speakers pull from the server, not from the phone** (2.28). A speaker cannot be told to trust the
+  homelab's own certificate authority the way a kiosk phone can, and Navidrome publishes no LAN port, so the
+  homelab serves `http://sonos.home` (plain HTTP, LAN only): Navidrome at the root, Audiobookshelf under
+  `/abs`. Hearth hands the speaker URLs on that host and acts as a remote control, so music carries on when
+  the phone locks or leaves the house. The cost, accepted deliberately: the Subsonic token rides in those
+  URLs unencrypted across the home network, and the speaker's queue holds them.
+- **A Sonos needs DIDL-Lite metadata with every URI.** `SetAVTransportURI` with empty metadata is refused
+  with UPnP error 714, because a Subsonic stream URL ends in `.view` and says nothing about its type. The
+  metadata declares `audio/mpeg` (music, `format=mp3`) or `audio/mp4` (m4b audiobooks).
