@@ -127,7 +127,8 @@ private fun SquareCard(color: Color, onClick: () -> Unit, content: @Composable (
     Column(
         Modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            // A touch taller than square: the avatar and three lines of text need the room.
+            .aspectRatio(0.82f)
             .clip(HearthTheme.shapes.card)
             .background(color)
             .clickable(onClick = onClick)
