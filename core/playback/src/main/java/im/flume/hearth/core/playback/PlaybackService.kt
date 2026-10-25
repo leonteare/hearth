@@ -35,7 +35,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * player holds. This file is the lifecycle and wiring; the behaviour lives in extensions and helpers
  * beside it: [buildPlayer] (PlayerSetup.kt), QueueEdits.kt, SpokenMode.kt, StreamCaching.kt,
  * QueuePersistence.kt, PlaybackRecovery.kt, SleepTimer.kt, VolumeLevelling.kt, SessionExtras.kt,
- * [SessionCallback], [PlayerListener], [SpokenAwarePlayer] and [RemoteVolumePlayer].
+ * [SessionCallback], [PlayerListener], [SpokenAwarePlayer] and [OutputAwarePlayer].
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
@@ -100,7 +100,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, c.mainActivity).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, RemoteVolumePlayer(this, SpokenAwarePlayer(this, player)))
+        session = MediaSession.Builder(this, OutputAwarePlayer(this, SpokenAwarePlayer(this, player)))
             .setCallback(SessionCallback(this))
             .setSessionActivity(openApp)
             // Artwork URIs are token-free hearth-cover:// / abs-cover:// links; this resolves them in the app.
@@ -178,11 +178,17 @@ class PlaybackService : MediaSessionService() {
         const val CMD_MOVE_AFTER = "hearth.MOVE_AFTER"
         const val CMD_RESTORE = "hearth.RESTORE"
         const val CMD_REMOVE_QUEUED = "hearth.REMOVE_QUEUED"
+        /**
+         * Stops this phone's own player as a speaker takes over. It goes straight to the player rather
+         * than through the session, whose play and pause belong to the speaker from that moment on.
+         */
+        const val CMD_STOP_LOCAL = "hearth.STOP_LOCAL"
         /** Only this app's own controllers may send these. */
         internal val CUSTOM_COMMANDS = listOf(
             CMD_PLAY_SOURCE, CMD_PLAY_NEXT, CMD_ADD_TO_QUEUE, CMD_TOGGLE_SHUFFLE, CMD_LIKE, CMD_MOVE_NEXT, CMD_SLEEP,
             CMD_SKIP_TO, CMD_REMOVE, CMD_MOVE_AFTER, CMD_RESTORE, CMD_REMOVE_QUEUED,
             CMD_PLAY_SPOKEN, CMD_SKIP_BACK, CMD_SKIP_FORWARD, CMD_SEEK_SPOKEN, CMD_SET_SPEED, CMD_BACK_TO_MUSIC,
+            CMD_STOP_LOCAL,
         )
         const val ARG_ITEM_ID = "absItemId"
         const val ARG_EPISODE_ID = "absEpisodeId"

@@ -47,6 +47,7 @@ import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SKIP_BACK
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SKIP_FORWARD
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SKIP_TO
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_SLEEP
+import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_STOP_LOCAL
 import im.flume.hearth.core.playback.PlaybackService.Companion.CMD_TOGGLE_SHUFFLE
 import im.flume.hearth.core.playback.PlaybackService.Companion.CUSTOM_COMMANDS
 import im.flume.hearth.core.playback.PlaybackService.Companion.SKIP_BACK_SEC
@@ -126,6 +127,9 @@ internal class SessionCallback(private val service: PlaybackService) : MediaSess
                 CMD_SEEK_SPOKEN -> seekSpokenTo(args.getLong(ARG_POSITION_MS) / 1000.0)
                 CMD_SET_SPEED -> setSpeed(args.getFloat(ARG_SPEED, 1f))
                 CMD_BACK_TO_MUSIC -> scope.launch { backToMusic() }
+                // The phone going quiet as a speaker takes the queue: the session's own pause would go
+                // to the speaker instead, so this one is aimed at the player itself.
+                CMD_STOP_LOCAL -> { player.pause(); player.stop() }
                 else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))

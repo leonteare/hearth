@@ -81,7 +81,7 @@ class PlayerConnection(private val context: Context) {
 
     /**
      * The same thing as a flow, for listeners that must not count as one of the [observers] - the media session's
-     * volume (see [RemoteVolumePlayer]), which has to follow the speaker with no screen on show at all.
+     * volume and state (see [OutputAwarePlayer]), which follow the speaker with no screen on show at all.
      */
     internal val outputNow: StateFlow<RemoteOutput?> = remoteNow.asStateFlow()
 
@@ -359,12 +359,10 @@ class PlayerConnection(private val context: Context) {
 
     /**
      * Hands the sound to a speaker: this phone stops and lets go of the audio focus, so nothing here
-     * claims to be playing, but the queue stays put ready for [resumeAt].
+     * claims to be playing, but the queue stays put ready for [resumeAt]. It is aimed at this phone's own
+     * player: a pause sent through the session would land on the speaker, just as the speaker takes over.
      */
-    internal fun stopKeepingQueue() = withController {
-        it.pause()
-        it.stop()
-    }
+    internal fun stopKeepingQueue() = send(PlaybackService.CMD_STOP_LOCAL, Bundle.EMPTY)
 
     /** Takes the sound back: carries on from [index] in the queue, [positionMs] into that song. */
     internal fun resumeAt(index: Int, positionMs: Long) = withController {
