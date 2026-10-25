@@ -171,6 +171,15 @@ while read -r name; do
     [ -n "${kt_names[$base]:-}" ] || fail "CLAUDE.md: mentions \`$name\`, which is not in the repo any more"
 done < <(grep -oE '`[^`]+\.kt`' CLAUDE.md | tr -d '`' | sort -u)
 
+# AGENTS.md points at CLAUDE.md. A copy of the rules drifted within days of being made, so it stays a pointer.
+if [ -f AGENTS.md ]; then
+    lines=$(wc -l < AGENTS.md)
+    if [ "$lines" -gt 20 ]; then
+        fail "AGENTS.md: $lines lines, so it is a copy of the rules again, not a pointer to CLAUDE.md"
+    fi
+    grep -q "CLAUDE.md" AGENTS.md || fail "AGENTS.md: does not point at CLAUDE.md"
+fi
+
 # Every module explains itself, so an agent can read one README instead of the whole map.
 for m in $modules; do
     dir=${m#:}
