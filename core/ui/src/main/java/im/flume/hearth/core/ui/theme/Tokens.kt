@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -216,6 +217,8 @@ data class HearthSpacing(
     val seekThumbDragging: Dp = 16.dp,
     /** Height of the seek bar's invisible touch area, so a thin bar is still easy to grab. */
     val seekTouch: Dp = 32.dp,
+    /** The smallest comfortable tap target. A tight icon-and-label pair shares one of these, not one each. */
+    val touchTarget: Dp = 48.dp,
 )
 
 /** Corner shapes by role; defaults are [HearthShapes]. */
@@ -337,6 +340,9 @@ data class HearthIcons(
 
     // Kiosk phones: the "Who's listening" tab
     val profiles: ImageVector = Icons.Filled.Face,
+
+    // Where the sound comes out: the speaker picker, and the player's button that opens it
+    val speaker: ImageVector = Icons.Filled.Speaker,
 )
 
 val LocalHearthColors = staticCompositionLocalOf { HearthColors() }

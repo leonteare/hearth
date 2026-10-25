@@ -43,6 +43,17 @@ class PlayerScreenshots : ScreenshotTest() {
     }
 
     @Test
+    fun `the music player controls while a speaker is playing`() = snap("player_controls_speaker") {
+        Column(Modifier.padding(horizontal = HearthTheme.spacing.gutter)) {
+            PlayerControls(
+                state, songs[1], onClose = {}, showLyrics = false,
+                onToggleLyrics = {}, onOpenQueue = {}, onOpenVisualiser = {},
+                speakerName = "Living Room", onOpenSpeakers = {},
+            )
+        }
+    }
+
+    @Test
     fun `the podcast player controls with speed and chapters`() {
         val spokenState = Samples.spokenPlayerState(speed = 1.25f)
         snap("spoken_controls") {
