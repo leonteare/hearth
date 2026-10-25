@@ -259,6 +259,18 @@ class SonosOutput(
 
     private fun onLook(seen: SonosLook) {
         failures = 0
+        val playing = seen.state == SonosTransportState.PLAYING || seen.state == SonosTransportState.TRANSITIONING
+        if (SonosPlan.takenBySomeoneElse(sent, seen.position.trackUri, playing)) {
+            // Someone else's Hearth handed it their own queue: let go quietly and leave it playing for them.
+            val room = (_output.value as? AudioOutput.Sonos)?.room
+            scope.launch {
+                lock.withLock {
+                    handBack(stopSpeaker = false)
+                    _error.value = room?.let { "$it is playing something else now" }
+                }
+            }
+            return
+        }
         look = seen
         lookAt = now()
         if (seen.volume >= 0) volume = seen.volume
@@ -270,18 +282,7 @@ class SonosOutput(
     private fun publish() {
         val out = _output.value
         if (out !is AudioOutput.Sonos) return
-        val playing = look.state == SonosTransportState.PLAYING || look.state == SonosTransportState.TRANSITIONING
-        player.onRemote(
-            RemoteOutput(
-                output = out,
-                isPlaying = playing,
-                queueIndex = SonosPlan.trackIndex(sent, look.position.trackUri),
-                positionMs = look.position.elapsedMs,
-                durationMs = look.position.durationMs,
-                volume = volume,
-                error = _error.value,
-            ),
-        )
+        player.onRemote(remoteOutputFrom(out, look, sent, volume, _error.value))
     }
 
     // ------------------------------------------------------------------ the remote control

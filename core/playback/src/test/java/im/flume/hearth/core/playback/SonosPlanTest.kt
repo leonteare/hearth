@@ -6,6 +6,7 @@ import im.flume.hearth.core.data.Settings
 import im.flume.hearth.core.network.SonosMime
 import im.flume.hearth.core.network.SonosPosition
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -170,5 +171,26 @@ class SonosPlanTest {
 
         assertSame(phone, phone.withRemote(null))
         assertSame(AudioOutput.Phone, phone.output)
+    }
+
+    @Test
+    fun `a speaker playing something this phone never sent it has been taken by someone else`() {
+        val sent = SonosPlan.handover(listOf(track(1), track(2)), currentIndex = 0, positionMs = 0)
+
+        assertTrue(SonosPlan.takenBySomeoneElse(sent, "http://sonos.home/rest/stream.view?id=99", playing = true))
+        assertFalse("one of ours is not a takeover", SonosPlan.takenBySomeoneElse(sent, sent.tracks[1].url, playing = true))
+        assertFalse("a stopped speaker says nothing", SonosPlan.takenBySomeoneElse(sent, "http://other", playing = false))
+        assertFalse("nothing sent yet, nothing to lose", SonosPlan.takenBySomeoneElse(null, "http://other", playing = true))
+        assertFalse("no answer is not a takeover", SonosPlan.takenBySomeoneElse(sent, "", playing = true))
+    }
+
+    @Test
+    fun `a queue index maps to the speaker's track number, counting from one`() {
+        val sent = SonosPlan.handover(listOf(track(1), track(2), track(3)), currentIndex = 1, positionMs = 0)
+
+        assertEquals("the song handed over first is track 1", 1, SonosPlan.trackNumber(sent, 1))
+        assertEquals(2, SonosPlan.trackNumber(sent, 2))
+        assertEquals("songs before the hand-over never went", 0, SonosPlan.trackNumber(sent, 0))
+        assertEquals(0, SonosPlan.trackNumber(null, 1))
     }
 }

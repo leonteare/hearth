@@ -5,6 +5,7 @@ package im.flume.hearth.core.playback
 import im.flume.hearth.core.data.Settings
 import im.flume.hearth.core.network.SonosPosition
 import im.flume.hearth.core.network.SonosXml
+import im.flume.hearth.core.network.SonosTransportState
 
 /** Where Hearth is sending sound. */
 sealed interface AudioOutput {
@@ -104,6 +105,16 @@ object SonosPlan {
      * Which song in the phone's queue the speaker has loaded, or -1 when it can't be told: we never gave it
      * a queue, it hasn't answered yet, or somebody started something else on it from the Sonos app.
      */
+    /**
+     * Whether the speaker is playing something this phone did not send it, which means somebody else has
+     * taken it: another phone hands a speaker its own queue, and the first phone has to let go rather than
+     * fight for it. An empty or unknown URI is not an answer, and neither is a stopped speaker.
+     */
+    fun takenBySomeoneElse(sent: SonosHandover?, trackUri: String?, playing: Boolean): Boolean {
+        if (!playing || sent == null || trackUri.isNullOrBlank()) return false
+        return sent.tracks.none { it.url == trackUri }
+    }
+
     /** Which track of the speaker's queue holds the phone's [queueIndex], counting from 1; 0 if it isn't there. */
     fun trackNumber(sent: SonosHandover?, queueIndex: Int): Int {
         val at = sent?.queueIndexes?.indexOf(queueIndex) ?: -1
@@ -153,6 +164,23 @@ fun PlayerUiState.withRemote(remote: RemoteOutput?): PlayerUiState {
  * The transport commands another box answers instead of this phone, so the player screens keep calling
  * [PlayerConnection] and don't need to know where the sound is. Implemented by [SonosOutput].
  */
+/** Builds the overlay from a speaker's last answer, so the screens draw what it is doing, not the phone. */
+internal fun remoteOutputFrom(
+    out: AudioOutput.Sonos,
+    look: SonosLook,
+    sent: SonosHandover?,
+    volume: Int,
+    error: String?,
+): RemoteOutput = RemoteOutput(
+    output = out,
+    isPlaying = look.state == SonosTransportState.PLAYING || look.state == SonosTransportState.TRANSITIONING,
+    queueIndex = SonosPlan.trackIndex(sent, look.position.trackUri),
+    positionMs = look.position.elapsedMs,
+    durationMs = look.position.durationMs,
+    volume = volume,
+    error = error,
+)
+
 internal interface RemoteTransport {
     /** False when the sound is on this phone, and every command then stays here. */
     val active: Boolean
